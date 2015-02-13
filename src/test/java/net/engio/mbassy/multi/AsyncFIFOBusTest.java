@@ -3,8 +3,6 @@ package net.engio.mbassy.multi;
 import java.util.LinkedList;
 import java.util.List;
 
-import net.engio.mbassy.multi.IMessageBus;
-import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.common.MessageBusTest;
 
@@ -20,7 +18,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     @Test
     public void testSingleThreadedSyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
-        IMessageBus fifoBUs = new MultiMBassador().start();
+        IMessageBus fifoBUs = new MultiMBassador();
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){
@@ -55,7 +53,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     @Test
     public void testSingleThreadedSyncAsyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
-        IMessageBus fifoBUs = new MultiMBassador(1).start();
+        IMessageBus fifoBUs = new MultiMBassador(1);
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){

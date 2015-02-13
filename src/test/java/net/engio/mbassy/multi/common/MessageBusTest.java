@@ -42,13 +42,13 @@ public abstract class MessageBusTest extends AssertSupport {
 
 
     public MultiMBassador createBus() {
-        MultiMBassador bus = new MultiMBassador().start();
+        MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(TestFailingHandler);
         return bus;
     }
 
     public MultiMBassador createBus(ListenerFactory listeners) {
-        MultiMBassador bus = new MultiMBassador().start();
+        MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(TestFailingHandler);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
         return bus;

@@ -2,8 +2,6 @@ package net.engio.mbassy.multi;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import net.engio.mbassy.multi.IMessageBus;
-import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.common.ConcurrentExecutor;
 import net.engio.mbassy.multi.common.ListenerFactory;
 import net.engio.mbassy.multi.common.MessageBusTest;
@@ -31,7 +29,7 @@ public class SyncBusTest extends MessageBusTest {
     @Test
     public void testSynchronousMessagePublication() throws Exception {
 
-        final IMessageBus bus = new MultiMBassador().start();
+        final IMessageBus bus = new MultiMBassador();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
@@ -84,7 +82,7 @@ public class SyncBusTest extends MessageBusTest {
             }
         };
 
-        final IMessageBus bus = new MultiMBassador().start();
+        final IMessageBus bus = new MultiMBassador();
         bus.addErrorHandler(ExceptionCounter);
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);

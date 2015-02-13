@@ -20,7 +20,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSending(){
-        IMessageBus bus = new MultiMBassador().start();
+        IMessageBus bus = new MultiMBassador();
 
         Listener listener1 = new Listener();
         bus.subscribe(listener1);

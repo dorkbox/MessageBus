@@ -1,20 +1,17 @@
 package net.engio.mbassy.multi;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 import net.engio.mbassy.multi.common.DisruptorThreadFactory;
 import net.engio.mbassy.multi.common.LinkedTransferQueue;
+import net.engio.mbassy.multi.common.Pow2;
 import net.engio.mbassy.multi.common.TransferQueue;
-import net.engio.mbassy.multi.disruptor.DeadMessage;
-import net.engio.mbassy.multi.disruptor.MessageHolder;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
-import net.engio.mbassy.multi.subscription.Subscription;
 import net.engio.mbassy.multi.subscription.SubscriptionManager;
-import dorkbox.util.objectPool.PoolableObject;
 
 /**
  * The base class for all message bus implementations with support for asynchronous message dispatch
@@ -25,60 +22,28 @@ import dorkbox.util.objectPool.PoolableObject;
  */
 public class MultiMBassador implements IMessageBus {
 
-//    private static final DisruptorThreadFactory THREAD_FACTORY = new DisruptorThreadFactory("MPMC");
-
     // error handling is first-class functionality
     // this handler will receive all errors that occur during message dispatch or message handling
     private final List<IPublicationErrorHandler> errorHandlers = new ArrayList<IPublicationErrorHandler>();
 
     private final SubscriptionManager subscriptionManager;
 
-
-    // any new thread will be 'NON-DAEMON', so that it will be forced to finish it's task before permitting the JVM to shut down
-//    private final ExecutorService dispatch_Executor;
-//    private final ExecutorService invoke_Executor;
-
-
 //    private final Queue<MessageHolder> dispatchQueue;
 //    private final BlockingQueue<MessageHolder> dispatchQueue;
     private final TransferQueue<Object> dispatchQueue;
     private final TransferQueue<Runnable> invokeQueue;
-//    private final SynchronousQueue<MessageHolder> dispatchQueue;
 
-//    private Queue<ObjectPoolHolder<MessageHolder>> mpmcArrayQueue;
 
     // all threads that are available for asynchronous message dispatching
     private List<Thread> threads;
 
-//    private dorkbox.util.objectPool.ObjectPool<MessageHolder> pool;
-
-
-    // must be power of 2. For very high performance the ring buffer, and its contents, should fit in L3 CPU cache for exchanging between threads.
-//    private final int dispatch_RingBufferSize = 4;
-//    private final int invoke_RingBufferSize = 2048;
-
-//    private final Disruptor<DispatchHolder> dispatch_Disruptor;
-//    private final RingBuffer<DispatchHolder> dispatch_RingBuffer;
-
-//    private final Disruptor<MessageHolder> invoke_Disruptor;
-//    private final RingBuffer<MessageHolder> invoke_RingBuffer;
-//    private final WorkerPool<MessageHolder> invoke_WorkerPool;
-
-
-
-    public static class HolderPoolable implements PoolableObject<MessageHolder> {
-        @Override
-        public MessageHolder create() {
-            return new MessageHolder();
-        }
-    }
-
     public MultiMBassador() {
-        this(Runtime.getRuntime().availableProcessors()*2);
+        this(Runtime.getRuntime().availableProcessors());
     }
 
 
-//    private long counter = 0L;
+    public static final int WORK_RUN_BLITZ = 50;
+    public static final int WORK_RUN_BLITZ_DIV2 = WORK_RUN_BLITZ/2;
 
     public MultiMBassador(int numberOfThreads) {
         if (numberOfThreads < 1) {
@@ -96,118 +61,18 @@ public class MultiMBassador implements IMessageBus {
 //        this.dispatchQueue = new SynchronousQueue<MessageHolder>();
 //        this.dispatchQueue = new LinkedBlockingQueue<MessageHolder>(Pow2.roundToPowerOfTwo(numberOfThreads));
 
-
-//        this.dispatch_Executor = new ThreadPoolExecutor(2, 4, 1L, TimeUnit.MINUTES,
-//                                                        new SynchronousQueue<Runnable>(),
-//                                                        new DisruptorThreadFactory("MB_Dispatch"));
-
-//        this.invoke_Executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads*2, 1L, TimeUnit.MINUTES,
-//                                                      new SynchronousQueue<Runnable>(),
-//                                                      new DisruptorThreadFactory("MB_Invoke"));
-
-
-
         this.subscriptionManager = new SubscriptionManager();
-//        this.mpmcArrayQueue = new MpmcArrayQueue<ObjectPoolHolder<MessageHolder>>(numberOfThreads*2);
-//        this.pool = ObjectPoolFactory.create(new HolderPoolable(), numberOfThreads*2);
-
 
 
         int dispatchSize = 2;
-//        int invokeSize = Pow2.roundToPowerOfTwo(numberOfThreads);
-        int invokeSize = numberOfThreads*2-dispatchSize;
+        int invokeSize = Pow2.roundToPowerOfTwo(numberOfThreads*2);
         this.threads = new ArrayList<Thread>(dispatchSize + invokeSize);
 
 
         DisruptorThreadFactory dispatchThreadFactory = new DisruptorThreadFactory("MB_Dispatch");
         for (int i = 0; i < dispatchSize; i++) {
             // each thread will run forever and process incoming message publication requests
-            Runnable runnable = new Runnable() {
-                @Override
-                public void run() {
-                    final MultiMBassador mbassador = MultiMBassador.this;
-                    SubscriptionManager manager = mbassador.subscriptionManager;
-                    final TransferQueue<Object> IN_queue = mbassador.dispatchQueue;
-                    final TransferQueue<Runnable> OUT_queue = mbassador.invokeQueue;
-
-                    Object message = null;
-                    while (true) {
-                        try {
-                            message = IN_queue.take();
-                            Class<?> messageClass = message.getClass();
-
-                            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-
-                            boolean empty = subscriptions.isEmpty();
-                            if (empty) {
-
-                                // Dead Event
-                                subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-
-                                DeadMessage deadMessage = new DeadMessage(message);
-                                message = deadMessage;
-                                empty = subscriptions.isEmpty();
-                            }
-
-                            if (!empty) {
-                                final Collection<Subscription> finalSubs = subscriptions;
-                                final Object finalMessage = message;
-                                Runnable e = new Runnable() {
-                                    @Override
-                                    public void run() {
-//                                                MultiMBassador mbassador = MultiMBassador.this;
-                                        Collection<Subscription> subs = finalSubs;
-                                        for (Subscription sub : subs) {
-//                                                    boolean handled = false;
-//                                                    if (sub.isVarArg()) {
-//                                                        // messageClass will NEVER be an array to begin with, since that will call the multi-arg method
-//                                                        if (vararg == null) {
-//                                                            // messy, but the ONLY way to do it.
-//                                                            vararg = (Object[]) Array.newInstance(messageClass, 1);
-//                                                            vararg[0] = message;
-//
-//                                                            Object[] newInstance =  new Object[1];
-//                                                            newInstance[0] = vararg;
-//                                                            vararg = newInstance;
-//                                                        }
-//                                                        handled = true;
-//                                                        sub.publishToSubscription(mbassador, vararg);
-//                                                    }
-//
-//                                                  if (!handled) {
-                                            sub.publishToSubscription(mbassador, finalMessage);
-//                                                  }
-                                        }
-                                    }
-                                };
-
-
-//                                counter = 5;
-//                                while (!OUT_queue.offer(e)) {
-//                                    if (counter > 3) {
-//                                        --counter;
-//                                        Thread.yield();
-//                                    } else if (counter > 0) {
-//                                        --counter;
-//                                        Thread.yield();
-////                                        LockSupport.parkNanos(1L);
-//                                    } else {
-                                        OUT_queue.transfer(e);
-//                                        break;
-//                                    }
-//                                }
-
-//                                OUT_queue.transfer(e);
-//                                OUT_queue.put(e);
-                            }
-                        } catch (InterruptedException e) {
-                            return;
-                        } catch (Throwable e) {
-                            mbassador.handlePublicationError(new PublicationError().setMessage("Error during publication of message").setCause(e).setPublishedObject(message));
-                        }
-                    }
-                }
-            };
+            Runnable runnable = new DispatchRunnable(this, this.subscriptionManager, this.dispatchQueue, this.invokeQueue);
 
             Thread runner = dispatchThreadFactory.newThread(runnable);
             this.threads.add(runner);
@@ -219,17 +84,36 @@ public class MultiMBassador implements IMessageBus {
         for (int i = 0; i < invokeSize; i++) {
             // each thread will run forever and process incoming message publication requests
             Runnable runnable = new Runnable() {
+                @SuppressWarnings("null")
                 @Override
                 public void run() {
                     final MultiMBassador mbassador = MultiMBassador.this;
                     final TransferQueue<Runnable> IN_queue = mbassador.invokeQueue;
 
                     try {
+                        Runnable runnable = null;
+                        int counter;
+
                         while (true) {
-                            IN_queue.take().run();
+                            runnable = null;
+                            counter = WORK_RUN_BLITZ;
+
+                            while ((runnable = IN_queue.poll()) == null) {
+                                if (counter > WORK_RUN_BLITZ_DIV2) {
+                                    --counter;
+                                    Thread.yield();
+                                } else if (counter > 0) {
+                                    --counter;
+                                    LockSupport.parkNanos(1L);
+                                } else {
+                                    runnable = IN_queue.take();
+                                    break;
+                                }
+                            }
+
+                            runnable.run();
                         }
                     } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
                         return;
                     }
                 }
@@ -239,141 +123,7 @@ public class MultiMBassador implements IMessageBus {
             this.threads.add(runner);
             runner.start();
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-////////////////////////////
-//        PublicationExceptionHandler loggingExceptionHandler = new PublicationExceptionHandler(this);
-//
-//        this.dispatch_Disruptor = new Disruptor<DispatchHolder>(new DispatchFactory(), this.dispatch_RingBufferSize, this.dispatch_Executor,
-//                                                                ProducerType.MULTI, new SleepingWaitStrategy());
-//        this.invoke_Disruptor = new Disruptor<MessageHolder>(new InvokeFactory(), this.invoke_RingBufferSize, this.invoke_Executor,
-//                                                             ProducerType.MULTI, new SleepingWaitStrategy());
-//
-//
-//        this.dispatch_RingBuffer = this.dispatch_Disruptor.getRingBuffer();
-//        this.invoke_RingBuffer = this.invoke_Disruptor.getRingBuffer();
-//
-//        // not too many handlers, so we don't contend the locks in the subscription manager
-//        EventHandler<DispatchHolder> dispatchHandlers[] = new DispatchProcessor[4];
-//        for (int i = 0; i < dispatchHandlers.length; i++) {
-//            dispatchHandlers[i] = new DispatchProcessor(this, i, dispatchHandlers.length, this.subscriptionManager, this.invokeQueue);
-//        }
-
-//        WorkHandler<MessageHolder> invokeHandlers[] = new InvokeProcessor[numberOfThreads];
-//        for (int i = 0; i < invokeHandlers.length; i++) {
-//            invokeHandlers[i] = new InvokeProcessor(this);
-//        }
-//
-//        this.dispatch_Disruptor.handleEventsWith(dispatchHandlers);
-//        this.invoke_WorkerPool = new WorkerPool<MessageHolder>(this.invoke_RingBuffer,
-//                                                               this.invoke_RingBuffer.newBarrier(),
-//                                                               loggingExceptionHandler,
-//                                                               invokeHandlers);
-//
-//        this.invoke_RingBuffer.addGatingSequences(this.invoke_WorkerPool.getWorkerSequences());
-/////////////////////////////////
-
-//
-//        this.runners = new ArrayList<InterruptRunnable>(numberOfThreads);
-//        for (int i = 0; i < numberOfThreads; i++) {
-//            // each thread will run forever and process incoming message publication requests
-//            InterruptRunnable runnable = new InterruptRunnable() {
-//                @Override
-//                public void run() {
-//                    final int DEFAULT_RETRIES = 200;
-//                    final MultiMBassador mbassador = MultiMBassador.this;
-//                    final Queue<ObjectPoolHolder<MessageHolder>> queue = mbassador.mpmcArrayQueue;
-//                    final ObjectPool<MessageHolder> pool2 = mbassador.pool;
-//
-//                    int counter = DEFAULT_RETRIES;
-//                    ObjectPoolHolder<MessageHolder> holder = null;
-//                    MessageHolder value;
-//
-//                    while (this.running) {
-//                        holder = queue.poll();
-//                        if (holder != null) {
-//                            // sends off to an executor
-//                            value = holder.getValue();
-//                            Collection<Subscription> subscriptions = value.subscriptionsHolder;
-//                            Object message = value.message1;
-//                            Class<? extends Object> messageClass = message.getClass();
-//
-//                            if (messageClass.equals(DeadMessage.class)) {
-//                                for (Subscription sub : subscriptions) {
-//                                    sub.publishToSubscription(mbassador, message);
-//                                }
-//                            } else {
-//                                Object[] vararg = null;
-//
-//                                for (Subscription sub : subscriptions) {
-//                                    boolean handled = false;
-//                                    if (sub.isVarArg()) {
-//                                        // messageClass will NEVER be an array to begin with, since that will call the multi-arg method
-//                                        if (vararg == null) {
-//                                            // messy, but the ONLY way to do it.
-//                                            vararg = (Object[]) Array.newInstance(messageClass, 1);
-//                                            vararg[0] = message;
-//
-//                                            Object[] newInstance =  new Object[1];
-//                                            newInstance[0] = vararg;
-//                                            vararg = newInstance;
-//                                        }
-//
-//                                        handled = true;
-//                                        sub.publishToSubscription(mbassador, vararg);
-//                                    }
-//
-//                                    if (!handled) {
-//                                        sub.publishToSubscription(mbassador, message);
-//                                    }
-//                                }
-//                            }
-//
-//                            pool2.release(holder);
-//                            counter = DEFAULT_RETRIES;
-//                        } else {
-//                            if (counter > 100) {
-//                                --counter;
-//                            } else if (counter > 0) {
-//                                --counter;
-//                                Thread.yield();
-//                            } else {
-//                                LockSupport.parkNanos(1L);
-//                                counter = DEFAULT_RETRIES;
-//                            }
-//                        }
-//
-////                            handlePublicationError(new PublicationError(t, "Error in asynchronous dispatch",holder));
-//                    }
-//                }
-//            };
-//            Thread runner = THREAD_FACTORY.newThread(runnable);
-//            this.runners.add(runnable);
-//            runner.start();
-//        }
     }
-
-    public final MultiMBassador start() {
-//        this.invoke_WorkerPool.start(this.invoke_Executor);
-//        this.invoke_Disruptor.start();
-//        this.dispatch_Disruptor.start();
-        return this;
-    }
-
 
     @Override
     public final void addErrorHandler(IPublicationErrorHandler handler) {

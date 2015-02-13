@@ -1,4 +1,4 @@
-package net.engio.mbassy.multi.disruptor;
+package net.engio.mbassy.multi.common;
 
 /**
  * The dead message event is published whenever no message

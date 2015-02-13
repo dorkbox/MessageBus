@@ -2,7 +2,6 @@ package net.engio.mbassy.multi;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.common.ConcurrentExecutor;
 import net.engio.mbassy.multi.common.ListenerFactory;
 import net.engio.mbassy.multi.common.MessageBusTest;
@@ -103,7 +102,7 @@ public class MBassadorTest extends MessageBusTest {
             }
         };
 
-        final MultiMBassador bus = new MultiMBassador().start();
+        final MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(ExceptionCounter);
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);
