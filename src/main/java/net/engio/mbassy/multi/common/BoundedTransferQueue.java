@@ -42,10 +42,20 @@ public final class BoundedTransferQueue<E> extends AbstractQueue<E> implements T
 
     @Override
     public boolean offer(E e) {
-        if(tryDecrementCapacity()) {
-            return this._queue.offer(e);
-        }
-        return false;
+//        if(tryDecrementCapacity()) {
+//            return this._queue.offer(e);
+//        }
+//        return false;
+
+        try {
+            if (tryDecrementCapacity()) {
+                this._queue.put(e);
+            } else {
+                this._queue.transfer(e);
+                this._remainingCapacity.decrementAndGet();
+            }
+        } catch (InterruptedException e2) {}
+        return true;
     }
 
     @Override
