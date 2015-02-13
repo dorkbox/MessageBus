@@ -34,11 +34,18 @@ public class Subscription {
     private final MessageHandler handlerMetadata;
 
     private final IHandlerInvocation invocation;
+//    protected final Collection<Object> listeners;
+//    protected final Map<WeakReference<Object>, Boolean> listeners;
+//    protected final Map<Object, Boolean> listeners;
     protected final IConcurrentSet<Object> listeners;
 
     Subscription(MessageHandler handler) {
 //        this.listeners = new WeakConcurrentSet<Object>();
         this.listeners = new StrongConcurrentSet<Object>();
+//        this.listeners = new ConcurrentHashMap<Object, Boolean>();
+//        this.listeners = new CopyOnWriteArrayList<Object>();
+//        this.listeners = new ConcurrentSkipListSet<Object>();
+//        this.listeners = new ConcurrentWeakHashMap<WeakReference<Object>, Boolean>();
         this.handlerMetadata = handler;
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
@@ -51,21 +58,10 @@ public class Subscription {
 
     /**
      * Check whether this subscription manages a message handler of the given message listener class
-     *
-     * @param listener
-     * @return
      */
+    // only in unit test
     public boolean belongsTo(Class<?> listener){
         return this.handlerMetadata.isFromListener(listener);
-    }
-
-    /**
-     * Check whether this subscriptions manages the given listener instance
-     * @param listener
-     * @return
-     */
-    public boolean contains(Object listener){
-        return this.listeners.contains(listener);
     }
 
     /** Check if this subscription permits sending objects as a VarArg (variable argument) */
@@ -105,19 +101,24 @@ public class Subscription {
         return this.handlerMetadata.handlesMessage(messageTypes);
     }
 
-    public Class<?>[] getHandledMessageTypes(){
+    public Class<?>[] getHandledMessageTypes() {
         return this.handlerMetadata.getHandledMessages();
     }
 
     public void subscribe(Object listener) {
+//        this.listeners.put(listener, Boolean.TRUE);
         this.listeners.add(listener);
     }
-
 
     /**
      * @return TRUE if the element was removed
      */
     public boolean unsubscribe(Object existingListener) {
+//        Boolean remove = this.listeners.remove(existingListener);
+//        if (remove != null) {
+//            return true;
+//        }
+//        return false;
         return this.listeners.remove(existingListener);
     }
 
@@ -125,15 +126,22 @@ public class Subscription {
         return this.listeners.isEmpty();
     }
 
+    // only used in unit-test
     public int size() {
         return this.listeners.size();
     }
 
+//    private AtomicLong counter = new AtomicLong();
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
-        if (this.listeners.size() > 0) {
-            Method handler = this.handlerMetadata.getHandler();
+//        Collection<Object> listeners = this.listeners.keySet();
+//        Collection<Object> listeners = this.listeners;
+        IConcurrentSet<Object> listeners = this.listeners;
 
-            for (Object listener : this.listeners) {
+        if (listeners.size() > 0) {
+            Method handler = this.handlerMetadata.getHandler();
+//            int count = 0;
+            for (Object listener : listeners) {
+//                count++;
                 try {
                     this.invocation.invoke(listener, handler, message);
                 } catch (IllegalAccessException e) {
@@ -171,14 +179,19 @@ public class Subscription {
                                                             .setPublishedObject(message));
                 }
             }
+//            this.counter.getAndAdd(count);
         }
     }
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
-        if (this.listeners.size() > 0) {
+//      Collection<Object> listeners = this.listeners.keySet();
+//      Collection<Object> listeners = this.listeners;
+        IConcurrentSet<Object> listeners = this.listeners;
+
+        if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
 
-            for (Object listener : this.listeners) {
+            for (Object listener : listeners) {
                 try {
                     this.invocation.invoke(listener, handler, message1, message2);
                 } catch (IllegalAccessException e) {
@@ -224,10 +237,14 @@ public class Subscription {
     }
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
-        if (this.listeners.size() > 0) {
+//      Collection<Object> listeners = this.listeners.keySet();
+//      Collection<Object> listeners = this.listeners;
+        IConcurrentSet<Object> listeners = this.listeners;
+
+        if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
 
-            for (Object listener : this.listeners) {
+            for (Object listener : listeners) {
                 try {
                     this.invocation.invoke(listener, handler, message1, message2, message3);
                 } catch (IllegalAccessException e) {
@@ -275,10 +292,14 @@ public class Subscription {
     }
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object... messages) {
-        if (this.listeners.size() > 0) {
+//      Collection<Object> listeners = this.listeners.keySet();
+//      Collection<Object> listeners = this.listeners;
+        IConcurrentSet<Object> listeners = this.listeners;
+
+        if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
 
-            for (Object listener : this.listeners) {
+            for (Object listener : listeners) {
                 try {
                     this.invocation.invoke(listener, handler, messages);
                 } catch (IllegalAccessException e) {

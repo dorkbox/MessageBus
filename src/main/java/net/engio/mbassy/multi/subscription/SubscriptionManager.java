@@ -13,14 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.engio.mbassy.multi.common.IdentityObjectTree;
 import net.engio.mbassy.multi.common.ReflectionUtils;
-import net.engio.mbassy.multi.common.SubscriptionPoolable;
 import net.engio.mbassy.multi.listener.MessageHandler;
 import net.engio.mbassy.multi.listener.MetadataReader;
 
 import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
-
-import dorkbox.util.objectPool.ObjectPool;
-import dorkbox.util.objectPool.ObjectPoolFactory;
 
 /**
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
@@ -35,13 +31,18 @@ import dorkbox.util.objectPool.ObjectPoolFactory;
  */
 public class SubscriptionManager {
 
+    public static class SubHolder {
+        public int count = 0;
+        public Collection<Subscription> subs = new ArrayDeque<Subscription>(0);
+    }
+
     // the metadata reader that is used to inspect objects passed to the subscribe method
     private final MetadataReader metadataReader = new MetadataReader();
 
     // all subscriptions per message type
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle = new IdentityHashMap<Class<?>, Collection<Subscription>>(50);
+    private final Map<Class<?>, SubHolder> subscriptionsPerMessageSingle = new IdentityHashMap<Class<?>, SubHolder>(50);
     private final IdentityObjectTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
 
     // all subscriptions per messageHandler type
@@ -64,10 +65,7 @@ public class SubscriptionManager {
     // synchronize read/write acces to the subscription maps
     private final ReentrantReadWriteUpdateLock LOCK = new ReentrantReadWriteUpdateLock();
 
-    private ObjectPool<Collection<Subscription>> pool;
-
     public SubscriptionManager() {
-        this.pool = ObjectPoolFactory.create(new SubscriptionPoolable(), 1024);
     }
 
     public void unsubscribe(Object listener) {
@@ -97,13 +95,16 @@ public class SubscriptionManager {
                             Class<?> clazz = handledMessageTypes[0];
 
                             // NOTE: Not thread-safe! must be synchronized in outer scope
-                            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
-                            if (subs != null) {
-                                subs.remove(subscription);
+                            SubHolder subHolder = this.subscriptionsPerMessageSingle.get(clazz);
+                            if (subHolder != null) {
+                                Collection<Subscription> subs = subHolder.subs;
+                                if (subs != null) {
+                                    subs.remove(subscription);
 
-                                if (subs.isEmpty()) {
-                                    // remove element
-                                    this.subscriptionsPerMessageSingle.remove(clazz);
+                                    if (subs.isEmpty()) {
+                                        // remove element
+                                        this.subscriptionsPerMessageSingle.remove(clazz);
+                                    }
                                 }
                             }
                         } else {
@@ -203,12 +204,14 @@ public class SubscriptionManager {
                             Class<?> clazz = handledMessageTypes[0];
 
                             // NOTE: Not thread-safe! must be synchronized in outer scope
-                            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
-                            if (subs == null) {
-                                subs = new ArrayList<Subscription>();
-                                this.subscriptionsPerMessageSingle.put(clazz, subs);
+                            SubHolder subHolder = this.subscriptionsPerMessageSingle.get(clazz);
+                            if (subHolder == null) {
+                                subHolder = new SubHolder();
+                                this.subscriptionsPerMessageSingle.put(clazz, subHolder);
                             }
+                            Collection<Subscription> subs = subHolder.subs;
                             subs.add(subscription);
+                            subHolder.count++;
 
                             // have to save our the VarArg class types, because creating var-arg arrays for objects is expensive
                             if (subscription.isVarArg()) {
@@ -288,50 +291,61 @@ public class SubscriptionManager {
         }
     }
 
-    private final ThreadLocal<Collection<Subscription>> subscriptionCache = new ThreadLocal<Collection<Subscription>>() {
-        @Override
-        protected Collection<Subscription> initialValue()
-        {
-            return new ArrayDeque<Subscription>(16); // default
-        }
-    };
-
 
     // obtain the set of subscriptions for the given message type
     // Note: never returns null!
     public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
         // thread safe publication
-        Collection<Subscription> subscriptions = this.subscriptionCache.get();
-        subscriptions.clear();
+        Collection<Subscription> subscriptions;
 
         try {
             this.LOCK.readLock().lock();
 
-            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(messageType);
-            if (subs != null) {
-                subscriptions.addAll(subs);
+            int count = 0;
+            Collection<Subscription> subs;
+            SubHolder primaryHolder = this.subscriptionsPerMessageSingle.get(messageType);
+            if (primaryHolder != null) {
+                subscriptions = new ArrayDeque<Subscription>(count);
+                subs = primaryHolder.subs;
+                count = primaryHolder.count;
+                if (subs != null) {
+                    subscriptions.addAll(subs);
+                }
+            } else {
+                subscriptions = new ArrayDeque<Subscription>(16);
             }
 
             // also add all subscriptions that match super types
+            SubHolder subHolder;
             ArrayList<Class<?>> types1 = superClassCache(messageType);
             if (types1 != null) {
                 Class<?> eventSuperType;
                 int i;
                 for (i = 0; i < types1.size(); i++) {
                     eventSuperType = types1.get(i);
-                    subs = this.subscriptionsPerMessageSingle.get(eventSuperType);
-                    if (subs != null) {
-                        for (Subscription sub : subs) {
-                            if (sub.handlesMessageType(messageType)) {
-                                subscriptions.add(sub);
+                    subHolder = this.subscriptionsPerMessageSingle.get(eventSuperType);
+                    if (subHolder != null) {
+                        subs = subHolder.subs;
+                        count += subHolder.count;
+
+                        if (subs != null) {
+                            for (Subscription sub : subs) {
+                                if (sub.handlesMessageType(messageType)) {
+                                    subscriptions.add(sub);
+                                }
                             }
                         }
                     }
-                    addVarArgClass(subscriptions, eventSuperType);
+                    count += addVarArgClass(subscriptions, eventSuperType);
                 }
             }
 
-            addVarArgClass(subscriptions, messageType);
+            count += addVarArgClass(subscriptions, messageType);
+
+            if (primaryHolder != null) {
+                // save off our count, so our collection creation size is optimal.
+                primaryHolder.count = count;
+            }
         } finally {
             this.LOCK.readLock().unlock();
         }
@@ -487,6 +501,8 @@ public class SubscriptionManager {
         try {
             this.LOCK.readLock().lock();
 
+            int count = 16;
+
             // NOTE: Not thread-safe! must be synchronized in outer scope
             Collection<Subscription> subs = this.subscriptionsPerMessageMulti.getValue(messageTypes);
             if (subs != null) {
@@ -497,7 +513,7 @@ public class SubscriptionManager {
                 }
             }
 
-
+            SubHolder subHolder;
             int size = messageTypes.length;
             if (size > 0) {
                 boolean allSameType = true;
@@ -536,10 +552,14 @@ public class SubscriptionManager {
                             eventSuperType = Array.newInstance(eventSuperType, 1).getClass();
 
                             // also add all subscriptions that match super types
-                            subs = this.subscriptionsPerMessageSingle.get(eventSuperType);
-                            if (subs != null) {
-                                for (Subscription sub : subs) {
-                                    subscriptions.add(sub);
+                            subHolder = this.subscriptionsPerMessageSingle.get(eventSuperType);
+                            if (subHolder != null) {
+                                subs = subHolder.subs;
+                                count += subHolder.count;
+                                if (subs != null) {
+                                    for (Subscription sub : subs) {
+                                        subscriptions.add(sub);
+                                    }
                                 }
                             }
                         }
@@ -547,6 +567,8 @@ public class SubscriptionManager {
                 }
 
             }
+
+
         } finally {
             this.LOCK.readLock().unlock();
         }
@@ -571,19 +593,27 @@ public class SubscriptionManager {
     ///////////////
     // a var-arg handler might match
     ///////////////
-    private void addVarArgClass(Collection<Subscription> subscriptions, Class<?> messageType) {
+    private int addVarArgClass(Collection<Subscription> subscriptions, Class<?> messageType) {
         // tricky part. We have to check the ARRAY version
+        SubHolder subHolder;
         Collection<Subscription> subs;
+        int count = 0;
+
         Class<?> varArgClass = this.varArgClasses.get(messageType);
         if (varArgClass != null) {
             // also add all subscriptions that match super types
-            subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-            if (subs != null) {
-                for (Subscription sub : subs) {
-                    subscriptions.add(sub);
+            subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+            if (subHolder != null) {
+                subs = subHolder.subs;
+                count += subHolder.count;
+                if (subs != null) {
+                    for (Subscription sub : subs) {
+                        subscriptions.add(sub);
+                    }
                 }
             }
         }
+        return count;
     }
 
     public Class<?> getVarArg(Class<?> clazz) {
@@ -594,16 +624,23 @@ public class SubscriptionManager {
     // a var-arg handler might match
     // tricky part. We have to check the ARRAY version
     ///////////////
-    private void addVarArgClasses(Collection<Subscription> subscriptions, Class<?> messageType, ArrayList<Class<?>> types1) {
+    private int addVarArgClasses(Collection<Subscription> subscriptions, Class<?> messageType, ArrayList<Class<?>> types1) {
         Collection<Subscription> subs;
+        SubHolder subHolder;
+        int count = 0;
 
         Class<?> varArgClass = this.varArgClasses.get(messageType);
         if (varArgClass != null) {
             // also add all subscriptions that match super types
-            subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-            if (subs != null) {
-                for (Subscription sub : subs) {
-                    subscriptions.add(sub);
+            subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+            if (subHolder != null) {
+                subs = subHolder.subs;
+                count += subHolder.count;
+
+                if (subs != null) {
+                    for (Subscription sub : subs) {
+                        subscriptions.add(sub);
+                    }
                 }
             }
         }
@@ -612,14 +649,21 @@ public class SubscriptionManager {
             varArgClass = this.varArgClasses.get(eventSuperType);
             if (varArgClass != null) {
                 // also add all subscriptions that match super types
-                subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-                if (subs != null) {
-                    for (Subscription sub : subs) {
-                        subscriptions.add(sub);
+                subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+                if (subHolder != null) {
+                    subs = subHolder.subs;
+                    count += subHolder.count;
+
+                    if (subs != null) {
+                        for (Subscription sub : subs) {
+                            subscriptions.add(sub);
+                        }
                     }
                 }
             }
         }
+
+        return count;
     }
 
     private void getSubsVarArg(Collection<Subscription> subscriptions, int length, int index,

@@ -1,5 +1,5 @@
 package net.engio.mbassy.multi.common;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 
 /**
@@ -9,11 +9,11 @@ import java.util.Iterator;
  * @author bennidi
  *         Date: 2/12/12
  */
-public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T>{
+public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
     public StrongConcurrentSet() {
-        super(new HashMap<T, ISetEntry<T>>());
+        super(new IdentityHashMap<T, ISetEntry<T>>());
     }
 
     @Override

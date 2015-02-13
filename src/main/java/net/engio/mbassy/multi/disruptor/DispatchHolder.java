@@ -6,8 +6,12 @@ package net.engio.mbassy.multi.disruptor;
  *         Date: 2/2/15
  */
 public class DispatchHolder {
+    public MessageType messageType = MessageType.ONE;
 
-    public Runnable runnable = null;
+    public Object message1 = null;
+    public Object message2 = null;
+    public Object message3 = null;
+    public Object[] messages = null;
 
     public DispatchHolder() {
     }

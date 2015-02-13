@@ -9,21 +9,24 @@ package net.engio.mbassy.multi.disruptor;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-final public class DeadMessage {
+public final class DeadMessage {
 
-    public Object[] relatedMessages = new Object[3];
+    private Object[] relatedMessages;
 
 
     public DeadMessage(Object message) {
+        this.relatedMessages = new Object[1];
         this.relatedMessages[0] = message;
     }
 
     public DeadMessage(Object message1, Object message2) {
+        this.relatedMessages = new Object[2];
         this.relatedMessages[0] = message1;
         this.relatedMessages[1] = message2;
     }
 
     public DeadMessage(Object message1, Object message2, Object message3 ) {
+        this.relatedMessages = new Object[3];
         this.relatedMessages[0] = message1;
         this.relatedMessages[1] = message2;
         this.relatedMessages[2] = message3;

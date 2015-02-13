@@ -2,7 +2,8 @@ package net.engio.mbassy.multi.common;
 
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
 
 /**
  * This data structure is optimized for non-blocking reads even when write operations occur.
@@ -16,7 +17,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
 
     // Internal state
-    protected final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    protected final ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
     private final Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
     protected Entry<T> head; // reference to the first element
 
@@ -66,6 +67,7 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
         return this.entries.size();
     }
 
+    @Override
     public boolean isEmpty() {
         return this.head == null;
     }
@@ -90,29 +92,38 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
      */
     @Override
     public boolean remove(T element) {
-        if (!contains(element)) {
-            // return quickly
-            return false;
-        } else {
-            Lock writeLock = this.lock.writeLock();
-            try {
-                writeLock.lock();
-                ISetEntry<T> listelement = this.entries.get(element);
-                if (listelement == null) {
-                    return false; //removed by other thread in the meantime
+
+        Lock updateLock = this.lock.updateLock();
+        boolean isNull;
+        try {
+            updateLock.lock();
+            ISetEntry<T> entry = this.entries.get(element);
+
+            isNull = entry == null || entry.getValue() == null;
+            if (isNull) {
+                Lock writeLock = this.lock.writeLock();
+                try {
+                    writeLock.lock();
+                    ISetEntry<T> listelement = this.entries.get(element);
+                    if (listelement == null) {
+                        return false; //removed by other thread in the meantime
+                    } else if (listelement != this.head) {
+                        listelement.remove();
+                    } else {
+                        // if it was second, now it's first
+                        this.head = this.head.next();
+                        //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
+                    }
+                    this.entries.remove(element);
+                    return true;
+                } finally {
+                    writeLock.unlock();
                 }
-                if (listelement != this.head) {
-                    listelement.remove();
-                } else {
-                    // if it was second, now it's first
-                    this.head = this.head.next();
-                    //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
-                }
-                this.entries.remove(element);
-            } finally {
-                writeLock.unlock();
+            } else {
+                return false; // fast exit
             }
-            return true;
+        } finally {
+            updateLock.unlock();
         }
     }
 
