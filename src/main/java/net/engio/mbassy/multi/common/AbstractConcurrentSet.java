@@ -1,7 +1,10 @@
 package net.engio.mbassy.multi.common;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
+
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
 
@@ -14,7 +17,7 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  * @author bennidi
  *         Date: 2/12/12
  */
-public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
+public abstract class AbstractConcurrentSet<T> implements Collection<T> {
 
     // Internal state
     protected final ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
@@ -28,21 +31,25 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
     protected abstract Entry<T> createEntry(T value, Entry<T> next);
 
     @Override
-    public void add(T element) {
+    public boolean add(T element) {
         if (element == null) {
-            return;
+            return false;
         }
         Lock writeLock = this.lock.writeLock();
+        boolean changed = false;
         writeLock.lock();
         if (this.entries.containsKey(element)) {
         } else {
             insert(element);
+            changed = true;
         }
         writeLock.unlock();
+
+        return changed;
     }
 
     @Override
-    public boolean contains(T element) {
+    public boolean contains(Object element) {
         Lock readLock = this.lock.readLock();
         ISetEntry<T> entry;
         try {
@@ -73,25 +80,28 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
     }
 
     @Override
-    public void addAll(Iterable<T> elements) {
+    public boolean addAll(Collection<? extends T> elements) {
+        boolean changed = false;
         Lock writeLock = this.lock.writeLock();
         try {
             writeLock.lock();
             for (T element : elements) {
                 if (element != null) {
                     insert(element);
+                    changed = true;
                 }
             }
         } finally {
             writeLock.unlock();
         }
+        return changed;
     }
 
     /**
      * @return TRUE if the element was successfully removed
      */
     @Override
-    public boolean remove(T element) {
+    public boolean remove(Object element) {
 
         Lock updateLock = this.lock.updateLock();
         boolean isNull;
@@ -100,15 +110,12 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
             ISetEntry<T> entry = this.entries.get(element);
 
             isNull = entry == null || entry.getValue() == null;
-            if (isNull) {
+            if (!isNull) {
                 Lock writeLock = this.lock.writeLock();
                 try {
                     writeLock.lock();
-                    ISetEntry<T> listelement = this.entries.get(element);
-                    if (listelement == null) {
-                        return false; //removed by other thread in the meantime
-                    } else if (listelement != this.head) {
-                        listelement.remove();
+                    if (entry != this.head) {
+                        entry.remove();
                     } else {
                         // if it was second, now it's first
                         this.head = this.head.next();
@@ -125,6 +132,36 @@ public abstract class AbstractConcurrentSet<T> implements IConcurrentSet<T> {
         } finally {
             updateLock.unlock();
         }
+    }
+
+    @Override
+    public Object[] toArray() {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public <T> T[] toArray(T[] a) {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public boolean containsAll(Collection<?> c) {
+       throw new NotImplementedException();
+    }
+
+    @Override
+    public boolean removeAll(Collection<?> c) {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public boolean retainAll(Collection<?> c) {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public void clear() {
+        throw new NotImplementedException();
     }
 
 

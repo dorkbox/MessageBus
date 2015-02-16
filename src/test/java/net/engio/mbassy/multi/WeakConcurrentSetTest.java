@@ -1,15 +1,13 @@
 package net.engio.mbassy.multi;
 
-import net.engio.mbassy.multi.common.ConcurrentExecutor;
-import net.engio.mbassy.multi.common.IConcurrentSet;
-import net.engio.mbassy.multi.common.WeakConcurrentSet;
-
-import org.junit.Before;
-import org.junit.Test;
-
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
+
+import net.engio.mbassy.multi.common.ConcurrentExecutor;
+import net.engio.mbassy.multi.common.WeakConcurrentSet;
+
+import org.junit.Test;
 
 /**
  *
@@ -24,7 +22,7 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
 
 
     @Override
-    protected IConcurrentSet createSet() {
+    protected Collection createSet() {
         return new WeakConcurrentSet();
     }
 
@@ -33,10 +31,10 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
 
         // Assemble
         final HashSet<Object> permanentElements = new HashSet<Object>();
-        final IConcurrentSet testSetWeak = createSet();
+        final Collection testSetWeak = createSet();
         final Random rand = new Random();
 
-        for (int i = 0; i < numberOfElements; i++) {
+        for (int i = 0; i < this.numberOfElements; i++) {
             Object candidate = new Object();
 
             if (rand.nextInt() % 3 == 0) {
@@ -58,13 +56,13 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
                     System.currentTimeMillis();
                 }
             }
-        }, numberOfThreads);
+        }, this.numberOfThreads);
 
         // the set should have cleaned up the garbage collected elements
         // it must still contain all of the permanent objects
         // since different GC mechanisms can be used (not necessarily full, stop-the-world) not all dead objects
         // must have been collected
-        assertTrue(permanentElements.size() <= testSetWeak.size() && testSetWeak.size() < numberOfElements);
+        assertTrue(permanentElements.size() <= testSetWeak.size() && testSetWeak.size() < this.numberOfElements);
         for (Object test : testSetWeak) {
             assertTrue(permanentElements.contains(test));
         }

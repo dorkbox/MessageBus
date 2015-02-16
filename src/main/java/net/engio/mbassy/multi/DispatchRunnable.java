@@ -1,5 +1,6 @@
 package net.engio.mbassy.multi;
 
+import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.concurrent.locks.LockSupport;
 
@@ -18,11 +19,11 @@ public class DispatchRunnable implements Runnable {
 
     private ErrorHandlingSupport errorHandler;
     private TransferQueue<Object> dispatchQueue;
-    private TransferQueue<Runnable> invokeQueue;
+    private TransferQueue<SubRunnable> invokeQueue;
     private SubscriptionManager manager;
 
     public DispatchRunnable(ErrorHandlingSupport errorHandler, SubscriptionManager subscriptionManager,
-                            TransferQueue<Object> dispatchQueue, TransferQueue<Runnable> invokeQueue) {
+                            TransferQueue<Object> dispatchQueue, TransferQueue<SubRunnable> invokeQueue) {
 
         this.errorHandler = errorHandler;
         this.manager = subscriptionManager;
@@ -35,19 +36,22 @@ public class DispatchRunnable implements Runnable {
         final SubscriptionManager manager = this.manager;
         final ErrorHandlingSupport errorHandler = this.errorHandler;
         final TransferQueue<Object> IN_queue = this.dispatchQueue;
-        final TransferQueue<Runnable> OUT_queue = this.invokeQueue;
+        final TransferQueue<SubRunnable> OUT_queue = this.invokeQueue;
+
+        final Runnable dummyRunnable = new Runnable() {
+            @Override
+            public void run() {
+            }
+        };
 
         Object message = null;
         int counter;
 
         while (true) {
             try {
-                counter = MultiMBassador.WORK_RUN_BLITZ;
+                counter = MultiMBassador.WORKER_BLITZ;
                 while ((message = IN_queue.poll()) == null) {
-                    if (counter > MultiMBassador.WORK_RUN_BLITZ_DIV2) {
-                        --counter;
-                        Thread.yield();
-                    } else if (counter > 0) {
+                    if (counter > 0) {
                         --counter;
                         LockSupport.parkNanos(1L);
                     } else {
@@ -56,23 +60,76 @@ public class DispatchRunnable implements Runnable {
                     }
                 }
 
+                @SuppressWarnings("null")
                 Class<?> messageClass = message.getClass();
+
+                manager.readLock();
+
                 Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-
                 boolean empty = subscriptions.isEmpty();
-                if (empty) {
-                    // Dead Event
-                    subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
 
-                    DeadMessage deadMessage = new DeadMessage(message);
-                    message = deadMessage;
-                    empty = subscriptions.isEmpty();
+                Collection<Subscription> deadSubscriptions = null;
+                if (empty) {
+                    // Dead Event. must EXACTLY MATCH (no subclasses or varargs)
+                    deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
                 }
+                Collection<Class<?>> superClasses = manager.getSuperClasses(messageClass);
+                Collection<Subscription> varArgs = manager.getVarArgs(messageClass);
+
+                manager.readUnLock();
+
 
                 if (!empty) {
-                    Runnable e = new InvokeRunnable(errorHandler, subscriptions, message);
-                    OUT_queue.transfer(e);
+                    for (Subscription sub : subscriptions) {
+                        sub.publishToSubscriptionSingle(OUT_queue, errorHandler, message);
+                    }
+
+//                    OUT_queue.put(new InvokeRunnable(errorHandler, subscriptions, message));
+                } else if (deadSubscriptions != null) {
+                    if (!deadSubscriptions.isEmpty()) {
+                        DeadMessage deadMessage = new DeadMessage(message);
+
+                        for (Subscription sub : deadSubscriptions) {
+                            sub.publishToSubscriptionSingle(OUT_queue, errorHandler, deadMessage);
+                        }
+
+//                        OUT_queue.put(new InvokeRunnable(errorHandler, deadSubscriptions, deadMessage));
+                    }
                 }
+
+                // now get superClasses
+                for (Class<?> superClass : superClasses) {
+                    subscriptions = manager.getSubscriptionsByMessageType(superClass);
+
+                    if (!subscriptions.isEmpty()) {
+                        for (Subscription sub : subscriptions) {
+                            sub.publishToSubscriptionSingle(OUT_queue, errorHandler, message);
+                        }
+
+//                        OUT_queue.put(new InvokeRunnable(errorHandler, subscriptions, message));
+                    }
+                }
+
+                // now get varargs
+                if (!varArgs.isEmpty()) {
+                    // messy, but the ONLY way to do it.
+                    Object[] vararg = (Object[]) Array.newInstance(message.getClass(), 1);
+                    vararg[0] = message;
+
+                    Object[] newInstance =  new Object[1];
+                    newInstance[0] = vararg;
+                    vararg = newInstance;
+
+                    for (Subscription sub : varArgs) {
+                        sub.publishToSubscriptionSingle(OUT_queue, errorHandler, vararg);
+                    }
+
+//                    OUT_queue.put(new InvokeRunnable(errorHandler, varArgs, vararg));
+                }
+
+                // make sure it's synced at this point
+//                OUT_queue.transfer(dummyRunnable);
+
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable e) {

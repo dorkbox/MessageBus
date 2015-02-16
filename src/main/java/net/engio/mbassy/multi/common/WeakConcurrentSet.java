@@ -116,9 +116,5 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
         public T getValue() {
             return this.value.get();
         }
-
-
-
-
     }
 }

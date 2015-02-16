@@ -1,13 +1,12 @@
 package net.engio.mbassy.multi;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
 import net.engio.mbassy.multi.common.DisruptorThreadFactory;
 import net.engio.mbassy.multi.common.LinkedTransferQueue;
-import net.engio.mbassy.multi.common.Pow2;
 import net.engio.mbassy.multi.common.TransferQueue;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
@@ -31,7 +30,7 @@ public class MultiMBassador implements IMessageBus {
 //    private final Queue<MessageHolder> dispatchQueue;
 //    private final BlockingQueue<MessageHolder> dispatchQueue;
     private final TransferQueue<Object> dispatchQueue;
-    private final TransferQueue<Runnable> invokeQueue;
+    private final TransferQueue<SubRunnable> invokeQueue;
 
 
     // all threads that are available for asynchronous message dispatching
@@ -42,17 +41,16 @@ public class MultiMBassador implements IMessageBus {
     }
 
 
-    public static final int WORK_RUN_BLITZ = 50;
-    public static final int WORK_RUN_BLITZ_DIV2 = WORK_RUN_BLITZ/2;
+    public static final int WORKER_BLITZ = 10;
 
     public MultiMBassador(int numberOfThreads) {
         if (numberOfThreads < 1) {
-            numberOfThreads = 1; // at LEAST 1 threads
+            numberOfThreads = 1; // at LEAST 1 thread
         }
 
 //        this.objectQueue = new LinkedTransferQueue<MessageHolder>();
         this.dispatchQueue = new LinkedTransferQueue<Object>();
-        this.invokeQueue = new LinkedTransferQueue<Runnable>();
+        this.invokeQueue = new LinkedTransferQueue<SubRunnable>();
 //        this.invokeQueue = new BoundedTransferQueue<Runnable>(numberOfThreads);
 //        this.dispatchQueue = new BoundedTransferQueue<MessageHolder>(numberOfThreads);
 //        this.dispatchQueue = new MpmcArrayQueue<MessageHolder>(Pow2.roundToPowerOfTwo(numberOfThreads/2));
@@ -65,7 +63,8 @@ public class MultiMBassador implements IMessageBus {
 
 
         int dispatchSize = 2;
-        int invokeSize = Pow2.roundToPowerOfTwo(numberOfThreads*2);
+//        int invokeSize = Pow2.roundToPowerOfTwo(numberOfThreads);
+        int invokeSize = 0;
         this.threads = new ArrayList<Thread>(dispatchSize + invokeSize);
 
 
@@ -88,30 +87,91 @@ public class MultiMBassador implements IMessageBus {
                 @Override
                 public void run() {
                     final MultiMBassador mbassador = MultiMBassador.this;
-                    final TransferQueue<Runnable> IN_queue = mbassador.invokeQueue;
+                    final TransferQueue<SubRunnable> IN_queue = mbassador.invokeQueue;
 
                     try {
-                        Runnable runnable = null;
+                        SubRunnable runnable = null;
                         int counter;
 
                         while (true) {
                             runnable = null;
-                            counter = WORK_RUN_BLITZ;
+                            counter = WORKER_BLITZ;
 
-                            while ((runnable = IN_queue.poll()) == null) {
-                                if (counter > WORK_RUN_BLITZ_DIV2) {
-                                    --counter;
-                                    Thread.yield();
-                                } else if (counter > 0) {
-                                    --counter;
-                                    LockSupport.parkNanos(1L);
-                                } else {
+//                            while ((runnable = IN_queue.poll()) == null) {
+//                                if (counter > 0) {
+//                                    --counter;
+//                                    LockSupport.parkNanos(1L);
+//                                } else {
                                     runnable = IN_queue.take();
-                                    break;
-                                }
-                            }
+//                                    break;
+//                                }
+//                            }
 
-                            runnable.run();
+
+                                    try {
+
+                                        runnable.handler.invoke(runnable.listener, runnable.message);
+
+//                                      this.invocation.invoke(listener, handler, message);
+                                  } catch (IllegalAccessException e) {
+//                                      errorHandler.handlePublicationError(new PublicationError()
+//                                                                              .setMessage("Error during invocation of message handler. " +
+//                                                                                          "The class or method is not accessible")
+//                                                                              .setCause(e)
+//                                                                              .setMethodName(handler.getName())
+//                                                                              .setListener(listener)
+//                                                                              .setPublishedObject(message));
+                                  } catch (IllegalArgumentException e) {
+//                                      errorHandler.handlePublicationError(new PublicationError()
+//                                                                              .setMessage("Error during invocation of message handler. " +
+//                                                                                          "Wrong arguments passed to method. Was: " + message.getClass()
+//                                                                                          + "Expected: " + handler.getParameterTypes()[0])
+//                                                                              .setCause(e)
+//                                                                              .setMethodName(handler.getName())
+//                                                                              .setListener(listener)
+//                                                                              .setPublishedObject(message));
+                                  } catch (InvocationTargetException e) {
+//                                      errorHandler.handlePublicationError(new PublicationError()
+//                                                                              .setMessage("Error during invocation of message handler. " +
+//                                                                                          "Message handler threw exception")
+//                                                                              .setCause(e)
+//                                                                              .setMethodName(handler.getName())
+//                                                                              .setListener(listener)
+//                                                                              .setPublishedObject(message));
+                                  } catch (Throwable e) {
+//                                      errorHandler.handlePublicationError(new PublicationError()
+//                                                                              .setMessage("Error during invocation of message handler. " +
+//                                                                                          "The handler code threw an exception")
+//                                                                              .setCause(e)
+//                                                                              .setMethodName(handler.getName())
+//                                                                              .setListener(listener)
+//                                                                              .setPublishedObject(message));
+                                  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//                            runnable.run();
                         }
                     } catch (InterruptedException e) {
                         return;
@@ -152,8 +212,7 @@ public class MultiMBassador implements IMessageBus {
 
     @Override
     public boolean hasPendingMessages() {
-//        return this.dispatch_RingBuffer.remainingCapacity() < this.dispatch_RingBufferSize;
-        return !(this.dispatchQueue.isEmpty() && this.invokeQueue.isEmpty());
+        return !this.dispatchQueue.isEmpty() || !this.invokeQueue.isEmpty();
     }
 
     @Override
@@ -161,15 +220,6 @@ public class MultiMBassador implements IMessageBus {
         for (Thread t : this.threads) {
             t.interrupt();
         }
-
-//        System.err.println(this.counter);
-
-//        for (InterruptRunnable runnable : this.invokeRunners) {
-//            runnable.stop();
-//        }
-
-//        this.dispatch_Disruptor.shutdown();
-//        this.dispatch_Executor.shutdown();
     }
 
 
@@ -449,61 +499,18 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publishAsync(Object message) {
         if (message != null) {
-//            // put this on the disruptor ring buffer
-//            final RingBuffer<DispatchHolder> ringBuffer = this.dispatch_RingBuffer;
-//
-//            // setup the job
-//            final long seq = ringBuffer.next();
-//            try {
-//                DispatchHolder eventJob = ringBuffer.get(seq);
-//                eventJob.messageType = MessageType.ONE;
-//                eventJob.message1 = message;
-//            } catch (Throwable e) {
-//                handlePublicationError(new PublicationError()
-//                                            .setMessage("Error while adding an asynchronous message")
-//                                            .setCause(e)
-//                                            .setPublishedObject(message));
-//            } finally {
-//                // always publish the job
-//                ringBuffer.publish(seq);
-//            }
+            try {
+                this.dispatchQueue.transfer(message);
+                return;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                // log.error(e);
 
-//            MessageHolder messageHolder = new MessageHolder();
-//            messageHolder.messageType = MessageType.ONE;
-//            messageHolder.message1 = message;
-
-
-//            new Runnable() {
-//                @Override
-//                public void run() {
-//
-//                }
-//            };
-
-            // faster if we can skip locking
-//            int counter = 200;
-//            while (!this.dispatchQueue.offer(message)) {
-//                if (counter > 100) {
-//                    --counter;
-//                    Thread.yield();
-//                } else if (counter > 0) {
-//                    --counter;
-//                    LockSupport.parkNanos(1L);
-//                } else {
-                    try {
-                        this.dispatchQueue.transfer(message);
-                        return;
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                        // log.error(e);
-
-                        handlePublicationError(new PublicationError()
-                        .setMessage("Error while adding an asynchronous message")
-                        .setCause(e)
-                        .setPublishedObject(message));
-                    }
-//                }
-//            }
+                handlePublicationError(new PublicationError()
+                                           .setMessage("Error while adding an asynchronous message")
+                                           .setCause(e)
+                                           .setPublishedObject(message));
+            }
         }
     }
 
