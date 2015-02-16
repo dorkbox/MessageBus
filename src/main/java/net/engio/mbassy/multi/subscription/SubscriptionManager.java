@@ -4,7 +4,6 @@ import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -14,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.engio.mbassy.multi.common.IdentityObjectTree;
 import net.engio.mbassy.multi.common.ReflectionUtils;
-import net.engio.mbassy.multi.common.StrongConcurrentSet;
 import net.engio.mbassy.multi.listener.MessageHandler;
 import net.engio.mbassy.multi.listener.MetadataReader;
 
@@ -33,13 +31,18 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  */
 public class SubscriptionManager {
 
+    public static class SubHolder {
+        public int count = 0;
+        public Collection<Subscription> subs = new ArrayDeque<Subscription>(0);
+    }
+
     // the metadata reader that is used to inspect objects passed to the subscribe method
     private final MetadataReader metadataReader = new MetadataReader();
 
     // all subscriptions per message type
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle = new IdentityHashMap<Class<?>, Collection<Subscription>>(50);
+    private final Map<Class<?>, SubHolder> subscriptionsPerMessageSingle = new IdentityHashMap<Class<?>, SubHolder>(50);
     private final IdentityObjectTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
 
     // all subscriptions per messageHandler type
@@ -91,14 +94,17 @@ public class SubscriptionManager {
                             // single
                             Class<?> clazz = handledMessageTypes[0];
 
-                            // NOTE: Order is important for safe publication
-                            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
-                            if (subs != null) {
-                                subs.remove(subscription);
+                            // NOTE: Not thread-safe! must be synchronized in outer scope
+                            SubHolder subHolder = this.subscriptionsPerMessageSingle.get(clazz);
+                            if (subHolder != null) {
+                                Collection<Subscription> subs = subHolder.subs;
+                                if (subs != null) {
+                                    subs.remove(subscription);
 
-                                if (subs.isEmpty()) {
-                                    // remove element
-                                    this.subscriptionsPerMessageSingle.remove(clazz);
+                                    if (subs.isEmpty()) {
+                                        // remove element
+                                        this.subscriptionsPerMessageSingle.remove(clazz);
+                                    }
                                 }
                             }
                         } else {
@@ -182,7 +188,7 @@ public class SubscriptionManager {
                     }
 
                     // it's SAFE to use non-concurrent collection here (read only). Same thread LOCKS on this with a write lock
-                    subscriptions = new StrongConcurrentSet<Subscription>(messageHandlers.size());
+                    subscriptions = new ArrayDeque<Subscription>(messageHandlers.size());
 
                     // create subscriptions for all detected message handlers
                     for (MessageHandler messageHandler : messageHandlers) {
@@ -197,16 +203,15 @@ public class SubscriptionManager {
                             // single
                             Class<?> clazz = handledMessageTypes[0];
 
-                            // NOTE: Order is important for safe publication
-                            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
-                            if (subs == null) {
-                                subs = new StrongConcurrentSet<Subscription>(2);
-//                                subs = new CopyOnWriteArrayList<Subscription>();
-                                subs.add(subscription);
-                                this.subscriptionsPerMessageSingle.put(clazz, subs);
-                            } else {
-                                subs.add(subscription);
+                            // NOTE: Not thread-safe! must be synchronized in outer scope
+                            SubHolder subHolder = this.subscriptionsPerMessageSingle.get(clazz);
+                            if (subHolder == null) {
+                                subHolder = new SubHolder();
+                                this.subscriptionsPerMessageSingle.put(clazz, subHolder);
                             }
+                            Collection<Subscription> subs = subHolder.subs;
+                            subs.add(subscription);
+                            subHolder.count++;
 
                             // have to save our the VarArg class types, because creating var-arg arrays for objects is expensive
                             if (subscription.isVarArg()) {
@@ -216,7 +221,7 @@ public class SubscriptionManager {
                                 // since it's vararg, this means that it's an ARRAY, so we ALSO
                                 // have to add the component classes of the array
                                 if (subscription.acceptsSubtypes()) {
-                                    ArrayList<Class<?>> setupSuperClassCache2 = setupSuperClassCache(componentType);
+                                    ArrayList<Class<?>> setupSuperClassCache2 = superClassCache(componentType);
                                     // have to setup each vararg chain
                                     for (int i = 0; i < setupSuperClassCache2.size(); i++) {
                                         Class<?> superClass = setupSuperClassCache2.get(i);
@@ -229,7 +234,7 @@ public class SubscriptionManager {
                                     }
                                 }
                             } else if (subscription.acceptsSubtypes()) {
-                                setupSuperClassCache(clazz);
+                                superClassCache(clazz);
                             }
                         }
                         else {
@@ -240,17 +245,17 @@ public class SubscriptionManager {
                                 case 2: {
                                     tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1]);
                                     if (subscription.acceptsSubtypes()) {
-                                        setupSuperClassCache(handledMessageTypes[0]);
-                                        setupSuperClassCache(handledMessageTypes[1]);
+                                        superClassCache(handledMessageTypes[0]);
+                                        superClassCache(handledMessageTypes[1]);
                                     }
                                     break;
                                 }
                                 case 3: {
                                     tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1], handledMessageTypes[2]);
                                     if (subscription.acceptsSubtypes()) {
-                                        setupSuperClassCache(handledMessageTypes[0]);
-                                        setupSuperClassCache(handledMessageTypes[1]);
-                                        setupSuperClassCache(handledMessageTypes[2]);
+                                        superClassCache(handledMessageTypes[0]);
+                                        superClassCache(handledMessageTypes[1]);
+                                        superClassCache(handledMessageTypes[2]);
                                     }
                                     break;
                                 }
@@ -258,7 +263,7 @@ public class SubscriptionManager {
                                     tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes);
                                     if (subscription.acceptsSubtypes()) {
                                         for (Class<?> c : handledMessageTypes) {
-                                            setupSuperClassCache(c);
+                                            superClassCache(c);
                                         }
                                     }
                                     break;
@@ -286,24 +291,10 @@ public class SubscriptionManager {
         }
     }
 
-    private final Collection<Subscription> EMPTY_LIST = Collections.emptyList();
-
-
-    // cannot return null, must be protected by read lock
-    public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
-        Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(messageType);
-        if (subs != null) {
-
-            return subs;
-        } else {
-            return this.EMPTY_LIST;
-        }
-    }
-
 
     // obtain the set of subscriptions for the given message type
     // Note: never returns null!
-    public Collection<Subscription> DEPRECATED_getSubscriptionsByMessageType(Class<?> messageType) {
+    public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
         // thread safe publication
         Collection<Subscription> subscriptions;
 
@@ -311,35 +302,50 @@ public class SubscriptionManager {
             this.LOCK.readLock().lock();
 
             int count = 0;
-            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(messageType);
-            if (subs != null) {
+            Collection<Subscription> subs;
+            SubHolder primaryHolder = this.subscriptionsPerMessageSingle.get(messageType);
+            if (primaryHolder != null) {
                 subscriptions = new ArrayDeque<Subscription>(count);
-                subscriptions.addAll(subs);
+                subs = primaryHolder.subs;
+                count = primaryHolder.count;
+                if (subs != null) {
+                    subscriptions.addAll(subs);
+                }
             } else {
                 subscriptions = new ArrayDeque<Subscription>(16);
             }
 
             // also add all subscriptions that match super types
-            ArrayList<Class<?>> types1 = setupSuperClassCache(messageType);
+            SubHolder subHolder;
+            ArrayList<Class<?>> types1 = superClassCache(messageType);
             if (types1 != null) {
                 Class<?> eventSuperType;
                 int i;
                 for (i = 0; i < types1.size(); i++) {
                     eventSuperType = types1.get(i);
-                    subs = this.subscriptionsPerMessageSingle.get(eventSuperType);
-                    if (subs != null) {
-                        for (Subscription sub : subs) {
-                            if (sub.handlesMessageType(messageType)) {
-                                subscriptions.add(sub);
+                    subHolder = this.subscriptionsPerMessageSingle.get(eventSuperType);
+                    if (subHolder != null) {
+                        subs = subHolder.subs;
+                        count += subHolder.count;
+
+                        if (subs != null) {
+                            for (Subscription sub : subs) {
+                                if (sub.handlesMessageType(messageType)) {
+                                    subscriptions.add(sub);
+                                }
                             }
                         }
                     }
-                    addVarArgClass(subscriptions, eventSuperType);
+                    count += addVarArgClass(subscriptions, eventSuperType);
                 }
             }
 
-            addVarArgClass(subscriptions, messageType);
+            count += addVarArgClass(subscriptions, messageType);
 
+            if (primaryHolder != null) {
+                // save off our count, so our collection creation size is optimal.
+                primaryHolder.count = count;
+            }
         } finally {
             this.LOCK.readLock().unlock();
         }
@@ -358,8 +364,8 @@ public class SubscriptionManager {
             this.LOCK.readLock().lock();
 
             // also add all subscriptions that match super types
-            ArrayList<Class<?>> types1 = setupSuperClassCache(messageType1);
-            ArrayList<Class<?>> types2 = setupSuperClassCache(messageType2);
+            ArrayList<Class<?>> types1 = superClassCache(messageType1);
+            ArrayList<Class<?>> types2 = superClassCache(messageType2);
 
             Collection<Subscription> subs;
             Class<?> eventSuperType1 = messageType1;
@@ -421,9 +427,9 @@ public class SubscriptionManager {
             this.LOCK.readLock().lock();
 
             // also add all subscriptions that match super types
-            ArrayList<Class<?>> types1 = setupSuperClassCache(messageType1);
-            ArrayList<Class<?>> types2 = setupSuperClassCache(messageType2);
-            ArrayList<Class<?>> types3 = setupSuperClassCache(messageType3);
+            ArrayList<Class<?>> types1 = superClassCache(messageType1);
+            ArrayList<Class<?>> types2 = superClassCache(messageType2);
+            ArrayList<Class<?>> types3 = superClassCache(messageType3);
 
             Class<?> eventSuperType1 = messageType1;
             IdentityObjectTree<Class<?>, Collection<Subscription>> leaf1;
@@ -507,6 +513,7 @@ public class SubscriptionManager {
                 }
             }
 
+            SubHolder subHolder;
             int size = messageTypes.length;
             if (size > 0) {
                 boolean allSameType = true;
@@ -530,7 +537,7 @@ public class SubscriptionManager {
                 if (allSameType) {
                     // do we have a var-arg (it shows as an array) subscribed?
 
-                    ArrayList<Class<?>> superClasses = setupSuperClassCache(firstType);
+                    ArrayList<Class<?>> superClasses = superClassCache(firstType);
 
                     Class<?> eventSuperType = firstType;
                     int j;
@@ -545,10 +552,14 @@ public class SubscriptionManager {
                             eventSuperType = Array.newInstance(eventSuperType, 1).getClass();
 
                             // also add all subscriptions that match super types
-                            subs = this.subscriptionsPerMessageSingle.get(eventSuperType);
-                            if (subs != null) {
-                                for (Subscription sub : subs) {
-                                    subscriptions.add(sub);
+                            subHolder = this.subscriptionsPerMessageSingle.get(eventSuperType);
+                            if (subHolder != null) {
+                                subs = subHolder.subs;
+                                count += subHolder.count;
+                                if (subs != null) {
+                                    for (Subscription sub : subs) {
+                                        subscriptions.add(sub);
+                                    }
                                 }
                             }
                         }
@@ -565,30 +576,12 @@ public class SubscriptionManager {
         return subscriptions;
     }
 
-
-    private final Collection<Class<?>> EMPTY_LIST_CLASSES = Collections.emptyList();
-    // must be protected by read lock
-    public Collection<Class<?>> getSuperClasses(Class<?> clazz) {
-        // not thread safe. DO NOT MODIFY
+    private ArrayList<Class<?>> superClassCache(Class<?> clazz) {
         ArrayList<Class<?>> types = this.superClassesCache.get(clazz);
-
-        if (types != null) {
-            return types;
-        }
-
-        return this.EMPTY_LIST_CLASSES;
-    }
-
-
-    // not a thread safe collection. must be locked by caller
-    private ArrayList<Class<?>> setupSuperClassCache(Class<?> clazz) {
-        ArrayList<Class<?>> types = this.superClassesCache.get(clazz);
-
         if (types == null) {
             // it doesn't matter if concurrent access stomps on values, since they are always the same.
             Set<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
             types = new ArrayList<Class<?>>(superTypes);
-            // NOTE: no need to write lock, since race conditions will result in duplicate answers
             this.superClassesCache.put(clazz, types);
         }
 
@@ -600,49 +593,54 @@ public class SubscriptionManager {
     ///////////////
     // a var-arg handler might match
     ///////////////
-    private void addVarArgClass(Collection<Subscription> subscriptions, Class<?> messageType) {
+    private int addVarArgClass(Collection<Subscription> subscriptions, Class<?> messageType) {
         // tricky part. We have to check the ARRAY version
+        SubHolder subHolder;
         Collection<Subscription> subs;
+        int count = 0;
 
         Class<?> varArgClass = this.varArgClasses.get(messageType);
         if (varArgClass != null) {
             // also add all subscriptions that match super types
-            subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-            if (subs != null) {
-                for (Subscription sub : subs) {
-                    subscriptions.add(sub);
+            subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+            if (subHolder != null) {
+                subs = subHolder.subs;
+                count += subHolder.count;
+                if (subs != null) {
+                    for (Subscription sub : subs) {
+                        subscriptions.add(sub);
+                    }
                 }
             }
         }
+        return count;
     }
 
-    // must be protected by read lock
-    public Collection<Subscription> getVarArgs(Class<?> clazz) {
-        Class<?> varArgClass = this.varArgClasses.get(clazz);
-        if (varArgClass != null) {
-            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-            if (subs != null) {
-                return subs;
-            }
-        }
-
-        return this.EMPTY_LIST;
+    public Class<?> getVarArg(Class<?> clazz) {
+        return this.varArgClasses.get(clazz);
     }
 
     ///////////////
     // a var-arg handler might match
     // tricky part. We have to check the ARRAY version
     ///////////////
-    private void addVarArgClasses(Collection<Subscription> subscriptions, Class<?> messageType, ArrayList<Class<?>> types1) {
+    private int addVarArgClasses(Collection<Subscription> subscriptions, Class<?> messageType, ArrayList<Class<?>> types1) {
         Collection<Subscription> subs;
+        SubHolder subHolder;
+        int count = 0;
 
         Class<?> varArgClass = this.varArgClasses.get(messageType);
         if (varArgClass != null) {
             // also add all subscriptions that match super types
-            subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-            if (subs != null) {
-                for (Subscription sub : subs) {
-                    subscriptions.add(sub);
+            subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+            if (subHolder != null) {
+                subs = subHolder.subs;
+                count += subHolder.count;
+
+                if (subs != null) {
+                    for (Subscription sub : subs) {
+                        subscriptions.add(sub);
+                    }
                 }
             }
         }
@@ -651,14 +649,21 @@ public class SubscriptionManager {
             varArgClass = this.varArgClasses.get(eventSuperType);
             if (varArgClass != null) {
                 // also add all subscriptions that match super types
-                subs = this.subscriptionsPerMessageSingle.get(varArgClass);
-                if (subs != null) {
-                    for (Subscription sub : subs) {
-                        subscriptions.add(sub);
+                subHolder = this.subscriptionsPerMessageSingle.get(varArgClass);
+                if (subHolder != null) {
+                    subs = subHolder.subs;
+                    count += subHolder.count;
+
+                    if (subs != null) {
+                        for (Subscription sub : subs) {
+                            subscriptions.add(sub);
+                        }
                     }
                 }
             }
         }
+
+        return count;
     }
 
     private void getSubsVarArg(Collection<Subscription> subscriptions, int length, int index,
@@ -666,7 +671,7 @@ public class SubscriptionManager {
 
         Class<?> classType = messageTypes[index];
         // get all the super types, if there are any.
-        ArrayList<Class<?>> superClasses = setupSuperClassCache(classType);
+        ArrayList<Class<?>> superClasses = superClassCache(classType);
 
         IdentityObjectTree<Class<?>, Collection<Subscription>> leaf;
         Collection<Subscription> subs;
@@ -696,13 +701,5 @@ public class SubscriptionManager {
                 }
             }
         }
-    }
-
-    public void readLock() {
-        this.LOCK.readLock().lock();
-    }
-
-    public void readUnLock() {
-        this.LOCK.readLock().unlock();
     }
 }

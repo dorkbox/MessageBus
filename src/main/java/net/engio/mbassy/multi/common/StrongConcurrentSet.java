@@ -13,11 +13,7 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
     public StrongConcurrentSet() {
-        this(16);
-    }
-
-    public StrongConcurrentSet(int size) {
-        super(new IdentityHashMap<T, ISetEntry<T>>(size));
+        super(new IdentityHashMap<T, ISetEntry<T>>());
     }
 
     @Override
@@ -79,5 +75,9 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
         public T getValue() {
             return this.value;
         }
+
+
+
+
     }
 }

@@ -1,13 +1,15 @@
 package net.engio.mbassy.multi;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Random;
-
 import net.engio.mbassy.multi.common.ConcurrentExecutor;
+import net.engio.mbassy.multi.common.IConcurrentSet;
 import net.engio.mbassy.multi.common.WeakConcurrentSet;
 
+import org.junit.Before;
 import org.junit.Test;
+
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
 
 /**
  *
@@ -22,7 +24,7 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
 
 
     @Override
-    protected Collection createSet() {
+    protected IConcurrentSet createSet() {
         return new WeakConcurrentSet();
     }
 
@@ -31,10 +33,10 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
 
         // Assemble
         final HashSet<Object> permanentElements = new HashSet<Object>();
-        final Collection testSetWeak = createSet();
+        final IConcurrentSet testSetWeak = createSet();
         final Random rand = new Random();
 
-        for (int i = 0; i < this.numberOfElements; i++) {
+        for (int i = 0; i < numberOfElements; i++) {
             Object candidate = new Object();
 
             if (rand.nextInt() % 3 == 0) {
@@ -56,13 +58,13 @@ public class WeakConcurrentSetTest extends ConcurrentSetTest{
                     System.currentTimeMillis();
                 }
             }
-        }, this.numberOfThreads);
+        }, numberOfThreads);
 
         // the set should have cleaned up the garbage collected elements
         // it must still contain all of the permanent objects
         // since different GC mechanisms can be used (not necessarily full, stop-the-world) not all dead objects
         // must have been collected
-        assertTrue(permanentElements.size() <= testSetWeak.size() && testSetWeak.size() < this.numberOfElements);
+        assertTrue(permanentElements.size() <= testSetWeak.size() && testSetWeak.size() < numberOfElements);
         for (Object test : testSetWeak) {
             assertTrue(permanentElements.contains(test));
         }

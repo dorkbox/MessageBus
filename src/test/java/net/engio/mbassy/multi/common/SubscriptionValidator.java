@@ -39,7 +39,7 @@ public class SubscriptionValidator extends AssertSupport{
     // for each tuple of subscriber and message type the specified number of listeners must exist
     public void validate(SubscriptionManager manager) {
         for (Class<?> messageType : this.messageTypes) {
-            Collection<Subscription> subscriptions = manager.DEPRECATED_getSubscriptionsByMessageType(messageType);
+            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageType);
             Collection<ValidationEntry> validationEntries = getEntries(messageType);
             assertEquals(subscriptions.size(), validationEntries.size());
             for(ValidationEntry validationValidationEntry : validationEntries){
