@@ -3,8 +3,8 @@ package net.engio.mbassy.multi.subscription;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collection;
 
-import net.engio.mbassy.multi.common.IConcurrentSet;
 import net.engio.mbassy.multi.common.StrongConcurrentSet;
 import net.engio.mbassy.multi.dispatch.IHandlerInvocation;
 import net.engio.mbassy.multi.dispatch.ReflectiveHandlerInvocation;
@@ -34,22 +34,15 @@ public class Subscription {
     private final MessageHandler handlerMetadata;
 
     private final IHandlerInvocation invocation;
-//    protected final Collection<Object> listeners;
-//    protected final Map<WeakReference<Object>, Boolean> listeners;
-//    protected final Map<Object, Boolean> listeners;
-    protected final IConcurrentSet<Object> listeners;
+    private final Collection<Object> listeners;
 
     Subscription(MessageHandler handler) {
 //        this.listeners = new WeakConcurrentSet<Object>();
         this.listeners = new StrongConcurrentSet<Object>();
-//        this.listeners = new ConcurrentHashMap<Object, Boolean>();
-//        this.listeners = new CopyOnWriteArrayList<Object>();
-//        this.listeners = new ConcurrentSkipListSet<Object>();
-//        this.listeners = new ConcurrentWeakHashMap<WeakReference<Object>, Boolean>();
         this.handlerMetadata = handler;
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
-        if (handler.isSynchronized()){
+        if (handler.isSynchronized()) {
             invocation = new SynchronizedHandlerInvocation(invocation);
         }
 
@@ -114,11 +107,6 @@ public class Subscription {
      * @return TRUE if the element was removed
      */
     public boolean unsubscribe(Object existingListener) {
-//        Boolean remove = this.listeners.remove(existingListener);
-//        if (remove != null) {
-//            return true;
-//        }
-//        return false;
         return this.listeners.remove(existingListener);
     }
 
@@ -133,9 +121,7 @@ public class Subscription {
 
 //    private AtomicLong counter = new AtomicLong();
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
-//        Collection<Object> listeners = this.listeners.keySet();
-//        Collection<Object> listeners = this.listeners;
-        IConcurrentSet<Object> listeners = this.listeners;
+        Collection<Object> listeners = this.listeners;
 
         if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
@@ -185,8 +171,8 @@ public class Subscription {
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
 //      Collection<Object> listeners = this.listeners.keySet();
-//      Collection<Object> listeners = this.listeners;
-        IConcurrentSet<Object> listeners = this.listeners;
+      Collection<Object> listeners = this.listeners;
+//        IConcurrentSet<Object> listeners = this.listeners;
 
         if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
@@ -238,8 +224,8 @@ public class Subscription {
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
 //      Collection<Object> listeners = this.listeners.keySet();
-//      Collection<Object> listeners = this.listeners;
-        IConcurrentSet<Object> listeners = this.listeners;
+      Collection<Object> listeners = this.listeners;
+//        IConcurrentSet<Object> listeners = this.listeners;
 
         if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
@@ -293,8 +279,8 @@ public class Subscription {
 
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object... messages) {
 //      Collection<Object> listeners = this.listeners.keySet();
-//      Collection<Object> listeners = this.listeners;
-        IConcurrentSet<Object> listeners = this.listeners;
+      Collection<Object> listeners = this.listeners;
+//        IConcurrentSet<Object> listeners = this.listeners;
 
         if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
@@ -327,6 +313,9 @@ public class Subscription {
                                                             .setMethodName(handler.getName())
                                                             .setListener(listener)
                                                             .setPublishedObject(messages));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 } catch (Throwable e) {
                     errorHandler.handlePublicationError(new PublicationError()
                                                             .setMessage("Error during invocation of message handler. " +

@@ -1,14 +1,19 @@
 package net.engio.mbassy.multi;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
+import net.engio.mbassy.multi.common.DeadMessage;
 import net.engio.mbassy.multi.common.DisruptorThreadFactory;
 import net.engio.mbassy.multi.common.LinkedTransferQueue;
 import net.engio.mbassy.multi.common.TransferQueue;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
+import net.engio.mbassy.multi.subscription.Subscription;
 import net.engio.mbassy.multi.subscription.SubscriptionManager;
 
 /**
@@ -26,7 +31,7 @@ public class MultiMBassador implements IMessageBus {
 
     private final SubscriptionManager subscriptionManager;
 
-    private final TransferQueue<Object> dispatchQueue;
+    private final TransferQueue<Runnable> dispatchQueue;
 
 
     // all threads that are available for asynchronous message dispatching
@@ -37,9 +42,6 @@ public class MultiMBassador implements IMessageBus {
     }
 
 
-    public static final int WORK_RUN_BLITZ = 50;
-    public static final int WORK_RUN_BLITZ_DIV2 = WORK_RUN_BLITZ/2;
-
     public MultiMBassador(int numberOfThreads) {
         if (numberOfThreads < 1) {
             numberOfThreads = 1; // at LEAST 1 threads
@@ -47,17 +49,43 @@ public class MultiMBassador implements IMessageBus {
 
 
         this.subscriptionManager = new SubscriptionManager();
-        this.dispatchQueue = new LinkedTransferQueue<>();
+        this.dispatchQueue = new LinkedTransferQueue<Runnable>();
 
 
-        int dispatchSize = 8;
+        int dispatchSize = numberOfThreads;
         this.threads = new ArrayList<Thread>();
 
 
         DisruptorThreadFactory dispatchThreadFactory = new DisruptorThreadFactory("MB_Dispatch");
         for (int i = 0; i < dispatchSize; i++) {
             // each thread will run forever and process incoming message publication requests
-            Runnable runnable = new DispatchRunnable(this, this.subscriptionManager, this.dispatchQueue);
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    TransferQueue<Runnable> IN_QUEUE= MultiMBassador.this.dispatchQueue;
+                    Runnable event = null;
+                    int counter;
+
+                    while (true) {
+                        try {
+                            counter = 200;
+                            while ((event = IN_QUEUE.poll()) == null) {
+                                if (counter > 0) {
+                                    --counter;
+                                    LockSupport.parkNanos(1L);
+                                } else {
+                                    event = IN_QUEUE.take();
+                                    break;
+                                }
+                            }
+
+                            event.run();
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                    }
+                }
+            };
 
             Thread runner = dispatchThreadFactory.newThread(runnable);
             this.threads.add(runner);
@@ -92,7 +120,6 @@ public class MultiMBassador implements IMessageBus {
 
     @Override
     public boolean hasPendingMessages() {
-//        return this.dispatch_RingBuffer.remainingCapacity() < this.dispatch_RingBufferSize;
         return !this.dispatchQueue.isEmpty();
     }
 
@@ -101,136 +128,144 @@ public class MultiMBassador implements IMessageBus {
         for (Thread t : this.threads) {
             t.interrupt();
         }
-
-//        System.err.println(this.counter);
-
-//        for (InterruptRunnable runnable : this.invokeRunners) {
-//            runnable.stop();
-//        }
-
-//        this.dispatch_Disruptor.shutdown();
-//        this.dispatch_Executor.shutdown();
     }
 
 
     @Override
     public void publish(Object message) {
-//        Class<?> messageClass = message.getClass();
+        Class<?> messageClass = message.getClass();
+
+        SubscriptionManager manager = this.subscriptionManager;
+//        Collection<Subscription> subscriptions = subscriptionManager.getSubscriptionsByMessageType(messageClass);
+
+        manager.readLock();
+
+        Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
+        boolean empty = subscriptions.isEmpty();
+
+        Collection<Subscription> deadSubscriptions = null;
+        if (empty) {
+            // Dead Event. must EXACTLY MATCH (no subclasses or varargs)
+            deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
+        }
+        Collection<Class<?>> superClasses = manager.getSuperClasses(messageClass);
+        Collection<Subscription> varArgs = manager.getVarArgs(messageClass);
+
+        manager.readUnLock();
+
+        if (!empty) {
+            for (Subscription sub : subscriptions) {
+                // this catches all exception types
+                sub.publishToSubscription(this, message);
+            }
+        } else if (deadSubscriptions != null && !deadSubscriptions.isEmpty()) {
+            DeadMessage deadMessage = new DeadMessage(message);
+
+            for (Subscription sub : deadSubscriptions) {
+                // this catches all exception types
+                sub.publishToSubscription(this, deadMessage);
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+//        if (subscriptions.isEmpty()) {
+//            // Dead Event. only matches EXACT handlers (no vararg, no subclasses)
+//            subscriptions = this.subscriptionManager.getSubscriptionsByMessageType(DeadMessage.class);
 //
-//        SubscriptionManager manager = this.subscriptionManager;
-//        Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-//
-//        try {
-//            if (subscriptions.isEmpty()) {
-//                // Dead Event
-//                subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-//
-//                DeadMessage deadMessage = new DeadMessage(message);
-//
+//            DeadMessage deadMessage = new DeadMessage(message);
+//            if (!subscriptions.isEmpty()) {
 //                for (Subscription sub : subscriptions) {
+//                    // this catches all exception types
 //                    sub.publishToSubscription(this, deadMessage);
 //                }
-//            } else {
-//                Object[] vararg = null;
-//
-//                for (Subscription sub : subscriptions) {
-//                    boolean handled = false;
-//                    if (sub.isVarArg()) {
-//                        // messageClass will NEVER be an array to begin with, since that will call the multi-arg method
-//                        if (vararg == null) {
-//                            // messy, but the ONLY way to do it.
-//                            vararg = (Object[]) Array.newInstance(messageClass, 1);
-//                            vararg[0] = message;
-//
-//                            Object[] newInstance =  new Object[1];
-//                            newInstance[0] = vararg;
-//                            vararg = newInstance;
-//                        }
-//
-//                        handled = true;
-//                        sub.publishToSubscription(this, vararg);
-//                    }
-//
-//                    if (!handled) {
-//                        sub.publishToSubscription(this, message);
-//                    }
-//                }
 //            }
-//        } catch (Throwable e) {
-//            handlePublicationError(new PublicationError()
-//                    .setMessage("Error during publication of message")
-//                    .setCause(e)
-//                    .setPublishedObject(message));
+//        }
+//        else {
+////            Object[] vararg = null;
+//            for (Subscription sub : subscriptions) {
+//                // this catches all exception types
+//                sub.publishToSubscription(this, message);
+//
+////                if (sub.isVarArg()) {
+////                    // messageClass will NEVER be an array to begin with, since that will call the multi-arg method
+////                    if (vararg == null) {
+////                        // messy, but the ONLY way to do it.
+////                        vararg = (Object[]) Array.newInstance(message.getClass(), 1);
+////                        vararg[0] = message;
+////
+////                        Object[] newInstance =  new Object[1];
+////                        newInstance[0] = vararg;
+////                        vararg = newInstance;
+////                    }
+////
+////                    // this catches all exception types
+////                    sub.publishToSubscription(this, vararg);
+////                    continue;
+////                }
+//            }
 //        }
     }
 
 
     @Override
     public void publish(Object message1, Object message2) {
-//        try {
-//            Class<?> messageClass1 = message1.getClass();
-//            Class<?> messageClass2 = message2.getClass();
-//
-//            SubscriptionManager manager = this.subscriptionManager;
-//            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
-//
-//            if (subscriptions == null || subscriptions.isEmpty()) {
-//                // Dead Event
-//                subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-//
-//                DeadMessage deadMessage = new DeadMessage(message1, message2);
-//
-//                for (Subscription sub : subscriptions) {
-//                    sub.publishToSubscription(this, deadMessage);
-//                }
-//            } else {
-//                Object[] vararg = null;
-//
-//                for (Subscription sub : subscriptions) {
-//                    boolean handled = false;
-//                    if (sub.isVarArg()) {
-//                        Class<?> class1 = message1.getClass();
-//                        Class<?> class2 = message2.getClass();
-//                        if (!class1.isArray() && class1 == class2) {
-//                            if (vararg == null) {
-//                                // messy, but the ONLY way to do it.
-//                                vararg = (Object[]) Array.newInstance(class1, 2);
-//                                vararg[0] = message1;
-//                                vararg[1] = message2;
-//
-//                                Object[] newInstance =  (Object[]) Array.newInstance(vararg.getClass(), 1);
-//                                newInstance[0] = vararg;
-//                                vararg = newInstance;
-//                            }
-//
-//                            handled = true;
-//                            sub.publishToSubscription(this, vararg);
-//                        }
-//                    }
-//
-//                    if (!handled) {
-//                        sub.publishToSubscription(this, message1, message2);
-//                    }
-//                }
-//
-//                // if the message did not have any listener/handler accept it
-//                if (subscriptions.isEmpty()) {
-//                    // cannot have DeadMessage published to this, so no extra check necessary
-//                    // Dead Event
-//                    subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-//                    DeadMessage deadMessage = new DeadMessage(message1, message2);
-//
-//                    for (Subscription sub : subscriptions) {
-//                        sub.publishToSubscription(this, deadMessage);
-//                    }
-//                }
-//            }
-//        } catch (Throwable e) {
-//            handlePublicationError(new PublicationError()
-//                    .setMessage("Error during publication of message")
-//                    .setCause(e)
-//                    .setPublishedObject(message1, message2));
-//        }
+        try {
+            Class<?> messageClass1 = message1.getClass();
+            Class<?> messageClass2 = message2.getClass();
+
+            SubscriptionManager manager = this.subscriptionManager;
+            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
+
+            if (subscriptions == null || subscriptions.isEmpty()) {
+                subscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+
+                DeadMessage deadMessage = new DeadMessage(message1, message2);
+
+                for (Subscription sub : subscriptions) {
+                    sub.publishToSubscription(this, deadMessage);
+                }
+            }
+            else {
+                Object[] vararg = null;
+
+                for (Subscription sub : subscriptions) {
+                    if (sub.isVarArg()) {
+                        Class<?> class1 = message1.getClass();
+                        Class<?> class2 = message2.getClass();
+                        if (!class1.isArray() && class1 == class2) {
+                            if (vararg == null) {
+                                // messy, but the ONLY way to do it.
+                                vararg = (Object[]) Array.newInstance(class1, 2);
+                                vararg[0] = message1;
+                                vararg[1] = message2;
+
+                                Object[] newInstance =  (Object[]) Array.newInstance(vararg.getClass(), 1);
+                                newInstance[0] = vararg;
+                                vararg = newInstance;
+                            }
+
+                            sub.publishToSubscription(this, vararg);
+                            continue;
+                        }
+                    }
+
+                    sub.publishToSubscription(this, message1, message2);
+                }
+            }
+        } catch (Throwable e) {
+            handlePublicationError(new PublicationError()
+                    .setMessage("Error during publication of message")
+                    .setCause(e)
+                    .setPublishedObject(message1, message2));
+        }
     }
 
     @Override
@@ -387,51 +422,30 @@ public class MultiMBassador implements IMessageBus {
     }
 
     @Override
-    public void publishAsync(Object message) {
+    public void publishAsync(final Object message) {
         if (message != null) {
-//            // put this on the disruptor ring buffer
-//            final RingBuffer<DispatchHolder> ringBuffer = this.dispatch_RingBuffer;
-//
-//            // setup the job
-//            final long seq = ringBuffer.next();
-//            try {
-//                DispatchHolder eventJob = ringBuffer.get(seq);
-//                eventJob.messageType = MessageType.ONE;
-//                eventJob.message1 = message;
-//            } catch (Throwable e) {
-//                handlePublicationError(new PublicationError()
-//                                            .setMessage("Error while adding an asynchronous message")
-//                                            .setCause(e)
-//                                            .setPublishedObject(message));
-//            } finally {
-//                // always publish the job
-//                ringBuffer.publish(seq);
-//            }
-
-//            MessageHolder messageHolder = new MessageHolder();
-//            messageHolder.messageType = MessageType.ONE;
-//            messageHolder.message1 = message;
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    MultiMBassador.this.publish(message);
+                }
+            };
 
 
-//            new Runnable() {
-//                @Override
-//                public void run() {
-//
-//                }
-//            };
 
             // faster if we can skip locking
 //            int counter = 200;
 //            while (!this.dispatchQueue.offer(message)) {
-//                if (counter > 100) {
-//                    --counter;
-//                    Thread.yield();
-//                } else if (counter > 0) {
+////                if (counter > 100) {
+////                    --counter;
+////                    Thread.yield();
+////                } else
+//                    if (counter > 0) {
 //                    --counter;
 //                    LockSupport.parkNanos(1L);
 //                } else {
                     try {
-                        this.dispatchQueue.transfer(message);
+                        this.dispatchQueue.transfer(runnable);
                         return;
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -442,9 +456,9 @@ public class MultiMBassador implements IMessageBus {
                         .setCause(e)
                         .setPublishedObject(message));
                     }
-//                }
+                }
 //            }
-        }
+//        }
     }
 
     @Override

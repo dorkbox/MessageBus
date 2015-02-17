@@ -1,19 +1,24 @@
 package net.engio.mbassy.multi.common;
 
+import java.util.Collection;
+
 /**
  * Todo: Add javadoc
  *
  * @author bennidi
  *         Date: 3/29/13
  */
-public interface IConcurrentSet<T> extends Iterable<T> {
+public interface IConcurrentSet<T> extends Collection<T> {
 
-    void add(T element);
+    @Override
+    boolean add(T element);
 
-    boolean contains(T element);
+    boolean contains(Object element);
 
+    @Override
     int size();
 
+    @Override
     boolean isEmpty();
 
     void addAll(Iterable<T> elements);
@@ -21,5 +26,5 @@ public interface IConcurrentSet<T> extends Iterable<T> {
     /**
      * @return TRUE if the element was removed
      */
-    boolean remove(T element);
+    boolean remove(Object element);
 }
