@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class DisruptorThreadFactory implements ThreadFactory {
+public class NamedThreadFactory implements ThreadFactory {
     /**
      * The stack size is arbitrary based on JVM implementation. Default is 0
      * 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
@@ -64,7 +64,7 @@ public class DisruptorThreadFactory implements ThreadFactory {
     private final ThreadGroup group;
     private final String groupName;
 
-    public DisruptorThreadFactory(String groupName) {
+    public NamedThreadFactory(String groupName) {
         this.groupName = groupName;
         this.group = new ThreadGroup(groupName);
     }
@@ -80,7 +80,7 @@ public class DisruptorThreadFactory implements ThreadFactory {
         // 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
         // To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)
         // Setting the size MAY or MAY NOT have any effect!!!
-        Thread t = new Thread(this.group, r, stringBuilder.toString(), DisruptorThreadFactory.stackSizeForThreads);
+        Thread t = new Thread(this.group, r, stringBuilder.toString(), NamedThreadFactory.stackSizeForThreads);
         t.setDaemon(true);// FORCE these threads to finish before allowing the JVM to exit
         if (t.getPriority() != Thread.NORM_PRIORITY) {
             t.setPriority(Thread.NORM_PRIORITY);

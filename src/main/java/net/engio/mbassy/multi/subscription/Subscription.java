@@ -66,40 +66,11 @@ public class Subscription {
         return this.handlerMetadata.acceptsSubtypes();
     }
 
-    /**
-     * Check whether this subscription manages a message handler
-     */
-    public boolean handlesMessageType(Class<?> messageType) {
-        return this.handlerMetadata.handlesMessage(messageType);
-    }
-
-    /**
-     * Check whether this subscription manages a message handler
-     */
-    public boolean handlesMessageType(Class<?> messageType1, Class<?> messageType2) {
-        return this.handlerMetadata.handlesMessage(messageType1, messageType2);
-    }
-
-    /**
-     * Check whether this subscription manages a message handler
-     */
-    public boolean handlesMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
-        return this.handlerMetadata.handlesMessage(messageType1, messageType2, messageType3);
-    }
-
-    /**
-     * Check whether this subscription manages a message handler
-     */
-    public boolean handlesMessageType(Class<?>... messageTypes) {
-        return this.handlerMetadata.handlesMessage(messageTypes);
-    }
-
     public Class<?>[] getHandledMessageTypes() {
         return this.handlerMetadata.getHandledMessages();
     }
 
     public void subscribe(Object listener) {
-//        this.listeners.put(listener, Boolean.TRUE);
         this.listeners.add(listener);
     }
 
@@ -119,17 +90,16 @@ public class Subscription {
         return this.listeners.size();
     }
 
-//    private AtomicLong counter = new AtomicLong();
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
         Collection<Object> listeners = this.listeners;
 
         if (listeners.size() > 0) {
             Method handler = this.handlerMetadata.getHandler();
-//            int count = 0;
+            IHandlerInvocation invocation = this.invocation;
+
             for (Object listener : listeners) {
-//                count++;
                 try {
-                    this.invocation.invoke(listener, handler, message);
+                    invocation.invoke(listener, handler, message);
                 } catch (IllegalAccessException e) {
                     errorHandler.handlePublicationError(new PublicationError()
                                                             .setMessage("Error during invocation of message handler. " +
@@ -165,7 +135,6 @@ public class Subscription {
                                                             .setPublishedObject(message));
                 }
             }
-//            this.counter.getAndAdd(count);
         }
     }
 

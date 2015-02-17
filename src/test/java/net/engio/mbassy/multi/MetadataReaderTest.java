@@ -138,7 +138,7 @@ public class MetadataReaderTest extends AssertSupport {
         public List<MessageHandler> getHandlers(MessageListener listener, Class<?>... messageTypes) {
             List<MessageHandler> matching = new LinkedList<MessageHandler>();
             for (MessageHandler handler : listener.getHandlers()) {
-                if (handler.handlesMessage(messageTypes)) {
+                if (handlesMessage(handler, messageTypes)) {
                     matching.add(handler);
                 }
             }
@@ -243,5 +243,202 @@ public class MetadataReaderTest extends AssertSupport {
 
         @Handler public void handleStringXplus1plusN(String[] s, Object o, Object... o1) {}
 
+    }
+
+    /**
+     * @return true if the message types are handled
+     */
+    private static boolean handlesMessage(MessageHandler handler, Class<?> messageType) {
+        Class<?>[] handledMessages = handler.getHandledMessages();
+        int handledLength = handledMessages.length;
+
+        if (handledLength != 1) {
+            return false;
+        }
+
+        if (handler.acceptsSubtypes()) {
+            if (!handledMessages[0].isAssignableFrom(messageType)) {
+                return false;
+            }
+        } else {
+            if (handledMessages[0] != messageType) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return true if the message types are handled
+     */
+    private static boolean handlesMessage(MessageHandler handler, Class<?> messageType1, Class<?> messageType2) {
+        Class<?>[] handledMessages = handler.getHandledMessages();
+        int handledLength = handledMessages.length;
+
+        if (handledLength != 2) {
+            return false;
+        }
+
+        if (handler.acceptsSubtypes()) {
+            if (!handledMessages[0].isAssignableFrom(messageType1)) {
+                return false;
+            }
+            if (!handledMessages[1].isAssignableFrom(messageType2)) {
+                return false;
+            }
+        } else {
+            if (handledMessages[0] != messageType1) {
+                return false;
+            }
+            if (handledMessages[1] != messageType2) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return true if the message types are handled
+     */
+    private static boolean handlesMessage(MessageHandler handler, Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
+        Class<?>[] handledMessages = handler.getHandledMessages();
+        int handledLength = handledMessages.length;
+
+        if (handledLength != 3) {
+            return false;
+        }
+
+        if (handler.acceptsSubtypes()) {
+            if (!handledMessages[0].isAssignableFrom(messageType1)) {
+                return false;
+            }
+            if (!handledMessages[1].isAssignableFrom(messageType2)) {
+                return false;
+            }
+            if (!handledMessages[2].isAssignableFrom(messageType3)) {
+                return false;
+            }
+        } else {
+            if (handledMessages[0] != messageType1) {
+                return false;
+            }
+            if (handledMessages[1] != messageType2) {
+                return false;
+            }
+            if (handledMessages[2] != messageType3) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return true if the message types are handled
+     */
+    private static boolean handlesMessage(MessageHandler handler, Class<?>... messageTypes) {
+        Class<?>[] handledMessages = handler.getHandledMessages();
+
+        int handledLength = handledMessages.length;
+        int handledLengthMinusVarArg = handledLength-1;
+
+        int messagesLength = messageTypes.length;
+
+        // do we even have enough to even CHECK the var-arg?
+        if (messagesLength < handledLengthMinusVarArg) {
+            // totally wrong number of args
+            return false;
+        }
+
+        // check BEFORE var-arg in handler (var-arg can ONLY be last element in array)
+        if (handledLengthMinusVarArg <= messagesLength) {
+            if (handler.acceptsSubtypes()) {
+                for (int i = 0; i < handledLengthMinusVarArg; i++) {
+                    Class<?> handledMessage = handledMessages[i];
+                    Class<?> messageType = messageTypes[i];
+
+                    if (!handledMessage.isAssignableFrom(messageType)) {
+                        return false;
+                    }
+                }
+            } else {
+                for (int i = 0; i < handledLengthMinusVarArg; i++) {
+                    Class<?> handledMessage = handledMessages[i];
+                    Class<?> messageType = messageTypes[i];
+
+                    if (handledMessage != messageType) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // do we even HAVE var-arg?
+        if (!handledMessages[handledLengthMinusVarArg].isArray()) {
+            // DO NOT HAVE VAR_ARG PRESENT IN HANDLERS
+
+            // fast exit
+            if (handledLength != messagesLength) {
+                return false;
+            }
+
+            // compare remaining arg
+            Class<?> handledMessage = handledMessages[handledLengthMinusVarArg];
+            Class<?> messageType = messageTypes[handledLengthMinusVarArg];
+
+            if (handler.acceptsSubtypes()) {
+                if (!handledMessage.isAssignableFrom(messageType)) {
+                    return false;
+                }
+            } else {
+                if (handledMessage != messageType) {
+                    return false;
+                }
+            }
+            // all args are dandy
+            return true;
+        }
+
+        // WE HAVE VAR_ARG PRESENT IN HANDLER
+
+        // do we have enough args to NEED to check the var-arg?
+        if (handledLengthMinusVarArg == messagesLength) {
+            // var-arg doesn't need checking
+            return true;
+        }
+
+        // then check var-arg in handler
+
+        // all the args to check for the var-arg MUST be the same! (ONLY ONE ARRAY THOUGH CAN BE PRESENT)
+        int messagesLengthMinusVarArg = messagesLength-1;
+
+        Class<?> typeCheck = messageTypes[handledLengthMinusVarArg];
+        for (int i = handledLengthMinusVarArg; i < messagesLength; i++) {
+            Class<?> t1 = messageTypes[i];
+            if (t1 != typeCheck) {
+                return false;
+            }
+        }
+
+        // if we got this far, then the args are the same type. IF we have more than one, AND they are arrays, NOPE!
+        if (messagesLength - handledLengthMinusVarArg > 1 && messageTypes[messagesLengthMinusVarArg].isArray()) {
+            return false;
+        }
+
+        // are we comparing array -> array or string -> array
+        Class<?> componentType;
+        if (messageTypes[messagesLengthMinusVarArg].isArray()) {
+            componentType = handledMessages[handledLengthMinusVarArg];
+        } else {
+            componentType = handledMessages[handledLengthMinusVarArg].getComponentType();
+        }
+
+        if (handler.acceptsSubtypes()) {
+            return componentType.isAssignableFrom(typeCheck);
+        } else {
+            return typeCheck == componentType;
+        }
     }
 }
