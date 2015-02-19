@@ -8,8 +8,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import net.engio.mbassy.multi.common.DeadMessage;
-import net.engio.mbassy.multi.common.NamedThreadFactory;
 import net.engio.mbassy.multi.common.LinkedTransferQueue;
+import net.engio.mbassy.multi.common.NamedThreadFactory;
 import net.engio.mbassy.multi.common.TransferQueue;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
@@ -29,7 +29,7 @@ public class MultiMBassador implements IMessageBus {
     // this handler will receive all errors that occur during message dispatch or message handling
     private final List<IPublicationErrorHandler> errorHandlers = new ArrayList<IPublicationErrorHandler>();
 
-    private final SubscriptionManager subscriptionManager = new SubscriptionManager();
+    private final SubscriptionManager subscriptionManager;
     private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
 
 
@@ -38,6 +38,7 @@ public class MultiMBassador implements IMessageBus {
 
     public MultiMBassador() {
         this(Runtime.getRuntime().availableProcessors());
+//        this(2);
     }
 
 
@@ -46,6 +47,7 @@ public class MultiMBassador implements IMessageBus {
             numberOfThreads = 1; // at LEAST 1 thread
         }
 
+        this.subscriptionManager = new SubscriptionManager(numberOfThreads);
         this.threads = new ArrayList<Thread>(numberOfThreads);
 
         NamedThreadFactory dispatchThreadFactory = new NamedThreadFactory("MessageBus");
@@ -124,43 +126,40 @@ public class MultiMBassador implements IMessageBus {
     }
 
 
-    @SuppressWarnings("null")
     @Override
     public void publish(Object message) {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-        manager.readLock();
+//        manager.readLock();
             Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-            boolean validSubs = subscriptions != null && !subscriptions.isEmpty();
-
-            Collection<Subscription> deadSubscriptions = null;
-            if (!validSubs) {
-                // Dead Event. must EXACTLY MATCH (no subclasses or varargs)
-                deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
-            }
-
             Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             Collection<Subscription> varArgs = manager.getVarArgs(messageClass);
-        manager.readUnLock();
+//        manager.readUnLock();
 
 
         // Run subscriptions
-        if (validSubs) {
+        if (subscriptions != null && !subscriptions.isEmpty()) {
             for (Subscription sub : subscriptions) {
                 // this catches all exception types
                 sub.publishToSubscription(this, message);
             }
-        } else if (deadSubscriptions != null && !deadSubscriptions.isEmpty()) {
-            DeadMessage deadMessage = new DeadMessage(message);
+        } else {
+//            manager.readLock();
+                // Dead Event must EXACTLY MATCH (no subclasses or varargs permitted)
+                Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+//            manager.readUnLock();
 
-            for (Subscription sub : deadSubscriptions) {
-                // this catches all exception types
-                sub.publishToSubscription(this, deadMessage);
+            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
+                DeadMessage deadMessage = new DeadMessage(message);
+                for (Subscription sub : deadSubscriptions) {
+                    // this catches all exception types
+                    sub.publishToSubscription(this, deadMessage);
+                }
+
             }
-            // Dead Event. only matches EXACT handlers (no vararg, no subclasses)
-            return;
         }
+
 
 
         // now get superClasses
@@ -170,6 +169,8 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message);
             }
         }
+
+
 
         // now get varargs
         if (varArgs != null && !varArgs.isEmpty()) {

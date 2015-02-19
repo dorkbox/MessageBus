@@ -1,8 +1,7 @@
 package net.engio.mbassy.multi.listener;
 
-import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * All instances of any class that defines at least one message handler (see @MessageHandler) are message listeners. Thus,
@@ -21,7 +20,7 @@ import java.util.List;
  */
 public class MessageListener {
 
-    private List<MessageHandler> handlers = new ArrayList<MessageHandler>();
+    private Collection<MessageHandler> handlers = new ArrayDeque<MessageHandler>();
     private Class<?> listenerDefinition;
 
     public MessageListener(Class<?> listenerDefinition) {
@@ -41,7 +40,7 @@ public class MessageListener {
         return this.handlers.add(messageHandler);
     }
 
-    public List<MessageHandler> getHandlers() {
+    public Collection<MessageHandler> getHandlers() {
         return this.handlers;
     }
 

@@ -13,10 +13,10 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
     public StrongConcurrentSet() {
-        this(16);
+        this(16, .75f);
     }
 
-    public StrongConcurrentSet(int size) {
+    public StrongConcurrentSet(int size, float lOAD_FACTOR) {
         super(new IdentityHashMap<T, ISetEntry<T>>(size));
     }
 

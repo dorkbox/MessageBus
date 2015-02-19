@@ -1,7 +1,7 @@
 package net.engio.mbassy.multi.common;
 
-import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -228,7 +228,7 @@ public class IdentityObjectTree<KEY, VALUE> {
         IdentityObjectTree<KEY, VALUE> objectTree;
 
         if (this.children == null) {
-            this.children = new IdentityHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2);
+            this.children = new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(4, .9f, 1);
 
             // might as well add too
             objectTree = new IdentityObjectTree<KEY, VALUE>();
