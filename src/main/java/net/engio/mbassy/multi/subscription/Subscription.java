@@ -57,11 +57,6 @@ public class Subscription {
         return this.handlerMetadata.isFromListener(listener);
     }
 
-    /** Check if this subscription permits sending objects as a VarArg (variable argument) */
-    public boolean isVarArg() {
-        return this.handlerMetadata.isVarArg();
-    }
-
     public boolean acceptsSubtypes() {
         return this.handlerMetadata.acceptsSubtypes();
     }

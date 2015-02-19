@@ -33,8 +33,6 @@ public class MessageHandler {
     private final boolean acceptsSubtypes;
     private final MessageListener listenerConfig;
 
-    // if ONE of the handled messages is of type array, then we configure it to ALSO accept var args!
-    private final boolean isVarArg;
     private final boolean isSynchronized;
 
     public MessageHandler(Method handler, Handler handlerConfig, MessageListener listenerMetadata){
@@ -53,10 +51,6 @@ public class MessageHandler {
         this.listenerConfig  = listenerMetadata;
         this.isSynchronized  = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
         this.handledMessages = handledMessages;
-
-
-        // if ONE of the handled messages is of type array, then we configure it to ALSO accept var args!
-        this.isVarArg = handledMessages.length == 1 && handledMessages[0].isArray();
     }
 
     public boolean isSynchronized(){
@@ -75,15 +69,6 @@ public class MessageHandler {
         return this.handledMessages;
     }
 
-    /*
-     * @author dorkbox, llc
-     *         Date: 2/2/15
-     */
-    /** Check if this handler permits sending objects as a VarArg (variable argument) */
-    public boolean isVarArg() {
-        return this.isVarArg;
-    }
-
     public boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
     }
@@ -93,7 +78,6 @@ public class MessageHandler {
         final int prime = 31;
         int result = 1;
         result = prime * result + (this.acceptsSubtypes ? 1231 : 1237);
-        result = prime * result + (this.isVarArg ? 1231 : 1237);
         result = prime * result + Arrays.hashCode(this.handledMessages);
         result = prime * result + (this.handler == null ? 0 : this.handler.hashCode());
         result = prime * result + (this.isSynchronized ? 1231 : 1237);
@@ -113,9 +97,6 @@ public class MessageHandler {
         }
         MessageHandler other = (MessageHandler) obj;
         if (this.acceptsSubtypes != other.acceptsSubtypes) {
-            return false;
-        }
-        if (this.isVarArg != other.isVarArg) {
             return false;
         }
         if (!Arrays.equals(this.handledMessages, other.handledMessages)) {

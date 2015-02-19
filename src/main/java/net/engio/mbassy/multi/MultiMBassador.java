@@ -131,13 +131,9 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-//        manager.readLock();
-            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
-            Collection<Subscription> varArgs = manager.getVarArgs(messageClass);
-//        manager.readUnLock();
 
 
+        Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
         // Run subscriptions
         if (subscriptions != null && !subscriptions.isEmpty()) {
             for (Subscription sub : subscriptions) {
@@ -145,10 +141,8 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message);
             }
         } else {
-//            manager.readLock();
-                // Dead Event must EXACTLY MATCH (no subclasses or varargs permitted)
-                Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-//            manager.readUnLock();
+            // Dead Event must EXACTLY MATCH (no subclasses or varargs permitted)
+            Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
 
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
@@ -161,34 +155,12 @@ public class MultiMBassador implements IMessageBus {
         }
 
 
-
+        Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
         // now get superClasses
         if (superSubscriptions != null) {
             for (Subscription sub : superSubscriptions) {
                 // this catches all exception types
                 sub.publishToSubscription(this, message);
-            }
-        }
-
-
-
-        // now get varargs
-        if (varArgs != null && !varArgs.isEmpty()) {
-            // messy, but the ONLY way to do it.
-            Object[] vararg = null;
-
-            for (Subscription sub : varArgs) {
-                if (sub.isVarArg()) {
-                    if (vararg == null) {
-                        vararg = (Object[]) Array.newInstance(messageClass, 1);
-                        vararg[0] = message;
-
-                        Object[] newInstance = new Object[1];
-                        newInstance[0] = vararg;
-                        vararg = newInstance;
-                    }
-                    sub.publishToSubscription(this, vararg);
-                }
             }
         }
     }

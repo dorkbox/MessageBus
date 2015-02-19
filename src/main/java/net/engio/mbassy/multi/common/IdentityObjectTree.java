@@ -228,7 +228,7 @@ public class IdentityObjectTree<KEY, VALUE> {
         IdentityObjectTree<KEY, VALUE> objectTree;
 
         if (this.children == null) {
-            this.children = new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(4, .9f, 1);
+            this.children = new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, .8f, 1);
 
             // might as well add too
             objectTree = new IdentityObjectTree<KEY, VALUE>();

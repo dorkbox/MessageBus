@@ -1,6 +1,5 @@
 package net.engio.mbassy.multi.subscription;
 
-import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Iterator;
@@ -52,9 +51,6 @@ public class SubscriptionManager {
 
     private final Object holder = new Object[0];
 
-    // remember classes that can have VarArg casting performed
-    private final Map<Class<?>, Class<?>> varArgClasses;
-
     private final Map<Class<?>, Collection<Class<?>>> superClassesCache;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
@@ -80,7 +76,6 @@ public class SubscriptionManager {
 //        // only used during SUB/UNSUB
 //        this.subscriptionsPerListener = new IdentityHashMap<Class<?>, Collection<Subscription>>(4);
 //
-//        this.varArgClasses = new IdentityHashMap<Class<?>, Class<?>>(8);
 //        this.superClassesCache = new IdentityHashMap<Class<?>, Collection<Class<?>>>(8);
 
         this.subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
@@ -89,10 +84,15 @@ public class SubscriptionManager {
         // only used during SUB/UNSUB
         this.subscriptionsPerListener = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, 1);
 
-        this.varArgClasses = new ConcurrentHashMap<Class<?>, Class<?>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
         this.superClassesCache = new ConcurrentHashMap<Class<?>, Collection<Class<?>>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
 
         this.nonListeners = new ConcurrentHashMap<Class<?>, Object>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
+    }
+
+    private final void resetSuperClassSubs() {
+        // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
+        // it's a hit on SUB/UNSUB, but improves performance on handlers
+        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
     }
 
     public void unsubscribe(Object listener) {
@@ -132,9 +132,7 @@ public class SubscriptionManager {
                                     // remove element
                                     this.subscriptionsPerMessageSingle.remove(clazz);
 
-                                    // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
-                                    // it's a hit on SUB/UNSUB, but improves performance on handlers
-                                    this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+                                    resetSuperClassSubs();
                                 }
                             }
                         } else {
@@ -199,10 +197,6 @@ public class SubscriptionManager {
             UPDATE.lock();
             subscriptions = this.subscriptionsPerListener.get(listenerClass);
 
-            // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
-            // it's a hit on SUB/UNSUB, but improves performance on handlers
-            this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
-
             if (subscriptions != null) {
                 // subscriptions already exist and must only be updated
                 for (Subscription subscription : subscriptions) {
@@ -222,6 +216,8 @@ public class SubscriptionManager {
                     }
 
                     subscriptions = new StrongConcurrentSet<Subscription>(8, this.LOAD_FACTOR);
+
+                    resetSuperClassSubs();
 
                     // create NEW subscriptions for all detected message handlers
                     for (MessageHandler messageHandler : messageHandlers) {
@@ -249,26 +245,7 @@ public class SubscriptionManager {
                                 subs.add(subscription);
                             }
 
-                            // have to save our the VarArg class types, because creating var-arg arrays for objects is expensive
-                            if (subscription.isVarArg()) {
-                                Class<?> componentType = clazz.getComponentType();
-                                this.varArgClasses.put(componentType, clazz);
-
-                                // since it's vararg, this means that it's an ARRAY, so we ALSO
-                                // have to add the component classes of the array
-                                if (acceptsSubtypes) {
-                                    Collection<Class<?>> superClasses = setupSuperClassCache(componentType);
-
-                                    // have to setup each vararg chain
-                                    for (Class<?> superClass : superClasses) {
-                                        if (!this.varArgClasses.containsKey(superClass)) {
-                                            // this is expensive, so we check the cache first
-                                            Class<?> c2 = Array.newInstance(superClass, 1).getClass();
-                                            this.varArgClasses.put(superClass, c2);
-                                        }
-                                    }
-                                }
-                            } else if (acceptsSubtypes) {
+                            if (acceptsSubtypes) {
                                 setupSuperClassCache(clazz);
                             }
                         }
@@ -357,7 +334,7 @@ public class SubscriptionManager {
     public Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
         Map<Class<?>, Collection<Subscription>> superClassSubs = this.superClassSubscriptions;
         if (superClassSubs == null) {
-            // we haven't created it yet
+            // we haven't created it yet (via subscribe)
             return null;
         }
 
@@ -521,57 +498,6 @@ public class SubscriptionManager {
         }
 
         return types;
-    }
-
-    // must be protected by read lock
-    public Collection<Subscription> getVarArgs(Class<?> clazz) {
-        Class<?> varArgClass = this.varArgClasses.get(clazz);
-        if (varArgClass != null) {
-            return this.subscriptionsPerMessageSingle.get(varArgClass);
-        }
-        return null;
-    }
-
-    // must be protected by read lock
-    public Collection<Subscription> getVarArgs(Class<?> clazz1, Class<?> clazz2) {
-        if (clazz1 == clazz2) {
-            Class<?> varArgClass = this.varArgClasses.get(clazz1);
-            if (varArgClass != null) {
-                return this.subscriptionsPerMessageSingle.get(varArgClass);
-            }
-        }
-        return null;
-    }
-
-    // must be protected by read lock
-    public Collection<Subscription> getVarArgs(Class<?> clazz1, Class<?> clazz2, Class<?> clazz3) {
-        if (clazz1 == clazz2 && clazz2 == clazz3) {
-            Class<?> varArgClass = this.varArgClasses.get(clazz1);
-            if (varArgClass != null) {
-                return this.subscriptionsPerMessageSingle.get(varArgClass);
-            }
-        }
-        return null;
-    }
-
-    // must be protected by read lock
-    public Collection<Subscription> getVarArgs(Class<?>... classes) {
-        // classes IS ALREADY ALL SAME TYPE!
-        Class<?> firstClass = classes[0];
-
-        Class<?> varArgClass = this.varArgClasses.get(firstClass);
-        if (varArgClass != null) {
-            return this.subscriptionsPerMessageSingle.get(varArgClass);
-        }
-        return null;
-    }
-
-    public void readLock() {
-        this.LOCK.readLock().lock();
-    }
-
-    public void readUnLock() {
-        this.LOCK.readLock().unlock();
     }
 
     public static class SuperClassIterator implements Iterator<Class<?>> {
