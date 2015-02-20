@@ -40,7 +40,7 @@ public class MultiMBassador implements IMessageBus {
     private List<Thread> threads;
 
     public MultiMBassador() {
-        this(Runtime.getRuntime().availableProcessors()*2);
+        this(Runtime.getRuntime().availableProcessors());
 //        this(2);
     }
 
@@ -134,6 +134,7 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
+//        manager.readLock();
         Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
 
         // Run subscriptions
@@ -166,6 +167,7 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message);
             }
         }
+//        manager.readUnLock();
     }
 
     @SuppressWarnings("null")
@@ -184,7 +186,7 @@ public class MultiMBassador implements IMessageBus {
                 deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
             }
 
-            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
+//            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
 
 
         // Run subscriptions
@@ -205,13 +207,13 @@ public class MultiMBassador implements IMessageBus {
         }
 
 
-        // now get superClasses
-        if (superSubscriptions != null) {
-            for (Subscription sub : superSubscriptions) {
-                // this catches all exception types
-                sub.publishToSubscription(this, message1, message2);
-            }
-        }
+//        // now get superClasses
+//        if (superSubscriptions != null) {
+//            for (Subscription sub : superSubscriptions) {
+//                // this catches all exception types
+//                sub.publishToSubscription(this, message1, message2);
+//            }
+//        }
     }
 
     @SuppressWarnings("null")
@@ -231,7 +233,7 @@ public class MultiMBassador implements IMessageBus {
                 deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
             }
 
-            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+//            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
 
 
         // Run subscriptions
@@ -252,13 +254,13 @@ public class MultiMBassador implements IMessageBus {
         }
 
 
-        // now get superClasses
-        if (superSubscriptions != null) {
-            for (Subscription sub : superSubscriptions) {
-                // this catches all exception types
-                sub.publishToSubscription(this, message1, message2, message3);
-            }
-        }
+//        // now get superClasses
+//        if (superSubscriptions != null) {
+//            for (Subscription sub : superSubscriptions) {
+//                // this catches all exception types
+//                sub.publishToSubscription(this, message1, message2, message3);
+//            }
+//        }
 
     }
 

@@ -7,6 +7,8 @@ import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.annotations.Synchronized;
 import net.engio.mbassy.multi.common.ReflectionUtils;
 
+import com.esotericsoftware.reflectasm.MethodAccess;
+
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
  * the handler is called a  message listener and more generally, any class containing a message handler in its class hierarchy
@@ -28,14 +30,16 @@ import net.engio.mbassy.multi.common.ReflectionUtils;
  */
 public class MessageHandler {
 
-    private final Method handler;
+    private final MethodAccess handler;
+    private final int methodIndex;
+
     private final Class<?>[] handledMessages;
     private final boolean acceptsSubtypes;
     private final MessageListener listenerConfig;
 
     private final boolean isSynchronized;
 
-    public MessageHandler(Method handler, Handler handlerConfig, MessageListener listenerMetadata){
+    public MessageHandler(Method handler, Handler handlerConfig, MessageListener listenerMetadata) {
         super();
 
         if (handler == null) {
@@ -44,8 +48,8 @@ public class MessageHandler {
 
         Class<?>[] handledMessages = handler.getParameterTypes();
 
-        this.handler = handler;
-        handler.setAccessible(true);
+        this.handler = MethodAccess.get(handler.getDeclaringClass());
+        this.methodIndex = this.handler.getIndex(handler.getName(), handledMessages);
 
         this.acceptsSubtypes = !handlerConfig.rejectSubtypes();
         this.listenerConfig  = listenerMetadata;
@@ -61,8 +65,12 @@ public class MessageHandler {
         return this.listenerConfig.isFromListener(listener);
     }
 
-    public Method getHandler() {
+    public MethodAccess getHandler() {
         return this.handler;
+    }
+
+    public int getMethodIndex() {
+        return this.methodIndex;
     }
 
     public Class<?>[] getHandledMessages() {

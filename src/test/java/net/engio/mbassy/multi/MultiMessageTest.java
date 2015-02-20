@@ -5,6 +5,8 @@ package net.engio.mbassy.multi;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.engio.mbassy.multi.IMessageBus;
+import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.common.MessageBusTest;
 

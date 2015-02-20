@@ -128,7 +128,7 @@ public class ReflectionUtils
     }
 
     public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType){
-       return getAnnotation(from, annotationType, Collections.newSetFromMap(new Object2BooleanOpenHashMap<AnnotatedElement>(8, .8f)));
+       return getAnnotation(from, annotationType, Collections.newSetFromMap(new Object2BooleanOpenHashMap<AnnotatedElement>(8, 0.8F)));
     }
 
     //

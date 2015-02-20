@@ -48,7 +48,6 @@ public class MetadataReader {
             // if a handler is overwritten it inherits the configuration of its parent method
             MessageHandler handlerMetadata = new MessageHandler(overriddenHandler, handlerConfig, listenerMetadata);
             listenerMetadata.addHandler(handlerMetadata);
-
         }
         return listenerMetadata;
     }

@@ -4,6 +4,7 @@
 package net.engio.mbassy.multi;
 
 import junit.framework.Assert;
+import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
@@ -42,7 +43,7 @@ public class PerformanceTest {
 
         long num = Long.MAX_VALUE;
         while (num-- > 0) {
-            bus.publish("s");
+            bus.publishAsync("s");
         }
 
 //        bus.publish("s", "s");

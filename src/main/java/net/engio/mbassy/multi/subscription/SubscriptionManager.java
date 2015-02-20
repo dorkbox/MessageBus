@@ -1,9 +1,10 @@
 package net.engio.mbassy.multi.subscription;
 
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanArrayMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.Entry;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.FastEntrySet;
 
-import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -53,7 +54,7 @@ public class SubscriptionManager {
 
     private final Object holder = new Object[0];
 
-    private final Map<Class<?>, Collection<Class<?>>> superClassesCache;
+    private final Map<Class<?>, FastEntrySet<Class<?>>> superClassesCache;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
@@ -65,8 +66,9 @@ public class SubscriptionManager {
     // remember already processed classes that do not contain any message handlers
     private final Map<Class<?>, Object> nonListeners;
 
-    // synchronize read/write acces to the subscription maps
+    // synchronize read/write access to the subscription maps
     private final ReentrantReadWriteLock LOCK = new ReentrantReadWriteLock();
+
 
     public SubscriptionManager(int numberOfThreads) {
         this.MAP_STRIPING = numberOfThreads;
@@ -78,7 +80,7 @@ public class SubscriptionManager {
         // only used during SUB/UNSUB
         this.subscriptionsPerListener = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, 1);
 
-        this.superClassesCache = new ConcurrentHashMap<Class<?>, Collection<Class<?>>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+        this.superClassesCache = new ConcurrentHashMap<Class<?>, FastEntrySet<Class<?>>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
 
         this.nonListeners = new ConcurrentHashMap<Class<?>, Object>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
     }
@@ -354,14 +356,17 @@ public class SubscriptionManager {
         FastEntrySet<Subscription> subsPerType = superClassSubs.get(superType);
 
         if (subsPerType == null) {
-            Collection<Class<?>> types = this.superClassesCache.get(superType);
+            FastEntrySet<Class<?>> types = this.superClassesCache.get(superType);
             if (types == null || types.isEmpty()) {
                 return null;
             }
 
             Reference2BooleanArrayMap<Subscription> map = new Reference2BooleanArrayMap<Subscription>(types.size() + 1);
 
-            for (Class<?> superClass : types) {
+            ObjectIterator<Entry<Class<?>>> fastIterator = types.fastIterator();
+            while (fastIterator.hasNext()) {
+                Class<?> superClass = fastIterator.next().getKey();
+
                 Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(superClass);
                 if (subs != null && !subs.isEmpty()) {
                     for (Subscription sub : subs) {
@@ -381,143 +386,146 @@ public class SubscriptionManager {
 
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
+    public void getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
 //        Collection<Subscription> subsPerType2 = this.superClassSubscriptions.get();
+//
+//
+//        // not thread safe. DO NOT MODIFY
+//        Collection<Class<?>> types1 = this.superClassesCache.get(superType1);
+//        Collection<Class<?>> types2 = this.superClassesCache.get(superType2);
+//
+//        Collection<Subscription> subsPerType = new ArrayDeque<Subscription>(DEFAULT_SUPER_CLASS_TREE_SIZE);
+//
+//        Collection<Subscription> subs;
+//        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf1;
+//        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf2;
+//
+//        Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
+//        Iterator<Class<?>> iterator2;
+//
+//        Class<?> eventSuperType1;
+//        Class<?> eventSuperType2;
+//
+//        while (iterator1.hasNext()) {
+//            eventSuperType1 = iterator1.next();
+//            boolean type1Matches = eventSuperType1 == superType1;
+//
+//            leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
+//            if (leaf1 != null) {
+//                iterator2 = new SuperClassIterator(superType2, types2);
+//
+//                while (iterator2.hasNext()) {
+//                    eventSuperType2 = iterator2.next();
+//                    if (type1Matches && eventSuperType2 == superType2) {
+//                        continue;
+//                    }
+//
+//                    leaf2 = leaf1.getLeaf(eventSuperType2);
+//
+//                    if (leaf2 != null) {
+//                        subs = leaf2.getValue();
+//                        if (subs != null) {
+//                            for (Subscription sub : subs) {
+//                                if (sub.acceptsSubtypes()) {
+//                                    subsPerType.add(sub);
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
 
-
-        // not thread safe. DO NOT MODIFY
-        Collection<Class<?>> types1 = this.superClassesCache.get(superType1);
-        Collection<Class<?>> types2 = this.superClassesCache.get(superType2);
-
-        Collection<Subscription> subsPerType = new ArrayDeque<Subscription>(DEFAULT_SUPER_CLASS_TREE_SIZE);
-
-        Collection<Subscription> subs;
-        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf1;
-        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf2;
-
-        Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
-        Iterator<Class<?>> iterator2;
-
-        Class<?> eventSuperType1;
-        Class<?> eventSuperType2;
-
-        while (iterator1.hasNext()) {
-            eventSuperType1 = iterator1.next();
-            boolean type1Matches = eventSuperType1 == superType1;
-
-            leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
-            if (leaf1 != null) {
-                iterator2 = new SuperClassIterator(superType2, types2);
-
-                while (iterator2.hasNext()) {
-                    eventSuperType2 = iterator2.next();
-                    if (type1Matches && eventSuperType2 == superType2) {
-                        continue;
-                    }
-
-                    leaf2 = leaf1.getLeaf(eventSuperType2);
-
-                    if (leaf2 != null) {
-                        subs = leaf2.getValue();
-                        if (subs != null) {
-                            for (Subscription sub : subs) {
-                                if (sub.acceptsSubtypes()) {
-                                    subsPerType.add(sub);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return subsPerType;
+//        return subsPerType;
     }
 
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
-        // not thread safe. DO NOT MODIFY
-        Collection<Class<?>> types1 = this.superClassesCache.get(superType1);
-        Collection<Class<?>> types2 = this.superClassesCache.get(superType2);
-        Collection<Class<?>> types3 = this.superClassesCache.get(superType3);
-
-        Collection<Subscription> subsPerType = new ArrayDeque<Subscription>(DEFAULT_SUPER_CLASS_TREE_SIZE);
-
-        Collection<Subscription> subs;
-        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf1;
-        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf2;
-        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf3;
-
-        Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
-        Iterator<Class<?>> iterator2;
-        Iterator<Class<?>> iterator3;
-
-        Class<?> eventSuperType1;
-        Class<?> eventSuperType2;
-        Class<?> eventSuperType3;
-
-        while (iterator1.hasNext()) {
-            eventSuperType1 = iterator1.next();
-            boolean type1Matches = eventSuperType1 == superType1;
-
-            leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
-            if (leaf1 != null) {
-                iterator2 = new SuperClassIterator(superType2, types2);
-
-                while (iterator2.hasNext()) {
-                    eventSuperType2 = iterator2.next();
-                    boolean type12Matches = type1Matches && eventSuperType2 == superType2;
-
-                    leaf2 = leaf1.getLeaf(eventSuperType2);
-
-                    if (leaf2 != null) {
-                        iterator3 = new SuperClassIterator(superType3, types3);
-
-                        while (iterator3.hasNext()) {
-                            eventSuperType3 = iterator3.next();
-                            if (type12Matches && eventSuperType3 == superType3) {
-                                continue;
-                            }
-
-                            leaf3 = leaf2.getLeaf(eventSuperType3);
-
-                            subs = leaf3.getValue();
-                            if (subs != null) {
-                                for (Subscription sub : subs) {
-                                    if (sub.acceptsSubtypes()) {
-                                        subsPerType.add(sub);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return subsPerType;
+    public void getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
+//        // not thread safe. DO NOT MODIFY
+//        Collection<Class<?>> types1 = this.superClassesCache.get(superType1);
+//        Collection<Class<?>> types2 = this.superClassesCache.get(superType2);
+//        Collection<Class<?>> types3 = this.superClassesCache.get(superType3);
+//
+//        Collection<Subscription> subsPerType = new ArrayDeque<Subscription>(DEFAULT_SUPER_CLASS_TREE_SIZE);
+//
+//        Collection<Subscription> subs;
+//        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf1;
+//        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf2;
+//        IdentityObjectTree<Class<?>, Collection<Subscription>> leaf3;
+//
+//        Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
+//        Iterator<Class<?>> iterator2;
+//        Iterator<Class<?>> iterator3;
+//
+//        Class<?> eventSuperType1;
+//        Class<?> eventSuperType2;
+//        Class<?> eventSuperType3;
+//
+//        while (iterator1.hasNext()) {
+//            eventSuperType1 = iterator1.next();
+//            boolean type1Matches = eventSuperType1 == superType1;
+//
+//            leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
+//            if (leaf1 != null) {
+//                iterator2 = new SuperClassIterator(superType2, types2);
+//
+//                while (iterator2.hasNext()) {
+//                    eventSuperType2 = iterator2.next();
+//                    boolean type12Matches = type1Matches && eventSuperType2 == superType2;
+//
+//                    leaf2 = leaf1.getLeaf(eventSuperType2);
+//
+//                    if (leaf2 != null) {
+//                        iterator3 = new SuperClassIterator(superType3, types3);
+//
+//                        while (iterator3.hasNext()) {
+//                            eventSuperType3 = iterator3.next();
+//                            if (type12Matches && eventSuperType3 == superType3) {
+//                                continue;
+//                            }
+//
+//                            leaf3 = leaf2.getLeaf(eventSuperType3);
+//
+//                            subs = leaf3.getValue();
+//                            if (subs != null) {
+//                                for (Subscription sub : subs) {
+//                                    if (sub.acceptsSubtypes()) {
+//                                        subsPerType.add(sub);
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        return subsPerType;
     }
 
 
     /**
      * race conditions will result in duplicate answers, which we don't care if happens
      */
-    private Collection<Class<?>> setupSuperClassCache(Class<?> clazz) {
-        Collection<Class<?>> types = this.superClassesCache.get(clazz);
-
-        if (types == null) {
+    private void setupSuperClassCache(Class<?> clazz) {
+        if (!this.superClassesCache.containsKey(clazz)) {
             // it doesn't matter if concurrent access stomps on values, since they are always the same.
             Set<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
 //            types = new ArrayDeque<Class<?>>(superTypes);
-            types = new StrongConcurrentSet<Class<?>>(superTypes.size(), this.LOAD_FACTOR);
-            types.addAll(superTypes);
+//            types = new StrongConcurrentSet<Class<?>>(superTypes.size(), this.LOAD_FACTOR);
+//            types.addAll(superTypes);
+
+            Reference2BooleanArrayMap<Class<?>> map = new Reference2BooleanArrayMap<Class<?>>(superTypes.size() + 1);
+            for (Class<?> c : superTypes) {
+                map.put(c, Boolean.TRUE);
+            }
+
+            FastEntrySet<Class<?>> fastSet = map.reference2BooleanEntrySet();
 
             // race conditions will result in duplicate answers, which we don't care about
-            this.superClassesCache.put(clazz, types);
+            this.superClassesCache.put(clazz, fastSet);
         }
-
-        return types;
     }
 
     public static class SuperClassIterator implements Iterator<Class<?>> {
