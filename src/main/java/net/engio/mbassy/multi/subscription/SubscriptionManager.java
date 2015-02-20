@@ -1,5 +1,8 @@
 package net.engio.mbassy.multi.subscription;
 
+import it.unimi.dsi.fastutil.objects.Reference2BooleanArrayMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.FastEntrySet;
+
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Iterator;
@@ -7,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import net.engio.mbassy.multi.common.IdentityObjectTree;
 import net.engio.mbassy.multi.common.ReflectionUtils;
@@ -14,8 +18,6 @@ import net.engio.mbassy.multi.common.StrongConcurrentSet;
 import net.engio.mbassy.multi.listener.MessageHandler;
 import net.engio.mbassy.multi.listener.MetadataReader;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
-import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
 
 /**
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
@@ -56,7 +58,7 @@ public class SubscriptionManager {
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
     // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
-    private volatile Map<Class<?>, Collection<Subscription>> superClassSubscriptions;
+    private volatile Map<Class<?>, FastEntrySet<Subscription>> superClassSubscriptions;
 //    private final IdentityObjectTree<Class<?>, Collection<Subscription>> superClassSubscriptionsMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
 
 
@@ -64,7 +66,7 @@ public class SubscriptionManager {
     private final Map<Class<?>, Object> nonListeners;
 
     // synchronize read/write acces to the subscription maps
-    private final ReentrantReadWriteUpdateLock LOCK = new ReentrantReadWriteUpdateLock();
+    private final ReentrantReadWriteLock LOCK = new ReentrantReadWriteLock();
 
     public SubscriptionManager(int numberOfThreads) {
         this.MAP_STRIPING = numberOfThreads;
@@ -84,7 +86,15 @@ public class SubscriptionManager {
     private final void resetSuperClassSubs() {
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance on handlers
-        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, FastEntrySet<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+    }
+
+    public void readLock() {
+        this.LOCK.readLock().lock();
+    }
+
+    public void readUnLock() {
+        this.LOCK.readLock().unlock();
     }
 
     public void unsubscribe(Object listener) {
@@ -332,15 +342,16 @@ public class SubscriptionManager {
     }
 
 
+
     // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
-        Map<Class<?>, Collection<Subscription>> superClassSubs = this.superClassSubscriptions;
+    public FastEntrySet<Subscription> getSuperSubscriptions(Class<?> superType) {
+        Map<Class<?>, FastEntrySet<Subscription>> superClassSubs = this.superClassSubscriptions;
         if (superClassSubs == null) {
             // we haven't created it yet (via subscribe)
             return null;
         }
 
-        Collection<Subscription> subsPerType = superClassSubs.get(superType);
+        FastEntrySet<Subscription> subsPerType = superClassSubs.get(superType);
 
         if (subsPerType == null) {
             Collection<Class<?>> types = this.superClassesCache.get(superType);
@@ -348,20 +359,20 @@ public class SubscriptionManager {
                 return null;
             }
 
-//            subsPerType = new StrongConcurrentSet<Subscription>(types.size(), this.LOAD_FACTOR);
-            subsPerType = new ArrayDeque<Subscription>(types.size() + 1);
+            Reference2BooleanArrayMap<Subscription> map = new Reference2BooleanArrayMap<Subscription>(types.size() + 1);
 
             for (Class<?> superClass : types) {
                 Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(superClass);
-                if (subs != null) {
+                if (subs != null && !subs.isEmpty()) {
                     for (Subscription sub : subs) {
                         if (sub.acceptsSubtypes()) {
-                            subsPerType.add(sub);
+                            map.put(sub, Boolean.TRUE);
                         }
                     }
                 }
             }
 
+            subsPerType = map.reference2BooleanEntrySet();
             superClassSubs.put(superType, subsPerType);
         }
 

@@ -87,7 +87,7 @@ public class Subscription {
     public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
         Collection<Object> listeners = this.listeners;
 
-        if (listeners.size() > 0) {
+        if (!listeners.isEmpty()) {
             Method handler = this.handlerMetadata.getHandler();
             IHandlerInvocation invocation = this.invocation;
 
