@@ -18,7 +18,6 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
     }
 
     public StrongConcurrentSet(int size, float loadFactor) {
-//        super(new ConcurrentHashMap<T, ISetEntry<T>>(size, loadFactor, 1));
         super(new Reference2ReferenceOpenHashMap<T, ISetEntry<T>>(size, loadFactor));
     }
 

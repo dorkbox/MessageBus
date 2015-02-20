@@ -44,7 +44,6 @@ public class MultiMBassador implements IMessageBus {
 //        this(2);
     }
 
-
     public MultiMBassador(int numberOfThreads) {
         if (numberOfThreads < 1) {
             numberOfThreads = 1; // at LEAST 1 thread
@@ -128,13 +127,11 @@ public class MultiMBassador implements IMessageBus {
         }
     }
 
-
     @Override
     public void publish(Object message) {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-//        manager.readLock();
         Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
 
         // Run subscriptions
@@ -144,9 +141,8 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message);
             }
         } else {
-            // Dead Event must EXACTLY MATCH (no subclasses or varargs permitted)
+            // Dead Event must EXACTLY MATCH (no subclasses)
             Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
                 for (Subscription sub : deadSubscriptions) {
@@ -167,7 +163,6 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message);
             }
         }
-//        manager.readUnLock();
     }
 
     @SuppressWarnings("null")
