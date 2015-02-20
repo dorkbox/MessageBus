@@ -1,5 +1,6 @@
 package net.engio.mbassy.multi.common;
-import java.util.IdentityHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+
 import java.util.Iterator;
 
 /**
@@ -13,11 +14,12 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
     public StrongConcurrentSet() {
-        this(16, .75f);
+        this(16, 0.75f);
     }
 
-    public StrongConcurrentSet(int size, float lOAD_FACTOR) {
-        super(new IdentityHashMap<T, ISetEntry<T>>(size));
+    public StrongConcurrentSet(int size, float loadFactor) {
+//        super(new ConcurrentHashMap<T, ISetEntry<T>>(size, loadFactor, 1));
+        super(new Reference2ReferenceOpenHashMap<T, ISetEntry<T>>(size, loadFactor));
     }
 
     @Override

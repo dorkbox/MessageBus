@@ -40,7 +40,7 @@ public class SubscriptionManager {
     // all subscriptions per message type
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle;
+    private final ConcurrentHashMap<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle;
     private final IdentityObjectTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti;
 
     // all subscriptions per messageHandler type
@@ -67,18 +67,10 @@ public class SubscriptionManager {
     private final ReentrantReadWriteUpdateLock LOCK = new ReentrantReadWriteUpdateLock();
 
     public SubscriptionManager(int numberOfThreads) {
-        this.MAP_STRIPING = 1;
+        this.MAP_STRIPING = numberOfThreads;
         this.LOAD_FACTOR = 0.8f;
 
-//        this.subscriptionsPerMessageSingle = new IdentityHashMap<Class<?>, Collection<Subscription>>(4);
-//        this.subscriptionsPerMessageMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
-//
-//        // only used during SUB/UNSUB
-//        this.subscriptionsPerListener = new IdentityHashMap<Class<?>, Collection<Subscription>>(4);
-//
-//        this.superClassesCache = new IdentityHashMap<Class<?>, Collection<Class<?>>>(8);
-
-        this.subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
+        this.subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, 1);
         this.subscriptionsPerMessageMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
 
         // only used during SUB/UNSUB
@@ -103,7 +95,7 @@ public class SubscriptionManager {
         Class<?> listenerClass = listener.getClass();
         Collection<Subscription> subscriptions;
         boolean nothingLeft = true;
-        Lock UPDATE = this.LOCK.updateLock();
+        Lock UPDATE = this.LOCK.writeLock();
         try {
             UPDATE.lock();
 
@@ -168,10 +160,7 @@ public class SubscriptionManager {
             }
 
             if (nothingLeft) {
-                Lock WRITE = this.LOCK.writeLock();
-                WRITE.lock();
                 this.subscriptionsPerListener.remove(listenerClass);
-                WRITE.unlock();
             }
 
         } finally {
@@ -181,6 +170,15 @@ public class SubscriptionManager {
         return;
     }
 
+    private final ThreadLocal<Collection<Subscription>> subInitialValue = new ThreadLocal<Collection<Subscription>>() {
+        @Override
+        protected java.util.Collection<Subscription> initialValue() {
+//            return new ArrayDeque<Subscription>(8);
+//            return Collections.newSetFromMap(new Reference2BooleanOpenHashMap<Subscription>(8, SubscriptionManager.this.LOAD_FACTOR));
+//            return Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(8, SubscriptionManager.this.LOAD_FACTOR, SubscriptionManager.this.MAP_STRIPING));
+            return new StrongConcurrentSet<Subscription>(8, SubscriptionManager.this.LOAD_FACTOR);
+        }
+    };
 
     // when a class is subscribed, the registrations for that class are permanent in the "subscriptionsPerListener"?
     public void subscribe(Object listener) {
@@ -192,9 +190,9 @@ public class SubscriptionManager {
         }
 
         Collection<Subscription> subscriptions;
-        Lock UPDATE = this.LOCK.updateLock();
+        Lock WRITE = this.LOCK.writeLock();
         try {
-            UPDATE.lock();
+            WRITE.lock();
             subscriptions = this.subscriptionsPerListener.get(listenerClass);
 
             if (subscriptions != null) {
@@ -203,19 +201,19 @@ public class SubscriptionManager {
                     subscription.subscribe(listener);
                 }
             } else {
-                Lock WRITE = this.LOCK.writeLock();
-                try {
-                    WRITE.lock(); // upgrade updatelock to write lock, Avoid DCL
+                // a listener is subscribed for the first time
+                Collection<MessageHandler> messageHandlers = this.metadataReader.getMessageListener(listenerClass).getHandlers();
+                int handlersSize = messageHandlers.size();
 
-                    // a listener is subscribed for the first time
-                    Collection<MessageHandler> messageHandlers = this.metadataReader.getMessageListener(listenerClass).getHandlers();
-                    if (messageHandlers.isEmpty()) {
-                        // remember the class as non listening class if no handlers are found
-                        this.nonListeners.put(listenerClass, this.holder);
-                        return;
-                    }
-
-                    subscriptions = new StrongConcurrentSet<Subscription>(8, this.LOAD_FACTOR);
+                if (handlersSize == 0) {
+                    // remember the class as non listening class if no handlers are found
+                    this.nonListeners.put(listenerClass, this.holder);
+                } else {
+                    subscriptions = new StrongConcurrentSet<Subscription>(handlersSize, this.LOAD_FACTOR);
+//                        subscriptions = Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(8, this.LOAD_FACTOR, this.MAP_STRIPING));
+//                        subscriptions = Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(8, this.LOAD_FACTOR, 1));
+//                        subscriptions = Collections.newSetFromMap(new Reference2BooleanOpenHashMap<Subscription>(8, this.LOAD_FACTOR));
+                    this.subscriptionsPerListener.put(listenerClass, subscriptions);
 
                     resetSuperClassSubs();
 
@@ -225,6 +223,11 @@ public class SubscriptionManager {
                         Subscription subscription = new Subscription(messageHandler);
                         subscription.subscribe(listener);
 
+                        subscriptions.add(subscription);
+
+                        //
+                        // save the subscription per message type
+                        //
                         // single or multi?
                         Class<?>[] handledMessageTypes = subscription.getHandledMessageTypes();
                         int size = handledMessageTypes.length;
@@ -236,70 +239,70 @@ public class SubscriptionManager {
 
                             Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
                             if (subs == null) {
-                                // NOTE: Order is important for safe publication
-                                subs = new StrongConcurrentSet<Subscription>(8, this.LOAD_FACTOR);
-                                subs.add(subscription);
-                                this.subscriptionsPerMessageSingle.put(clazz, subs);
-
-                            } else {
-                                subs.add(subscription);
+                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageSingle.putIfAbsent(clazz, this.subInitialValue.get());
+                                if (putIfAbsent != null) {
+                                    subs = putIfAbsent;
+                                } else {
+                                    subs = this.subInitialValue.get();
+//                                        this.subInitialValue.set(Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(8, this.LOAD_FACTOR, 1)));
+//                                        this.subInitialValue.set(Collections.newSetFromMap(new Reference2BooleanOpenHashMap<Subscription>(8, this.LOAD_FACTOR)));
+                                    this.subInitialValue.set(new StrongConcurrentSet<Subscription>(8, this.LOAD_FACTOR));
+//                                        this.subInitialValue.set(new ArrayDeque<Subscription>(8));
+                                }
                             }
 
+                            subs.add(subscription);
+
                             if (acceptsSubtypes) {
+                                // race conditions will result in duplicate answers, which we don't care about
                                 setupSuperClassCache(clazz);
                             }
                         }
                         else {
-                            // NOTE: Not thread-safe! must be synchronized in outer scope
-                            IdentityObjectTree<Class<?>, Collection<Subscription>> tree;
-
-                            switch (size) {
-                                case 2: {
-                                    tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1]);
-                                    if (acceptsSubtypes) {
-                                        setupSuperClassCache(handledMessageTypes[0]);
-                                        setupSuperClassCache(handledMessageTypes[1]);
-                                    }
-                                    break;
-                                }
-                                case 3: {
-                                    tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1], handledMessageTypes[2]);
-                                    if (acceptsSubtypes) {
-                                        setupSuperClassCache(handledMessageTypes[0]);
-                                        setupSuperClassCache(handledMessageTypes[1]);
-                                        setupSuperClassCache(handledMessageTypes[2]);
-                                    }
-                                    break;
-                                }
-                                default: {
-                                    tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes);
-                                    if (acceptsSubtypes) {
-                                        for (Class<?> c : handledMessageTypes) {
-                                            setupSuperClassCache(c);
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-
-                            Collection<Subscription> subs = tree.getValue();
-                            if (subs == null) {
-                                subs = new StrongConcurrentSet<Subscription>(16, this.LOAD_FACTOR);
-                                tree.putValue(subs);
-                            }
-                            subs.add(subscription);
+//                                // NOTE: Not thread-safe! must be synchronized in outer scope
+//                                IdentityObjectTree<Class<?>, Collection<Subscription>> tree;
+//
+//                                switch (size) {
+//                                    case 2: {
+//                                        tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1]);
+//                                        if (acceptsSubtypes) {
+//                                            setupSuperClassCache(handledMessageTypes[0]);
+//                                            setupSuperClassCache(handledMessageTypes[1]);
+//                                        }
+//                                        break;
+//                                    }
+//                                    case 3: {
+//                                        tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes[0], handledMessageTypes[1], handledMessageTypes[2]);
+//                                        if (acceptsSubtypes) {
+//                                            setupSuperClassCache(handledMessageTypes[0]);
+//                                            setupSuperClassCache(handledMessageTypes[1]);
+//                                            setupSuperClassCache(handledMessageTypes[2]);
+//                                        }
+//                                        break;
+//                                    }
+//                                    default: {
+//                                        tree = this.subscriptionsPerMessageMulti.createLeaf(handledMessageTypes);
+//                                        if (acceptsSubtypes) {
+//                                            for (Class<?> c : handledMessageTypes) {
+//                                                setupSuperClassCache(c);
+//                                            }
+//                                        }
+//                                        break;
+//                                    }
+//                                }
+//
+//                                Collection<Subscription> subs = tree.getValue();
+//                                if (subs == null) {
+//                                    subs = new StrongConcurrentSet<Subscription>(16, this.LOAD_FACTOR);
+//                                    tree.putValue(subs);
+//                                }
+//                                subs.add(subscription);
                         }
-
-                        subscriptions.add(subscription);
                     }
-
-                    this.subscriptionsPerListener.put(listenerClass, subscriptions);
-                } finally {
-                    WRITE.unlock();
                 }
             }
         } finally {
-            UPDATE.unlock();
+            WRITE.unlock();
         }
     }
 
@@ -329,7 +332,6 @@ public class SubscriptionManager {
     }
 
 
-    // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
     public Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
         Map<Class<?>, Collection<Subscription>> superClassSubs = this.superClassSubscriptions;
@@ -346,7 +348,8 @@ public class SubscriptionManager {
                 return null;
             }
 
-            subsPerType = new StrongConcurrentSet<Subscription>(16, this.LOAD_FACTOR);
+//            subsPerType = new StrongConcurrentSet<Subscription>(types.size(), this.LOAD_FACTOR);
+            subsPerType = new ArrayDeque<Subscription>(types.size() + 1);
 
             for (Class<?> superClass : types) {
                 Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(superClass);
@@ -485,13 +488,19 @@ public class SubscriptionManager {
         return subsPerType;
     }
 
+
+    /**
+     * race conditions will result in duplicate answers, which we don't care if happens
+     */
     private Collection<Class<?>> setupSuperClassCache(Class<?> clazz) {
         Collection<Class<?>> types = this.superClassesCache.get(clazz);
 
         if (types == null) {
             // it doesn't matter if concurrent access stomps on values, since they are always the same.
             Set<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
-            types = new ArrayDeque<Class<?>>(superTypes);
+//            types = new ArrayDeque<Class<?>>(superTypes);
+            types = new StrongConcurrentSet<Class<?>>(superTypes.size(), this.LOAD_FACTOR);
+            types.addAll(superTypes);
 
             // race conditions will result in duplicate answers, which we don't care about
             this.superClassesCache.put(clazz, types);

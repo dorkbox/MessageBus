@@ -2,6 +2,7 @@ package net.engio.mbassy.multi.common;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -17,12 +18,12 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  * @author bennidi
  *         Date: 2/12/12
  */
-public abstract class AbstractConcurrentSet<T> implements Collection<T> {
+public abstract class AbstractConcurrentSet<T> implements Set<T> {
 
     // Internal state
-    protected final ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
-    private final Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
-    protected Entry<T> head; // reference to the first element
+    protected final transient ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
+    private final transient Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
+    protected transient Entry<T> head; // reference to the first element
 
     protected AbstractConcurrentSet(Map<T, ISetEntry<T>> entries) {
         this.entries = entries;

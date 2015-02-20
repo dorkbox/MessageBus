@@ -1,7 +1,8 @@
 package net.engio.mbassy.multi.common;
 
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -20,6 +21,12 @@ public class IdentityObjectTree<KEY, VALUE> {
 
     public IdentityObjectTree() {
     }
+
+    // can be overridded to provide a custom backing map
+    protected Map<KEY, IdentityObjectTree<KEY, VALUE>> createChildren() {
+//        return new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, 0.75f, 1);
+        return new Reference2ReferenceOpenHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, 0.75f);
+     }
 
     public VALUE getValue() {
         VALUE returnValue = this.value;
@@ -219,7 +226,6 @@ public class IdentityObjectTree<KEY, VALUE> {
         return leaf;
     }
 
-
     public final IdentityObjectTree<KEY, VALUE> createLeaf(KEY key, VALUE value, boolean setValue) {
         if (key == null) {
             return null;
@@ -228,7 +234,7 @@ public class IdentityObjectTree<KEY, VALUE> {
         IdentityObjectTree<KEY, VALUE> objectTree;
 
         if (this.children == null) {
-            this.children = new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, .8f, 1);
+            this.children = createChildren();
 
             // might as well add too
             objectTree = new IdentityObjectTree<KEY, VALUE>();

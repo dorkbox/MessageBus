@@ -1,6 +1,5 @@
 package net.engio.mbassy.multi;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -150,10 +149,8 @@ public class MultiMBassador implements IMessageBus {
                     // this catches all exception types
                     sub.publishToSubscription(this, deadMessage);
                 }
-
             }
         }
-
 
         Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
         // now get superClasses
@@ -172,7 +169,6 @@ public class MultiMBassador implements IMessageBus {
 
         Class<?> messageClass1 = message1.getClass();
         Class<?> messageClass2 = message2.getClass();
-        manager.readLock();
             Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
             boolean validSubs = subscriptions != null && !subscriptions.isEmpty();
 
@@ -183,8 +179,6 @@ public class MultiMBassador implements IMessageBus {
             }
 
             Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
-            Collection<Subscription> varArgs = manager.getVarArgs(messageClass1, messageClass2);
-        manager.readUnLock();
 
 
         // Run subscriptions
@@ -212,27 +206,6 @@ public class MultiMBassador implements IMessageBus {
                 sub.publishToSubscription(this, message1, message2);
             }
         }
-
-        // now get varargs
-        if (varArgs != null && !varArgs.isEmpty()) {
-            // messy, but the ONLY way to do it.
-            Object[] vararg = null;
-
-            for (Subscription sub : varArgs) {
-                if (sub.isVarArg()) {
-                    if (vararg == null) {
-                        vararg = (Object[]) Array.newInstance(messageClass1, 2);
-                        vararg[0] = message1;
-                        vararg[1] = message2;
-
-                        Object[] newInstance = new Object[1];
-                        newInstance[0] = vararg;
-                        vararg = newInstance;
-                    }
-                    sub.publishToSubscription(this, vararg);
-                }
-            }
-        }
     }
 
     @SuppressWarnings("null")
@@ -243,7 +216,6 @@ public class MultiMBassador implements IMessageBus {
         Class<?> messageClass1 = message1.getClass();
         Class<?> messageClass2 = message2.getClass();
         Class<?> messageClass3 = message3.getClass();
-        manager.readLock();
             Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
             boolean validSubs = subscriptions != null && !subscriptions.isEmpty();
 
@@ -254,8 +226,6 @@ public class MultiMBassador implements IMessageBus {
             }
 
             Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
-            Collection<Subscription> varArgs = manager.getVarArgs(messageClass1, messageClass2, messageClass3);
-        manager.readUnLock();
 
 
         // Run subscriptions
@@ -284,27 +254,6 @@ public class MultiMBassador implements IMessageBus {
             }
         }
 
-        // now get varargs
-        if (varArgs != null && !varArgs.isEmpty()) {
-            // messy, but the ONLY way to do it.
-            Object[] vararg = null;
-
-            for (Subscription sub : varArgs) {
-                if (sub.isVarArg()) {
-                    if (vararg == null) {
-                        vararg = (Object[]) Array.newInstance(messageClass1, 3);
-                        vararg[0] = message1;
-                        vararg[0] = message2;
-                        vararg[0] = message3;
-
-                        Object[] newInstance = new Object[1];
-                        newInstance[0] = vararg;
-                        vararg = newInstance;
-                    }
-                    sub.publishToSubscription(this, vararg);
-                }
-            }
-        }
     }
 
     @SuppressWarnings("null")
@@ -328,7 +277,6 @@ public class MultiMBassador implements IMessageBus {
             }
         }
 
-        manager.readLock();
             Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClasses);
             boolean validSubs = subscriptions != null && !subscriptions.isEmpty();
 
@@ -338,13 +286,6 @@ public class MultiMBassador implements IMessageBus {
                 deadSubscriptions  = manager.getSubscriptionsByMessageType(DeadMessage.class);
             }
 
-            // we don't support super subscriptions for var-args
-            // Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClasses);
-            Collection<Subscription> varArgs = null;
-            if (allSameType) {
-                varArgs = manager.getVarArgs(messageClasses);
-            }
-        manager.readUnLock();
 
         // Run subscriptions
         if (validSubs) {
@@ -372,27 +313,6 @@ public class MultiMBassador implements IMessageBus {
 //            }
 //        }
 
-        // now get varargs
-        if (varArgs != null && !varArgs.isEmpty()) {
-            // messy, but the ONLY way to do it.
-            Object[] vararg = null;
-
-            for (Subscription sub : varArgs) {
-                if (sub.isVarArg()) {
-                    if (vararg == null) {
-                        vararg = (Object[]) Array.newInstance(first, size);
-                        for (int i=0;i<size;i++) {
-                            vararg[i] = messages[i];
-                        }
-
-                        Object[] newInstance = new Object[1];
-                        newInstance[0] = vararg;
-                        vararg = newInstance;
-                    }
-                    sub.publishToSubscription(this, vararg);
-                }
-            }
-        }
     }
 
     @Override
@@ -405,17 +325,40 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
-                this.dispatchQueue.transfer(runnable);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                // log.error(e);
+//            try {
+//                this.dispatchQueue.put(runnable);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//                // log.error(e);
+//
+//                handlePublicationError(new PublicationError()
+//                .setMessage("Error while adding an asynchronous message")
+//                .setCause(e)
+//                .setPublishedObject(message));
+//            }
 
-                handlePublicationError(new PublicationError()
-                .setMessage("Error while adding an asynchronous message")
-                .setCause(e)
-                .setPublishedObject(message));
-            }
+
+
+//            int counter = 200;
+//            while (!this.dispatchQueue.offer(runnable)) {
+//                if (counter > 0) {
+//                    --counter;
+//                    LockSupport.parkNanos(1L);
+//                } else {
+                    try {
+                        this.dispatchQueue.transfer(runnable);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        // log.error(e);
+
+                        handlePublicationError(new PublicationError()
+                        .setMessage("Error while adding an asynchronous message")
+                        .setCause(e)
+                        .setPublishedObject(message));
+                    }
+//                    break;
+//                }
+//            }
         }
     }
 

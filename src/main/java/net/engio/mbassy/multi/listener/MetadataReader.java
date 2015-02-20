@@ -1,11 +1,11 @@
 package net.engio.mbassy.multi.listener;
 
 import java.lang.reflect.Method;
-import java.util.ArrayDeque;
 import java.util.Collection;
 
 import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.common.ReflectionUtils;
+import net.engio.mbassy.multi.common.StrongConcurrentSet;
 
 /**
  * The meta data reader is responsible for parsing and validating message handler configurations.
@@ -23,19 +23,19 @@ public class MetadataReader {
         Collection<Method> allHandlers = ReflectionUtils.getMethods(target);
 
         // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-        Collection<Method> bottomMostHandlers = new ArrayDeque<Method>();
+        Collection<Method> bottomMostHandlers = new StrongConcurrentSet<Method>(allHandlers.size(), .8F);
         for (Method handler : allHandlers) {
             if (!ReflectionUtils.containsOverridingMethod(allHandlers, handler)) {
                 bottomMostHandlers.add(handler);
             }
         }
 
-        MessageListener listenerMetadata = new MessageListener(target);
+        MessageListener listenerMetadata = new MessageListener(target, bottomMostHandlers.size());
 
         // for each handler there will be no overriding method that specifies @Handler annotation
         // but an overriding method does inherit the listener configuration of the overwritten method
         for (Method handler : bottomMostHandlers) {
-            Handler handlerConfig = ReflectionUtils.getAnnotation( handler, Handler.class);
+            Handler handlerConfig = ReflectionUtils.getAnnotation(handler, Handler.class);
             if (handlerConfig == null || !handlerConfig.enabled()) {
                 continue; // disabled or invalid listeners are ignored
             }

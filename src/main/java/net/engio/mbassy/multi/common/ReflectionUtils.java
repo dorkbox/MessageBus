@@ -1,11 +1,12 @@
 package net.engio.mbassy.multi.common;
 
+import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Set;
 
 import net.engio.mbassy.multi.annotations.Handler;
@@ -20,7 +21,10 @@ public class ReflectionUtils
 
     // modified by dorkbox, llc 2015
     public static Collection<Method> getMethods(Class<?> target) {
-        Collection<Method> methods = new ArrayDeque<Method>();
+        return getMethods(target, new StrongConcurrentSet<Method>());
+    }
+
+    public static Collection<Method> getMethods(Class<?> target, Collection<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -31,7 +35,7 @@ public class ReflectionUtils
         }
 
         if (!target.equals(Object.class)) {
-            methods.addAll(getMethods(target.getSuperclass()));
+            getMethods(target.getSuperclass(), methods);
         }
         return methods;
     }
@@ -66,7 +70,8 @@ public class ReflectionUtils
      * @return A set of classes, each representing a super type of the root class
      */
     public static Set<Class<?>> getSuperTypes(Class<?> from) {
-        Set<Class<?>> superclasses = new HashSet<Class<?>>();
+        Set<Class<?>> superclasses = new StrongConcurrentSet<Class<?>>(8, .8f);
+
         collectInterfaces( from, superclasses );
 
         while ( !from.equals( Object.class ) && !from.isInterface() ) {
@@ -104,7 +109,7 @@ public class ReflectionUtils
     * @param <A> Class of annotation type
     * @return Annotation instance or null
     */
-    private static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType, Set<AnnotatedElement> visited) {
+    private static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType, Collection<AnnotatedElement> visited) {
         if( visited.contains(from) ) {
             return null;
         }
@@ -123,7 +128,7 @@ public class ReflectionUtils
     }
 
     public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType){
-       return getAnnotation(from, annotationType, new HashSet<AnnotatedElement>());
+       return getAnnotation(from, annotationType, Collections.newSetFromMap(new Object2BooleanOpenHashMap<AnnotatedElement>(8, .8f)));
     }
 
     //
