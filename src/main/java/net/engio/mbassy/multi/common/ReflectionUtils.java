@@ -1,13 +1,12 @@
 package net.engio.mbassy.multi.common;
 
-import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
-
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.engio.mbassy.multi.annotations.Handler;
 
@@ -127,8 +126,19 @@ public class ReflectionUtils
         return null;
     }
 
-    public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType){
-       return getAnnotation(from, annotationType, Collections.newSetFromMap(new Object2BooleanOpenHashMap<AnnotatedElement>(8, 0.8F)));
+    private static final ThreadLocal<Collection<AnnotatedElement>> annotationCollector = new ThreadLocal<Collection<AnnotatedElement>>() {
+        @Override
+        protected Collection<AnnotatedElement> initialValue() {
+            return Collections.newSetFromMap(new ConcurrentHashMap<AnnotatedElement, Boolean>(8, .8F, 1));
+        }
+    };
+
+    public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType) {
+        Collection<AnnotatedElement> collection = annotationCollector.get();
+
+        A annotation = getAnnotation(from, annotationType, collection);
+        collection.clear();
+        return annotation;
     }
 
     //

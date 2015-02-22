@@ -1,10 +1,5 @@
 package net.engio.mbassy.multi.subscription;
 
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.Reference2BooleanArrayMap;
-import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.Entry;
-import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.FastEntrySet;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -34,7 +29,7 @@ public class SubscriptionManager {
     private float LOAD_FACTOR;
 
     // the metadata reader that is used to inspect objects passed to the subscribe method
-    private final MetadataReader metadataReader = new MetadataReader();
+    private static final MetadataReader metadataReader = new MetadataReader();
 
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
@@ -50,12 +45,12 @@ public class SubscriptionManager {
 
     private final Object holder = new Object[0];
 
-    private final Map<Class<?>, FastEntrySet<Class<?>>> superClassesCache;
+    private final Map<Class<?>, Set<Class<?>>> superClassesCache;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
     // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
-    private Map<Class<?>, FastEntrySet<Subscription>> superClassSubscriptions;
+    private Map<Class<?>, Set<Subscription>> superClassSubscriptions;
 //    private final IdentityObjectTree<Class<?>, Collection<Subscription>> superClassSubscriptionsMulti = new IdentityObjectTree<Class<?>, Collection<Subscription>>();
 
 
@@ -73,10 +68,10 @@ public class SubscriptionManager {
         // only used during SUB/UNSUB
         this.subscriptionsPerListener = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
 
-        this.superClassesCache = new ConcurrentHashMap<Class<?>, FastEntrySet<Class<?>>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+        this.superClassesCache = new ConcurrentHashMap<Class<?>, Set<Class<?>>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance on handlers
-        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, FastEntrySet<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
+        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Set<Subscription>>(8, this.LOAD_FACTOR, this.MAP_STRIPING);
 
         this.nonListeners = new ConcurrentHashMap<Class<?>, Object>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
     }
@@ -172,7 +167,7 @@ public class SubscriptionManager {
         Collection<Subscription> subscriptions = this.subscriptionsPerListener.get(listenerClass);
         if (subscriptions == null) {
             // a listener is subscribed for the first time
-            Collection<MessageHandler> messageHandlers = this.metadataReader.getMessageListener(listenerClass).getHandlers();
+            Collection<MessageHandler> messageHandlers = SubscriptionManager.metadataReader.getMessageListener(listenerClass).getHandlers();
             int handlersSize = messageHandlers.size();
 
             if (handlersSize == 0) {
@@ -347,65 +342,61 @@ public class SubscriptionManager {
 
     // must be protected by read lock
     // CAN RETURN NULL - not thread safe.
-    public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
         return this.subscriptionsPerMessageSingle.get(messageType);
     }
 
     // must be protected by read lock
     // CAN RETURN NULL - not thread safe.
-    public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2);
     }
 
 
     // must be protected by read lock
     // CAN RETURN NULL - not thread safe.
-    public Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2, messageType3);
     }
 
     // must be protected by read lock
     // CAN RETURN NULL - not thread safe.
-    public Collection<Subscription> getSubscriptionsByMessageType(Class<?>... messageTypes) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?>... messageTypes) {
         return this.subscriptionsPerMessageMulti.getValue(messageTypes);
     }
 
 
 
     // ALSO checks to see if the superClass accepts subtypes.
-    public FastEntrySet<Subscription> getSuperSubscriptions(Class<?> superType) {
-        Map<Class<?>, FastEntrySet<Subscription>> superClassSubs = this.superClassSubscriptions;
-        if (superClassSubs == null) {
-            // we haven't created it yet (via subscribe)
-            return null;
-        }
-
-        FastEntrySet<Subscription> subsPerType = superClassSubs.get(superType);
+    public final Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
+        // whenever our subscriptions change, this map is cleared.
+        Set<Subscription> subsPerType = this.superClassSubscriptions.get(superType);
 
         if (subsPerType == null) {
-            FastEntrySet<Class<?>> types = this.superClassesCache.get(superType);
+            // this caches our class hierarchy. This is never cleared.
+            Set<Class<?>> types = this.superClassesCache.get(superType);
             if (types == null || types.isEmpty()) {
                 return null;
             }
 
-            Reference2BooleanArrayMap<Subscription> map = new Reference2BooleanArrayMap<Subscription>(types.size() + 1);
+            subsPerType = new StrongConcurrentSet<Subscription>(types.size() + 1, this.LOAD_FACTOR);
 
-            ObjectIterator<Entry<Class<?>>> fastIterator = types.fastIterator();
-            while (fastIterator.hasNext()) {
-                Class<?> superClass = fastIterator.next().getKey();
+            Iterator<Class<?>> iterator = types.iterator();
+            while (iterator.hasNext()) {
+                Class<?> superClass = iterator.next();
 
                 Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(superClass);
                 if (subs != null && !subs.isEmpty()) {
                     for (Subscription sub : subs) {
                         if (sub.acceptsSubtypes()) {
-                            map.put(sub, Boolean.TRUE);
+                            subsPerType.add(sub);
                         }
                     }
                 }
             }
 
-            subsPerType = map.reference2BooleanEntrySet();
-            superClassSubs.put(superType, subsPerType);
+            // cache our subscriptions for super classes, so that their access can be fast!
+            this.superClassSubscriptions.put(superType, subsPerType);
         }
 
         return subsPerType;
@@ -539,15 +530,13 @@ public class SubscriptionManager {
         if (!this.superClassesCache.containsKey(clazz)) {
             // it doesn't matter if concurrent access stomps on values, since they are always the same.
             Set<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
-            Reference2BooleanArrayMap<Class<?>> map = new Reference2BooleanArrayMap<Class<?>>(superTypes.size() + 1);
+            StrongConcurrentSet<Class<?>> set = new StrongConcurrentSet<Class<?>>(superTypes.size() + 1, this.LOAD_FACTOR);
             for (Class<?> c : superTypes) {
-                map.put(c, Boolean.TRUE);
+                set.add(c);
             }
 
-            FastEntrySet<Class<?>> fastSet = map.reference2BooleanEntrySet();
-
             // race conditions will result in duplicate answers, which we don't care about
-            this.superClassesCache.put(clazz, fastSet);
+            this.superClassesCache.put(clazz, set);
         }
     }
 

@@ -2,12 +2,14 @@ package net.engio.mbassy.multi.subscription;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.engio.mbassy.multi.common.StrongConcurrentSet;
 import net.engio.mbassy.multi.dispatch.IHandlerInvocation;
 import net.engio.mbassy.multi.dispatch.ReflectiveHandlerInvocation;
 import net.engio.mbassy.multi.dispatch.SynchronizedHandlerInvocation;
 import net.engio.mbassy.multi.error.ErrorHandlingSupport;
+import net.engio.mbassy.multi.error.PublicationError;
 import net.engio.mbassy.multi.listener.MessageHandler;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
@@ -28,6 +30,9 @@ import com.esotericsoftware.reflectasm.MethodAccess;
  *         Date: 2/2/15
  */
 public class Subscription {
+    private static AtomicInteger ID_COUNTER = new AtomicInteger();
+    private final int ID = ID_COUNTER.getAndIncrement();
+
 
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
     private final MessageHandler handlerMetadata;
@@ -47,20 +52,12 @@ public class Subscription {
         this.invocation = invocation;
     }
 
-    /**
-     * Check whether this subscription manages a message handler of the given message listener class
-     */
-    // only in unit test
-    public boolean belongsTo(Class<?> listener){
-        return this.handlerMetadata.isFromListener(listener);
+    public Class<?>[] getHandledMessageTypes() {
+        return this.handlerMetadata.getHandledMessages();
     }
 
     public boolean acceptsSubtypes() {
         return this.handlerMetadata.acceptsSubtypes();
-    }
-
-    public Class<?>[] getHandledMessageTypes() {
-        return this.handlerMetadata.getHandledMessages();
     }
 
     public void subscribe(Object listener) {
@@ -74,8 +71,12 @@ public class Subscription {
         return this.listeners.remove(existingListener);
     }
 
-    public boolean isEmpty() {
-        return this.listeners.isEmpty();
+    /**
+     * Check whether this subscription manages a message handler of the given message listener class
+     */
+    // only in unit test
+    public boolean belongsTo(Class<?> listener){
+        return this.handlerMetadata.isFromListener(listener);
     }
 
     // only used in unit-test
@@ -96,41 +97,41 @@ public class Subscription {
                     invocation.invoke(listener, handler, handleIndex, message);
                 } catch (IllegalAccessException e) {
                     e.printStackTrace();
-    //                errorHandler.handlePublicationError(new PublicationError()
-    //                .setMessage("Error during invocation of message handler. " +
-    //                                "The class or method is not accessible")
-    //                                .setCause(e)
-    //                                .setMethodName(handler.getName())
-    ////                                .setListener(listener)
-    //                                .setPublishedObject(message));
+                    errorHandler.handlePublicationError(new PublicationError()
+                    .setMessage("Error during invocation of message handler. " +
+                                    "The class or method is not accessible")
+                                    .setCause(e)
+                                    .setMethodName(handler.getMethodNames()[handleIndex])
+                                    .setListener(listener)
+                                    .setPublishedObject(message));
                 } catch (IllegalArgumentException e) {
                     e.printStackTrace();
-    //                errorHandler.handlePublicationError(new PublicationError()
-    //                .setMessage("Error during invocation of message handler. " +
-    //                                "Wrong arguments passed to method. Was: " + message.getClass()
-    //                                + "Expected: " + handler.getParameterTypes()[0])
-    //                                .setCause(e)
-    //                                .setMethodName(handler.getName())
-    ////                                .setListener(listener)
-    //                                .setPublishedObject(message));
+                    errorHandler.handlePublicationError(new PublicationError()
+                    .setMessage("Error during invocation of message handler. " +
+                                    "Wrong arguments passed to method. Was: " + message.getClass()
+                                    + "Expected: " + handler.getParameterTypes()[0])
+                                    .setCause(e)
+                                    .setMethodName(handler.getMethodNames()[handleIndex])
+                                    .setListener(listener)
+                                    .setPublishedObject(message));
                 } catch (InvocationTargetException e) {
                     e.printStackTrace();
-    //                errorHandler.handlePublicationError(new PublicationError()
-    //                .setMessage("Error during invocation of message handler. " +
-    //                                "Message handler threw exception")
-    //                                .setCause(e)
-    //                                .setMethodName(handler.getName())
-    ////                                .setListener(listener)
-    //                                .setPublishedObject(message));
+                    errorHandler.handlePublicationError(new PublicationError()
+                    .setMessage("Error during invocation of message handler. " +
+                                    "Message handler threw exception")
+                                    .setCause(e)
+                                    .setMethodName(handler.getMethodNames()[handleIndex])
+                                    .setListener(listener)
+                                    .setPublishedObject(message));
                 } catch (Throwable e) {
                     e.printStackTrace();
-    //                errorHandler.handlePublicationError(new PublicationError()
-    //                .setMessage("Error during invocation of message handler. " +
-    //                                "The handler code threw an exception")
-    //                                .setCause(e)
-    //                                .setMethodName(handler.getName())
-    ////                                .setListener(listener)
-    //                                .setPublishedObject(message));
+                    errorHandler.handlePublicationError(new PublicationError()
+                    .setMessage("Error during invocation of message handler. " +
+                                    "The handler code threw an exception")
+                                    .setCause(e)
+                                    .setMethodName(handler.getMethodNames()[handleIndex])
+                                    .setListener(listener)
+                                    .setPublishedObject(message));
                 }
             }
         }
@@ -292,10 +293,7 @@ public class Subscription {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (this.handlerMetadata == null ? 0 : this.handlerMetadata.hashCode());
-        return result;
+        return this.ID;
     }
 
     @Override
@@ -310,13 +308,6 @@ public class Subscription {
             return false;
         }
         Subscription other = (Subscription) obj;
-        if (this.handlerMetadata == null) {
-            if (other.handlerMetadata != null) {
-                return false;
-            }
-        } else if (!this.handlerMetadata.equals(other.handlerMetadata)) {
-            return false;
-        }
-        return true;
+        return this.ID == other.ID;
     }
 }

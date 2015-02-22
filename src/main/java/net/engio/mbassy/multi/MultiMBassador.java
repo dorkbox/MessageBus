@@ -1,11 +1,8 @@
 package net.engio.mbassy.multi;
 
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.Entry;
-import it.unimi.dsi.fastutil.objects.Reference2BooleanMap.FastEntrySet;
-
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -152,13 +149,17 @@ public class MultiMBassador implements IMessageBus {
             }
         }
 
-        FastEntrySet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+//        FastEntrySet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+        Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
         // now get superClasses
         if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-            ObjectIterator<Entry<Subscription>> fastIterator = superSubscriptions.fastIterator();
+//            ObjectIterator<Entry<Subscription>> fastIterator = superSubscriptions.fastIterator();
+            Iterator<Subscription> fastIterator = superSubscriptions.iterator();
 
             while (fastIterator.hasNext()) {
-                Subscription sub = fastIterator.next().getKey();
+//                Subscription sub = fastIterator.next().getKey();
+                Subscription sub = fastIterator.next();
+
                 // this catches all exception types
                 sub.publishToSubscription(this, message);
             }
