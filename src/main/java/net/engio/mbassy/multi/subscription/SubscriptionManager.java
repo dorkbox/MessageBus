@@ -59,7 +59,7 @@ public class SubscriptionManager {
 
 
     public SubscriptionManager(int numberOfThreads) {
-        this.MAP_STRIPING = numberOfThreads/2;
+        this.MAP_STRIPING = numberOfThreads;
         this.LOAD_FACTOR = 0.8f;
 
         this.subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, Collection<Subscription>>(4, this.LOAD_FACTOR, this.MAP_STRIPING);
