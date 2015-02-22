@@ -93,55 +93,8 @@ public class SubscriptionManager {
             for (Subscription subscription : subscriptions) {
                 subscription.unsubscribe(listener);
 
-//                boolean isEmpty = subscription.isEmpty();
-//
-//                if (isEmpty) {
-//                    // single or multi?
-//                    Class<?>[] handledMessageTypes = subscription.getHandledMessageTypes();
-//                    int size = handledMessageTypes.length;
-//                    if (size == 1) {
-//                        // single
-//                        Class<?> clazz = handledMessageTypes[0];
-//
-//                        // NOTE: Order is important for safe publication
-//                        Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(clazz);
-//                        if (subs != null) {
-//                            subs.remove(subscription);
-//
-//                            if (subs.isEmpty()) {
-//                                // remove element
-//                                this.subscriptionsPerMessageSingle.remove(clazz);
-//
-//                                resetSuperClassSubs();
-//                            }
-//                        }
-//                    } else {
-//                        // NOTE: Not thread-safe! must be synchronized in outer scope
-//                        IdentityObjectTree<Class<?>, Collection<Subscription>> tree;
-//
-//                        switch (size) {
-//                            case 2: tree = this.subscriptionsPerMessageMulti.getLeaf(handledMessageTypes[0], handledMessageTypes[1]); break;
-//                            case 3: tree = this.subscriptionsPerMessageMulti.getLeaf(handledMessageTypes[1], handledMessageTypes[1], handledMessageTypes[2]); break;
-//                            default: tree = this.subscriptionsPerMessageMulti.getLeaf(handledMessageTypes); break;
-//                        }
-//
-//                        if (tree != null) {
-//                            Collection<Subscription> subs = tree.getValue();
-//                            if (subs != null) {
-//                                subs.remove(subscription);
-//
-//                                if (subs.isEmpty()) {
-//                                    // remove tree element
-//                                    switch (size) {
-//                                        case 2: this.subscriptionsPerMessageMulti.remove(handledMessageTypes[0], handledMessageTypes[1]); break;
-//                                        case 3: this.subscriptionsPerMessageMulti.remove(handledMessageTypes[1], handledMessageTypes[1], handledMessageTypes[2]); break;
-//                                        default: this.subscriptionsPerMessageMulti.remove(handledMessageTypes); break;
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
+                // purposefully DO NOT do anything else. We keep references to Class<?>/subscription, because
+                // it acts as a "cache" of sorts, so that future add operations are quicker.
             }
         }
 
@@ -340,27 +293,23 @@ public class SubscriptionManager {
 //            }
     }
 
-    // must be protected by read lock
-    // CAN RETURN NULL - not thread safe.
+    // CAN RETURN NULL
     public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
         return this.subscriptionsPerMessageSingle.get(messageType);
     }
 
-    // must be protected by read lock
-    // CAN RETURN NULL - not thread safe.
+    // CAN RETURN NULL
     public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2);
     }
 
 
-    // must be protected by read lock
-    // CAN RETURN NULL - not thread safe.
+    // CAN RETURN NULL
     public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2, messageType3);
     }
 
-    // must be protected by read lock
-    // CAN RETURN NULL - not thread safe.
+    // CAN RETURN NULL
     public final Collection<Subscription> getSubscriptionsByMessageType(Class<?>... messageTypes) {
         return this.subscriptionsPerMessageMulti.getValue(messageTypes);
     }

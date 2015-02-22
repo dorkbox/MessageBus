@@ -1,5 +1,6 @@
 package net.engio.mbassy.multi;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -27,7 +28,7 @@ public class MultiMBassador implements IMessageBus {
 
     // error handling is first-class functionality
     // this handler will receive all errors that occur during message dispatch or message handling
-    private final List<IPublicationErrorHandler> errorHandlers = new ArrayList<IPublicationErrorHandler>();
+    private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
     private final SubscriptionManager subscriptionManager;
     private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
@@ -62,9 +63,11 @@ public class MultiMBassador implements IMessageBus {
 
                     while (true) {
                         try {
-                            counter = 200;
+                            counter = 500;
                             while ((event = IN_QUEUE.poll()) == null) {
-                                if (counter > 0) {
+                                if (counter > 200) {
+                                    --counter;
+                                } else if (counter > 0) {
                                     --counter;
                                     LockSupport.parkNanos(1L);
                                 } else {
@@ -149,15 +152,12 @@ public class MultiMBassador implements IMessageBus {
             }
         }
 
-//        FastEntrySet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
         Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
         // now get superClasses
         if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-//            ObjectIterator<Entry<Subscription>> fastIterator = superSubscriptions.fastIterator();
             Iterator<Subscription> fastIterator = superSubscriptions.iterator();
 
             while (fastIterator.hasNext()) {
-//                Subscription sub = fastIterator.next().getKey();
                 Subscription sub = fastIterator.next();
 
                 // this catches all exception types

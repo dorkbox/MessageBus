@@ -78,9 +78,5 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
         public T getValue() {
             return this.value;
         }
-
-
-
-
     }
 }
