@@ -21,12 +21,12 @@ public class IdentityObjectTree<KEY, VALUE> {
     public IdentityObjectTree() {
     }
 
-    // can be overridded to provide a custom backing map
+    /**
+     * can be overridden to provide a custom backing map
+     */
     protected Map<KEY, IdentityObjectTree<KEY, VALUE>> createChildren() {
-//TODO: this needs to be concurrent?!?!?
         return new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, 0.75f, 1);
-//        return new Reference2ReferenceOpenHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, 0.75f);
-     }
+    }
 
     public VALUE getValue() {
         VALUE returnValue = this.value;

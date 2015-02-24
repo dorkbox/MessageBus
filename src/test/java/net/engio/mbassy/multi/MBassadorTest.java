@@ -2,7 +2,6 @@ package net.engio.mbassy.multi;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import net.engio.mbassy.multi.MultiMBassador;
 import net.engio.mbassy.multi.common.ConcurrentExecutor;
 import net.engio.mbassy.multi.common.ListenerFactory;
 import net.engio.mbassy.multi.common.MessageBusTest;
@@ -77,19 +76,22 @@ public class MBassadorTest extends MessageBusTest {
         Runnable publishAndCheck = new Runnable() {
             @Override
             public void run() {
-
                 bus.publishAsync(MessageTypes.Simple);
-
             }
         };
 
         ConcurrentExecutor.runConcurrent(publishAndCheck, 1);
-        messageManager.waitForMessages(processingTimeInMS);
+        while (bus.hasPendingMessages()) {
+            pause(10);
+        }
 
         MessageTypes.resetAll();
         ConcurrentExecutor.runConcurrent(publishAndCheck, ConcurrentUnits);
-        messageManager.waitForMessages(processingTimeInMS);
 
+        while (bus.hasPendingMessages()) {
+            pause(10);
+        }
+        messageManager.waitForMessages(600);
     }
 
 
@@ -119,14 +121,18 @@ public class MBassadorTest extends MessageBusTest {
 
         // single threaded
         ConcurrentExecutor.runConcurrent(publishAndCheck, 1);
-        pause(processingTimeInMS);
+        while (bus.hasPendingMessages()) {
+            pause(10);
+        }
         assertEquals(InstancesPerListener, exceptionCount.get());
 
 
         // multi threaded
         exceptionCount.set(0);
         ConcurrentExecutor.runConcurrent(publishAndCheck, ConcurrentUnits);
-        pause(processingTimeInMS);
+        while (bus.hasPendingMessages()) {
+            pause(10);
+        }
         assertEquals(InstancesPerListener * ConcurrentUnits, exceptionCount.get());
 
         bus.shutdown();

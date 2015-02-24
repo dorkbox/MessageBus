@@ -28,13 +28,9 @@ public class MessageListener {
         this.listenerDefinition = listenerDefinition;
     }
 
+    // only in unit test
     public boolean isFromListener(Class<?> listener) {
         return this.listenerDefinition.equals(listener);
-    }
-
-    public MessageListener addHandlers(Collection<? extends MessageHandler> c) {
-        this.handlers.addAll(c);
-        return this;
     }
 
     public boolean addHandler(MessageHandler messageHandler) {
@@ -43,9 +39,5 @@ public class MessageListener {
 
     public Collection<MessageHandler> getHandlers() {
         return this.handlers;
-    }
-
-    public Class<?> getListerDefinition() {
-        return this.listenerDefinition;
     }
 }

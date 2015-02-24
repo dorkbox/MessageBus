@@ -61,6 +61,7 @@ public class MessageHandler {
         return this.isSynchronized;
     }
 
+    // only in unit test
     public boolean isFromListener(Class<?> listener){
         return this.listenerConfig.isFromListener(listener);
     }

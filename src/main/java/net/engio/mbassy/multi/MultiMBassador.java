@@ -1,10 +1,8 @@
 package net.engio.mbassy.multi;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -15,7 +13,6 @@ import net.engio.mbassy.multi.common.TransferQueue;
 import net.engio.mbassy.multi.error.IPublicationErrorHandler;
 import net.engio.mbassy.multi.error.PublicationError;
 import net.engio.mbassy.multi.subscription.Subscription;
-import net.engio.mbassy.multi.subscription.SubscriptionManager;
 
 /**
  * The base class for all message bus implementations with support for asynchronous message dispatch
@@ -30,12 +27,16 @@ public class MultiMBassador implements IMessageBus {
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
-    private final SubscriptionManager subscriptionManager;
     private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
 
 
+    private final SubscriptionManager subscriptionManager;
+
     // all threads that are available for asynchronous message dispatching
-    private List<Thread> threads;
+    private final int numberOfThreads;
+    private final Collection<Thread> threads;
+
+
 
     public MultiMBassador() {
         this(Runtime.getRuntime().availableProcessors());
@@ -46,9 +47,10 @@ public class MultiMBassador implements IMessageBus {
         if (numberOfThreads < 1) {
             numberOfThreads = 1; // at LEAST 1 thread
         }
+        this.numberOfThreads = numberOfThreads;
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
-        this.threads = new ArrayList<Thread>(numberOfThreads);
+        this.threads = new ArrayDeque<Thread>(numberOfThreads);
 
         NamedThreadFactory dispatchThreadFactory = new NamedThreadFactory("MessageBus");
         for (int i = 0; i < numberOfThreads; i++) {
@@ -57,7 +59,7 @@ public class MultiMBassador implements IMessageBus {
                 @SuppressWarnings("null")
                 @Override
                 public void run() {
-                    TransferQueue<Runnable> IN_QUEUE= MultiMBassador.this.dispatchQueue;
+                    TransferQueue<Runnable> IN_QUEUE = MultiMBassador.this.dispatchQueue;
                     Runnable event = null;
                     int counter;
 
@@ -88,6 +90,8 @@ public class MultiMBassador implements IMessageBus {
             this.threads.add(runner);
             runner.start();
         }
+
+
     }
 
     @Override
@@ -105,19 +109,19 @@ public class MultiMBassador implements IMessageBus {
     }
 
     @Override
-    public void unsubscribe(Object listener) {
-        this.subscriptionManager.unsubscribe(listener);
+    public void subscribe(final Object listener) {
+        MultiMBassador.this.subscriptionManager.subscribe(listener);
     }
-
 
     @Override
-    public void subscribe(Object listener) {
-        this.subscriptionManager.subscribe(listener);
+    public void unsubscribe(final Object listener) {
+        MultiMBassador.this.subscriptionManager.unsubscribe(listener);
     }
+
 
     @Override
     public boolean hasPendingMessages() {
-        return !this.dispatchQueue.isEmpty();
+        return this.dispatchQueue.getWaitingConsumerCount() != this.numberOfThreads;
     }
 
     @Override

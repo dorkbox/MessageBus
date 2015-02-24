@@ -1,13 +1,14 @@
 package net.engio.mbassy.multi.common;
 
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import net.engio.mbassy.multi.SubscriptionManager;
 import net.engio.mbassy.multi.subscription.Subscription;
-import net.engio.mbassy.multi.subscription.SubscriptionManager;
 
 /**
 *
@@ -39,13 +40,24 @@ public class SubscriptionValidator extends AssertSupport{
     // for each tuple of subscriber and message type the specified number of listeners must exist
     public void validate(SubscriptionManager manager) {
         for (Class<?> messageType : this.messageTypes) {
-            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageType);
             Collection<ValidationEntry> validationEntries = getEntries(messageType);
-            assertEquals(subscriptions.size(), validationEntries.size());
+
+            // we split subs + superSubs into TWO calls.
+            Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
+            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageType);
+            if (subscriptions != null) {
+                collection.addAll(subscriptions);
+            }
+            Collection<Subscription> superSubs = manager.getSuperSubscriptions(messageType);
+            if (superSubs != null) {
+                collection.addAll(superSubs);
+            }
+
+            assertEquals(validationEntries.size(), collection.size());
             for(ValidationEntry validationValidationEntry : validationEntries){
                 Subscription matchingSub = null;
                 // one of the subscriptions must belong to the subscriber type
-                for(Subscription sub : subscriptions){
+                for(Subscription sub : collection){
                     if(sub.belongsTo(validationValidationEntry.subscriber)){
                         matchingSub = sub;
                         break;

@@ -1,11 +1,11 @@
 package net.engio.mbassy.multi.common;
 
-import net.engio.mbassy.multi.MultiMBassador;
-import net.engio.mbassy.multi.PubSubSupport;
-import net.engio.mbassy.multi.subscription.SubscriptionManager;
-
 import java.util.Iterator;
 import java.util.List;
+
+import net.engio.mbassy.multi.MultiMBassador;
+import net.engio.mbassy.multi.PubSubSupport;
+import net.engio.mbassy.multi.SubscriptionManager;
 
 /**
  * Todo: Add javadoc
@@ -81,15 +81,16 @@ public class TestUtil {
 
         for(int i = 0; i < numberOfThreads; i++){
             final int partitionStart = i * partitionSize;
-            final int partitionEnd = (i+1 < numberOfThreads)
+            final int partitionEnd = i+1 < numberOfThreads
                     ? partitionStart + partitionSize + 1
                     : listeners.size();
             setupUnits[i] = new Runnable() {
 
                 private List<Object> listenerSubset = listeners.subList(partitionStart, partitionEnd);
 
+                @Override
                 public void run() {
-                   for(Object listener : listenerSubset){
+                   for(Object listener : this.listenerSubset){
                        bus.subscribe(listener);
                    }
                 }

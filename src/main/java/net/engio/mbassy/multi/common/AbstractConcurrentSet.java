@@ -3,6 +3,7 @@ package net.engio.mbassy.multi.common;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -19,6 +20,8 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  *         Date: 2/12/12
  */
 public abstract class AbstractConcurrentSet<T> implements Set<T> {
+    private static final AtomicLong id = new AtomicLong();
+    private final long ID = id.getAndIncrement();
 
     // Internal state
     protected final transient ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
@@ -135,13 +138,12 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
 
     @Override
     public Object[] toArray() {
-        throw new NotImplementedException();
+        return this.entries.entrySet().toArray();
     }
 
-    @SuppressWarnings("hiding")
     @Override
     public <T> T[] toArray(T[] a) {
-        throw new NotImplementedException();
+        return this.entries.entrySet().toArray(a);
     }
 
     @Override
@@ -162,6 +164,32 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     @Override
     public void clear() {
         throw new NotImplementedException();
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + (int) (this.ID ^ this.ID >>> 32);
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        AbstractConcurrentSet other = (AbstractConcurrentSet) obj;
+        if (this.ID != other.ID) {
+            return false;
+        }
+        return true;
     }
 
 

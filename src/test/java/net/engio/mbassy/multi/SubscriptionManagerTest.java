@@ -20,7 +20,6 @@ import net.engio.mbassy.multi.messages.IMultipartMessage;
 import net.engio.mbassy.multi.messages.MessageTypes;
 import net.engio.mbassy.multi.messages.MultipartMessage;
 import net.engio.mbassy.multi.messages.StandardMessage;
-import net.engio.mbassy.multi.subscription.SubscriptionManager;
 
 import org.junit.Test;
 
@@ -162,8 +161,8 @@ public class SubscriptionManagerTest extends AssertSupport {
                 Overloading.ListenerBase.class,
                 Overloading.ListenerSub.class);
 
-        SubscriptionManager subscriptionManager = new SubscriptionManager(ConcurrentUnits);
-        ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), ConcurrentUnits);
+        SubscriptionManager subscriptionManager = new SubscriptionManager(1);
+        ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners)
                 .listener(Overloading.ListenerBase.class).handles(Overloading.TestMessageA.class, Overloading.TestMessageA.class)
@@ -181,13 +180,13 @@ public class SubscriptionManagerTest extends AssertSupport {
     }
 
     private void runTestWith(final ListenerFactory listeners, final SubscriptionValidator validator){
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(ConcurrentUnits);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(1);
 
-        ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), ConcurrentUnits);
+        ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
         validator.validate(subscriptionManager);
 
-         ConcurrentExecutor.runConcurrent(TestUtil.unsubscriber(subscriptionManager, listeners), ConcurrentUnits);
+        ConcurrentExecutor.runConcurrent(TestUtil.unsubscriber(subscriptionManager, listeners), 1);
 
         listeners.clear();
         validator.clear();
