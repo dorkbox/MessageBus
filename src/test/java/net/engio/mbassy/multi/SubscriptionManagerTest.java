@@ -1,5 +1,6 @@
 package net.engio.mbassy.multi;
 
+import net.engio.mbassy.multi.SubscriptionManager;
 import net.engio.mbassy.multi.common.AssertSupport;
 import net.engio.mbassy.multi.common.ConcurrentExecutor;
 import net.engio.mbassy.multi.common.ListenerFactory;

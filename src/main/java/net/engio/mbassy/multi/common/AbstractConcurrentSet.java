@@ -6,8 +6,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
 
 /**
@@ -21,7 +19,7 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  */
 public abstract class AbstractConcurrentSet<T> implements Set<T> {
     private static final AtomicLong id = new AtomicLong();
-    private final long ID = id.getAndIncrement();
+    private final transient long ID = id.getAndIncrement();
 
     // Internal state
     protected final transient ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
@@ -43,10 +41,7 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
 
         Lock writeLock = this.lock.writeLock();
         writeLock.lock();
-        if (!this.entries.containsKey(element)) {
-            insert(element);
-            changed = true;
-        }
+        changed = insert(element);
         writeLock.unlock();
 
         return changed;
@@ -66,11 +61,13 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
         return entry != null && entry.getValue() != null;
     }
 
-    private void insert(T element) {
+    private boolean insert(T element) {
         if (!this.entries.containsKey(element)) {
             this.head = createEntry(element, this.head);
             this.entries.put(element, this.head);
+            return true;
         }
+        return false;
     }
 
     @Override
@@ -91,8 +88,7 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
             writeLock.lock();
             for (T element : elements) {
                 if (element != null) {
-                    insert(element);
-                    changed = true;
+                    changed |= insert(element);
                 }
             }
         } finally {
@@ -148,22 +144,29 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
 
     @Override
     public boolean containsAll(Collection<?> c) {
-       throw new NotImplementedException();
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        throw new NotImplementedException();
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
     public void clear() {
-        throw new NotImplementedException();
+        Lock writeLock = this.lock.writeLock();
+        try {
+            writeLock.lock();
+                this.head = null;
+                this.entries.clear();
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     @Override

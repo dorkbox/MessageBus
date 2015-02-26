@@ -30,7 +30,7 @@ public class ICountableListener {
     public static class NoSubtypesListener extends BaseListener {
 
         @Override
-        @Handler(rejectSubtypes = true)
+        @Handler(acceptSubtypes = true)
         public void handle(ICountable message){
             super.handle(message);
         }

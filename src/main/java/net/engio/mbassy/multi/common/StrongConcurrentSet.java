@@ -1,5 +1,7 @@
 package net.engio.mbassy.multi.common;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * This implementation uses strong references to the elements.
@@ -16,7 +18,11 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
     }
 
     public StrongConcurrentSet(int size, float loadFactor) {
-        super(new ConcurrentHashMapV8<T, ISetEntry<T>>(size, loadFactor));
+        this(new HashMap<T, ISetEntry<T>>(size, loadFactor));
+    }
+
+    public StrongConcurrentSet(Map<T, ISetEntry<T>> entries) {
+        super(entries);
     }
 
     @Override

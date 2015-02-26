@@ -1,7 +1,6 @@
 package net.engio.mbassy.multi.common;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -25,7 +24,7 @@ public class IdentityObjectTree<KEY, VALUE> {
      * can be overridden to provide a custom backing map
      */
     protected Map<KEY, IdentityObjectTree<KEY, VALUE>> createChildren() {
-        return new ConcurrentHashMap<KEY, IdentityObjectTree<KEY, VALUE>>(2, 0.75f, 1);
+        return new ConcurrentHashMapV8<KEY, IdentityObjectTree<KEY, VALUE>>(4);
     }
 
     public VALUE getValue() {

@@ -2,7 +2,7 @@ package net.engio.mbassy.multi.listener;
 
 import java.util.Collection;
 
-import net.engio.mbassy.multi.common.StrongConcurrentSet;
+import net.engio.mbassy.multi.common.StrongConcurrentSetV8;
 
 /**
  * All instances of any class that defines at least one message handler (see @MessageHandler) are message listeners. Thus, a message
@@ -24,7 +24,7 @@ public class MessageListener {
     private Class<?> listenerDefinition;
 
     public MessageListener(Class<?> listenerDefinition, int size) {
-        this.handlers = new StrongConcurrentSet<MessageHandler>(size, 0.8F);
+        this.handlers = new StrongConcurrentSetV8<MessageHandler>(size, 0.8F, 1);
         this.listenerDefinition = listenerDefinition;
     }
 

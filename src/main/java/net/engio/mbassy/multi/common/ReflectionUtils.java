@@ -4,9 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import net.engio.mbassy.multi.annotations.Handler;
 
@@ -14,13 +12,13 @@ import net.engio.mbassy.multi.annotations.Handler;
  * @author bennidi
  *         Date: 2/16/12
  *         Time: 12:14 PM
+ * @author dorkbox
+ *         Date: 2/2/15
  */
-public class ReflectionUtils
-{
+public class ReflectionUtils {
 
-    // modified by dorkbox, llc 2015
     public static Collection<Method> getMethods(Class<?> target) {
-        return getMethods(target, new StrongConcurrentSet<Method>());
+        return getMethods(target, new StrongConcurrentSetV8<Method>(16, .8F, 1));
     }
 
     public static Collection<Method> getMethods(Class<?> target, Collection<Method> methods) {
@@ -69,7 +67,7 @@ public class ReflectionUtils
      * @return A set of classes, each representing a super type of the root class
      */
     public static Set<Class<?>> getSuperTypes(Class<?> from) {
-        Set<Class<?>> superclasses = new StrongConcurrentSet<Class<?>>(8, .8f);
+        Set<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F, 1);
 
         collectInterfaces( from, superclasses );
 
@@ -108,7 +106,7 @@ public class ReflectionUtils
     * @param <A> Class of annotation type
     * @return Annotation instance or null
     */
-    private static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType, Collection<AnnotatedElement> visited) {
+    private static <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType, Collection<AnnotatedElement> visited) {
         if( visited.contains(from) ) {
             return null;
         }
@@ -126,18 +124,8 @@ public class ReflectionUtils
         return null;
     }
 
-    private static final ThreadLocal<Collection<AnnotatedElement>> annotationCollector = new ThreadLocal<Collection<AnnotatedElement>>() {
-        @Override
-        protected Collection<AnnotatedElement> initialValue() {
-            return Collections.newSetFromMap(new ConcurrentHashMap<AnnotatedElement, Boolean>(8, .8F, 1));
-        }
-    };
-
     public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType) {
-        Collection<AnnotatedElement> collection = annotationCollector.get();
-
-        A annotation = getAnnotation(from, annotationType, collection);
-        collection.clear();
+        A annotation = getAnnotation(from, annotationType, new StrongConcurrentSetV8<AnnotatedElement>(16, .8F, 1));
         return annotation;
     }
 

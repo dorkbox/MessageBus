@@ -12,6 +12,8 @@ import java.lang.annotation.Target;
  *
  * @author bennidi
  *         Date: 2/8/12
+ * @author dorkbox
+ *         Date: 2/2/15
  */
 @Retention(value = RetentionPolicy.RUNTIME)
 @Inherited
@@ -19,10 +21,18 @@ import java.lang.annotation.Target;
 public @interface Handler {
 
     /**
+     * Define whether or not the handler accepts variable arguments it declares in its signature.
+     * VarArg "acceptance" means that the handler, handle(String... s), will accept a publication
+     * of ("s"), ("s", "s"), or (String[3]{"s", "s", "s"}). By default, handle(String... s) will
+     * only handle publications that are exactly an array (String[3]{"s"})
+     */
+    boolean acceptVarargs() default false;
+
+    /**
      * Define whether or not the handler accepts sub types of the message type it declares in its
      * signature.
      */
-    boolean rejectSubtypes() default false;
+    boolean acceptSubtypes() default true;
 
     /**
      * Enable or disable the handler. Disabled handlers do not receive any messages.

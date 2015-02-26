@@ -35,6 +35,7 @@ public class MessageHandler {
 
     private final Class<?>[] handledMessages;
     private final boolean acceptsSubtypes;
+    private final boolean acceptsVarArgs;
     private final MessageListener listenerConfig;
 
     private final boolean isSynchronized;
@@ -51,10 +52,12 @@ public class MessageHandler {
         this.handler = MethodAccess.get(handler.getDeclaringClass());
         this.methodIndex = this.handler.getIndex(handler.getName(), handledMessages);
 
-        this.acceptsSubtypes = !handlerConfig.rejectSubtypes();
+        this.acceptsSubtypes = handlerConfig.acceptSubtypes();
         this.listenerConfig  = listenerMetadata;
         this.isSynchronized  = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
         this.handledMessages = handledMessages;
+
+        this.acceptsVarArgs = handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs();
     }
 
     public boolean isSynchronized(){
@@ -80,6 +83,10 @@ public class MessageHandler {
 
     public boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
+    }
+
+    public boolean acceptsVarArgs() {
+        return this.acceptsVarArgs;
     }
 
     @Override

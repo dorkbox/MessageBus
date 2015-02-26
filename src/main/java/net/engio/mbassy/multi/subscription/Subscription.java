@@ -60,6 +60,10 @@ public class Subscription {
         return this.handlerMetadata.acceptsSubtypes();
     }
 
+    public boolean acceptsVarArgs() {
+        return this.handlerMetadata.acceptsVarArgs();
+    }
+
     public boolean isEmpty() {
         return this.listeners.isEmpty();
     }
@@ -241,55 +245,6 @@ public class Subscription {
 //        }
     }
 
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, Object... messages) {
-//      Collection<Object> listeners = this.listeners;
-//
-//        if (listeners.size() > 0) {
-//            Method handler = this.handlerMetadata.getHandler();
-//
-//            for (Object listener : listeners) {
-//                try {
-//                    this.invocation.invoke(listener, handler, messages);
-//                } catch (IllegalAccessException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                            "The class or method is not accessible")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getName())
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(messages));
-//                } catch (IllegalArgumentException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "Wrong arguments passed to method. Was: " + Arrays.deepToString(messages)
-//                                                                        + "Expected: " + Arrays.deepToString(handler.getParameterTypes()))
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getName())
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(messages));
-//                } catch (InvocationTargetException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "Message handler threw exception")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getName())
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(messages));
-//                } catch (InterruptedException e) {
-//                    Thread.currentThread().interrupt();
-//                    return;
-//                } catch (Throwable e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "The handler code threw an exception")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getName())
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(messages));
-//                }
-//            }
-//        }
-    }
 
     @Override
     public int hashCode() {

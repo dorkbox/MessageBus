@@ -5,7 +5,7 @@ import java.util.Collection;
 
 import net.engio.mbassy.multi.annotations.Handler;
 import net.engio.mbassy.multi.common.ReflectionUtils;
-import net.engio.mbassy.multi.common.StrongConcurrentSet;
+import net.engio.mbassy.multi.common.StrongConcurrentSetV8;
 
 /**
  * The meta data reader is responsible for parsing and validating message handler configurations.
@@ -23,7 +23,7 @@ public class MetadataReader {
         Collection<Method> allHandlers = ReflectionUtils.getMethods(target);
 
         // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-        Collection<Method> bottomMostHandlers = new StrongConcurrentSet<Method>(allHandlers.size(), .8F);
+        Collection<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F, 1);
         for (Method handler : allHandlers) {
             if (!ReflectionUtils.containsOverridingMethod(allHandlers, handler)) {
                 bottomMostHandlers.add(handler);
