@@ -174,15 +174,13 @@ public class MultiMBassador implements IMessageBus {
 
         Class<?> messageClass = message.getClass();
         Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
-        boolean publishDeadSubs = true;
+        boolean subsPublished = false;
 
         // Run subscriptions
         if (subscriptions != null && !subscriptions.isEmpty()) {
-            publishDeadSubs = false;
-
             for (Subscription sub : subscriptions) {
                 // this catches all exception types
-                sub.publishToSubscription(this, message);
+                subsPublished |= sub.publishToSubscription(this, message);
             }
         }
 
@@ -190,11 +188,9 @@ public class MultiMBassador implements IMessageBus {
             Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
             if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-                publishDeadSubs = false;
-
                 for (Subscription sub : superSubscriptions) {
                     // this catches all exception types
-                    sub.publishToSubscription(this, message);
+                    subsPublished |= sub.publishToSubscription(this, message);
                 }
             }
 
@@ -205,22 +201,18 @@ public class MultiMBassador implements IMessageBus {
 
                 Collection<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
                     asArray[0] = message;
 
                     for (Subscription sub : varargSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
 
                 Collection<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     if (asArray == null) {
                         asArray = (Object[]) Array.newInstance(messageClass, 1);
                         asArray[0] = message;
@@ -228,13 +220,13 @@ public class MultiMBassador implements IMessageBus {
 
                     for (Subscription sub : varargSuperSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
             }
         }
 
-        if (publishDeadSubs) {
+        if (!subsPublished) {
             // Dead Event must EXACTLY MATCH (no subclasses)
             Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
@@ -255,15 +247,14 @@ public class MultiMBassador implements IMessageBus {
         Class<?> messageClass2 = message2.getClass();
 
         Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
-        boolean publishDeadSubs = true;
+        boolean subsPublished = false;
 
 
         // Run subscriptions
         if (subscriptions != null && !subscriptions.isEmpty()) {
-            publishDeadSubs = false;
             for (Subscription sub : subscriptions) {
                 // this catches all exception types
-                sub.publishToSubscription(this, message1, message2);
+                subsPublished |= sub.publishToSubscription(this, message1, message2);
             }
         }
 
@@ -271,10 +262,9 @@ public class MultiMBassador implements IMessageBus {
             Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
             // now get superClasses
             if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-                publishDeadSubs = false;
                 for (Subscription sub : superSubscriptions) {
                     // this catches all exception types
-                    sub.publishToSubscription(this, message1, message2);
+                    subsPublished |= sub.publishToSubscription(this, message1, message2);
                 }
             }
 
@@ -284,23 +274,19 @@ public class MultiMBassador implements IMessageBus {
 
                 Collection<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     asArray = (Object[]) Array.newInstance(messageClass1, 2);
                     asArray[0] = message1;
                     asArray[1] = message2;
 
                     for (Subscription sub : varargSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
 
                 Collection<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     if (asArray == null) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 2);
                         asArray[0] = message1;
@@ -309,14 +295,14 @@ public class MultiMBassador implements IMessageBus {
 
                     for (Subscription sub : varargSuperSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
             }
         }
 
 
-        if (publishDeadSubs) {
+        if (!subsPublished) {
             // Dead Event must EXACTLY MATCH (no subclasses)
             Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
@@ -338,14 +324,13 @@ public class MultiMBassador implements IMessageBus {
         Class<?> messageClass3 = message3.getClass();
 
         Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
-        boolean publishDeadSubs = true;
+        boolean subsPublished = false;
 
         // Run subscriptions
         if (subscriptions != null && !subscriptions.isEmpty()) {
-            publishDeadSubs = false;
             for (Subscription sub : subscriptions) {
                 // this catches all exception types
-                sub.publishToSubscription(this, message1, message2, message3);
+                subsPublished |= sub.publishToSubscription(this, message1, message2, message3);
             }
         }
 
@@ -365,8 +350,6 @@ public class MultiMBassador implements IMessageBus {
                 Object[] asArray = null;
                 Collection<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     asArray = (Object[]) Array.newInstance(messageClass1, 3);
                     asArray[0] = message1;
                     asArray[1] = message2;
@@ -374,15 +357,13 @@ public class MultiMBassador implements IMessageBus {
 
                     for (Subscription sub : varargSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
 
                 Collection<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    publishDeadSubs = false;
-
                     if (asArray == null) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 3);
                         asArray[0] = message1;
@@ -392,14 +373,14 @@ public class MultiMBassador implements IMessageBus {
 
                     for (Subscription sub : varargSuperSubscriptions) {
                         // this catches all exception types
-                        sub.publishToSubscription(this, asArray);
+                        subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
             }
         }
 
 
-        if (publishDeadSubs) {
+        if (!subsPublished) {
             // Dead Event must EXACTLY MATCH (no subclasses)
             Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {

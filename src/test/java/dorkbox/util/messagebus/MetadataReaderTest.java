@@ -150,7 +150,7 @@ public class MetadataReaderTest extends AssertSupport {
     @SuppressWarnings("unused")
     public class MessageListener1 {
 
-        @Handler(acceptSubtypes = true)
+        @Handler(acceptSubtypes = false)
         public void handleObject(Object o) {
 
         }
@@ -181,7 +181,7 @@ public class MetadataReaderTest extends AssertSupport {
 
         // narrow the handler
         @Override
-        @Handler(acceptSubtypes = true)
+        @Handler(acceptSubtypes = false)
         public void handleAny(Object o) {
 
         }

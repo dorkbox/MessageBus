@@ -92,7 +92,7 @@ public class Subscription {
         return this.listeners.size();
     }
 
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
+    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
         Collection<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -138,10 +138,12 @@ public class Subscription {
                                     .setPublishedObject(message));
                 }
             }
+            return true;
         }
+        return false;
     }
 
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
+    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
         Collection<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -191,10 +193,12 @@ public class Subscription {
                                                             .setPublishedObject(message1, message2));
                 }
             }
+            return true;
         }
+        return false;
     }
 
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
+    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
         Collection<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -246,7 +250,9 @@ public class Subscription {
                                                             .setPublishedObject(message1, message2, message3));
                 }
             }
+            return true;
         }
+        return false;
     }
 
 

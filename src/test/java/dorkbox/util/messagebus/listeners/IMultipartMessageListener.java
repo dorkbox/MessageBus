@@ -30,7 +30,7 @@ public class IMultipartMessageListener {
     public static class NoSubtypesListener extends BaseListener {
 
         @Override
-        @Handler(acceptSubtypes = true)
+        @Handler(acceptSubtypes = false)
         public void handle(IMultipartMessage message){
             super.handle(message);
         }

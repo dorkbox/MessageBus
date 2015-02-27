@@ -24,7 +24,7 @@ public class MultiMessageTest extends MessageBusTest {
 
         Listener listener1 = new Listener();
         bus.subscribe(listener1);
-//        bus.unsubscribe(listener1);
+        bus.unsubscribe(listener1);
 
         bus.publish("s");
         bus.publish("s", "s");
@@ -42,7 +42,7 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publish(1, 2, "s");
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
 
-        assertEquals(10, count.get());
+        assertEquals(12, count.get());
 
 
         bus.shutdown();
@@ -50,11 +50,11 @@ public class MultiMessageTest extends MessageBusTest {
 
     @SuppressWarnings("unused")
     public static class Listener {
-//        @Handler
-//        public void handleSync(String o1) {
-//            count.getAndIncrement();
-//            System.err.println("match String");
-//        }
+        @Handler
+        public void handleSync(String o1) {
+            count.getAndIncrement();
+            System.err.println("match String");
+        }
 
         @Handler
         public void handleSync(String o1, String o2) {
@@ -62,18 +62,18 @@ public class MultiMessageTest extends MessageBusTest {
             System.err.println("match String, String");
         }
 
-//        @Handler
-//        public void handleSync(String o1, String o2, String o3) {
-//            count.getAndIncrement();
-//            System.err.println("match String, String, String");
-//        }
-//
-//        @Handler
-//        public void handleSync(Integer o1, Integer o2, String o3) {
-//            count.getAndIncrement();
-//            System.err.println("match Integer, Integer, String");
-//        }
-//
+        @Handler
+        public void handleSync(String o1, String o2, String o3) {
+            count.getAndIncrement();
+            System.err.println("match String, String, String");
+        }
+
+        @Handler
+        public void handleSync(Integer o1, Integer o2, String o3) {
+            count.getAndIncrement();
+            System.err.println("match Integer, Integer, String");
+        }
+
         @Handler(acceptVarargs=true)
         public void handleSync(String... o) {
             count.getAndIncrement();

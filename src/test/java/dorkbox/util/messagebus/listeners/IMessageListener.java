@@ -30,7 +30,7 @@ public class IMessageListener {
     public static class NoSubtypesListener extends BaseListener {
 
         @Override
-        @Handler(acceptSubtypes = true)
+        @Handler(acceptSubtypes = false)
         public void handle(IMessage message){
             super.handle(message);
         }
