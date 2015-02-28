@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
@@ -72,6 +73,9 @@ public class SubscriptionManager {
 
     private final Map<Class<?>, Collection<Subscription>> varArgSubscriptions;
     private final Map<Class<?>, Collection<Subscription>> varArgSuperClassSubscriptions;
+
+    // to keep track if we really need to clear our maps
+    private final AtomicBoolean superCheck = new AtomicBoolean();
 
     // stripe size of maps for concurrency
     private final int STRIPE_SIZE;
@@ -142,9 +146,12 @@ public class SubscriptionManager {
         }
 
         // these are concurrent collections
-        this.superClassSubscriptions.clear();
-        this.varArgSubscriptions.clear();
-        this.varArgSuperClassSubscriptions.clear();
+        boolean compareAndSet = this.superCheck.compareAndSet(true, false);
+        if (compareAndSet) {
+            this.superClassSubscriptions.clear();
+            this.varArgSubscriptions.clear();
+            this.varArgSuperClassSubscriptions.clear();
+        }
 
 
         // no point in locking everything. We lock on the class object being subscribed, since that is as coarse as we can go.
@@ -254,10 +261,12 @@ public class SubscriptionManager {
             return;
         }
 
-        // these are concurrent collections
-        this.superClassSubscriptions.clear();
-        this.varArgSubscriptions.clear();
-        this.varArgSuperClassSubscriptions.clear();
+        boolean compareAndSet = this.superCheck.compareAndSet(true, false);
+        if (compareAndSet) {
+            this.superClassSubscriptions.clear();
+            this.varArgSubscriptions.clear();
+            this.varArgSuperClassSubscriptions.clear();
+        }
 
         // no point in locking everything. We lock on the class object being subscribed, since that is as coarse as we can go.
         // the listenerClass is GUARANTEED to be unique and the same object, per classloader. We do NOT LOCK for visibility, but for concurrency
@@ -345,6 +354,7 @@ public class SubscriptionManager {
     // check to see if the messageType can convert/publish to the "array" version, without the hit to JNI
     // and then, returns the array'd version subscriptions
     public Collection<Subscription> getVarArgSubscriptions(Class<?> varArgType) {
+        this.superCheck.set(true);
         Map<Class<?>, Collection<Subscription>> local = this.varArgSubscriptions;
 
         // whenever our subscriptions change, this map is cleared.
@@ -378,6 +388,7 @@ public class SubscriptionManager {
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
     public Collection<Subscription> getVarArgSuperSubscriptions(Class<?> varArgType) {
+        this.superCheck.set(true);
         Map<Class<?>, Collection<Subscription>> local = this.varArgSuperClassSubscriptions;
 
         // whenever our subscriptions change, this map is cleared.
@@ -421,6 +432,7 @@ public class SubscriptionManager {
 
     // ALSO checks to see if the superClass accepts subtypes.
     public final Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
+        this.superCheck.set(true);
         Map<Class<?>, Collection<Subscription>> local = this.superClassSubscriptions;
 
         // whenever our subscriptions change, this map is cleared.
@@ -462,6 +474,7 @@ public class SubscriptionManager {
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
     public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
+        this.superCheck.set(true);
         HashMapTree<Class<?>, Collection<Subscription>> local = this.superClassSubscriptionsMulti;
 
         // whenever our subscriptions change, this map is cleared.
@@ -535,6 +548,7 @@ public class SubscriptionManager {
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
     public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
+        this.superCheck.set(true);
         HashMapTree<Class<?>, Collection<Subscription>> local = this.superClassSubscriptionsMulti;
 
         // whenever our subscriptions change, this map is cleared.

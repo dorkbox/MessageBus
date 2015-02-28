@@ -2,7 +2,6 @@ package dorkbox.util.messagebus;
 
 import org.junit.Test;
 
-import dorkbox.util.messagebus.SubscriptionManager;
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
@@ -36,7 +35,6 @@ import dorkbox.util.messagebus.messages.StandardMessage;
 public class SubscriptionManagerTest extends AssertSupport {
 
     private static final int InstancesPerListener = 5000;
-    private static final int ConcurrentUnits = 1;
 
     @Test
     public void testIMessageListener(){
@@ -190,7 +188,6 @@ public class SubscriptionManagerTest extends AssertSupport {
         ConcurrentExecutor.runConcurrent(TestUtil.unsubscriber(subscriptionManager, listeners), 1);
 
         listeners.clear();
-        validator.clear();
 
         validator.validate(subscriptionManager);
     }

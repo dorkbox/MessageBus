@@ -92,6 +92,9 @@ public class Subscription {
         return this.listeners.size();
     }
 
+    /**
+     * @return true if there were listeners for this publication, false if there was nothing
+     */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
         Collection<Object> listeners = this.listeners;
 
@@ -143,6 +146,9 @@ public class Subscription {
         return false;
     }
 
+    /**
+     * @return true if there were listeners for this publication, false if there was nothing
+     */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
         Collection<Object> listeners = this.listeners;
 
@@ -198,6 +204,9 @@ public class Subscription {
         return false;
     }
 
+    /**
+     * @return true if there were listeners for this publication, false if there was nothing
+     */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
         Collection<Object> listeners = this.listeners;
 
