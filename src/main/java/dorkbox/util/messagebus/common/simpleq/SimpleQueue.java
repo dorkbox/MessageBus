@@ -11,7 +11,7 @@ import com.lmax.disruptor.MessageHolder;
 
 
 
-public class SimpleQueue {
+public final class SimpleQueue {
 
 
     private static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
@@ -25,7 +25,6 @@ public class SimpleQueue {
     private final AtomicReference<MessageHolder> consumer = new AtomicReference<MessageHolder>();
     private final AtomicReference<MessageHolder> producer = new AtomicReference<MessageHolder>();
 
-    private volatile boolean waitingProducer = false;
     private final AtomicInteger availableThreads = new AtomicInteger();
 
 
@@ -40,10 +39,10 @@ public class SimpleQueue {
         if ((holder = this.producer.getAndSet(null)) == null) {
             this.publisherLock.lock();
             try {
-                while ((holder = this.producer.getAndSet(null)) == null) {
-                    this.waitingProducer = true;
+                do {
                     this.publisherNotifyCondition.await();
-                }
+//                    LockSupport.parkNanos(1L);
+                } while ((holder = this.producer.getAndSet(null)) == null);
             } finally {
                 this.publisherLock.unlock();
             }
@@ -69,20 +68,22 @@ public class SimpleQueue {
 
     }
 
-    public MessageHolder poll() {
-        return this.consumer.getAndSet(null);
-    }
+//    public MessageHolder poll() {
+//        return this.consumer.getAndSet(null);
+//    }
 
     public MessageHolder take() throws InterruptedException {
         MessageHolder holder = null;
 
-        this.consumerLock.lock();
-        try {
-            while ((holder = this.consumer.getAndSet(null)) == null) {
-                this.consumerNotifyCondition.await();
+        if ((holder = this.consumer.getAndSet(null)) == null) {
+            this.consumerLock.lock();
+            try {
+                do {
+                    this.consumerNotifyCondition.await();
+                } while ((holder = this.consumer.getAndSet(null)) == null);
+            } finally {
+                this.consumerLock.unlock();
             }
-        } finally {
-            this.consumerLock.unlock();
         }
 
 
@@ -94,16 +95,11 @@ public class SimpleQueue {
     public void release(MessageHolder holder) {
         this.producer.set(holder);
 
-        if (this.waitingProducer) {
-            this.publisherLock.lock();
-            try {
-                if (this.waitingProducer) {
-                    this.waitingProducer = false;
-                    this.publisherNotifyCondition.signalAll();
-                }
-            } finally {
-                this.publisherLock.unlock();
-            }
+        this.publisherLock.lock();
+        try {
+            this.publisherNotifyCondition.signalAll();
+        } finally {
+            this.publisherLock.unlock();
         }
     }
 }

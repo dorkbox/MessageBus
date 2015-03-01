@@ -4,7 +4,6 @@ import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
 import com.lmax.disruptor.MessageHolder;
 
@@ -63,7 +62,7 @@ public class MultiMBassador implements IMessageBus {
      * By default, will permit subTypes and VarArg matching, and will use all CPUs available for dispatching async messages
      */
     public MultiMBassador() {
-        this(Runtime.getRuntime().availableProcessors());
+        this(Runtime.getRuntime().availableProcessors()/2);
 //        this(2);
     }
 
@@ -108,18 +107,18 @@ public class MultiMBassador implements IMessageBus {
 
                     while (true) {
                         try {
-                            spins = maxSpins;
-                            while ((event = IN_QUEUE.poll()) == null) {
-                                if (spins > 100) {
-                                    --spins;
-                                } else if (spins > 0) {
-                                    --spins;
-                                    LockSupport.parkNanos(1L);
-                                } else {
+//                            spins = maxSpins;
+//                            while ((event = IN_QUEUE.poll()) == null) {
+//                                if (spins > 100) {
+//                                    --spins;
+//                                } else if (spins > 0) {
+//                                    --spins;
+//                                    LockSupport.parkNanos(1L);
+//                                } else {
                                     event = IN_QUEUE.take();
-                                    break;
-                                }
-                            }
+//                                    break;
+//                                }
+//                            }
 
                             Object message1 = event.message1;
                             IN_QUEUE.release(event);
