@@ -1,9 +1,8 @@
-package dorkbox.util.messagebus.subscription;
+package com.lmax.disruptor;
 
 
 /**
- * @author dorkbox, llc
- *         Date: 2/2/15
+ * @author dorkbox, llc Date: 2/2/15
  */
 public class MessageHolder {
     public MessageType messageType = MessageType.ONE;
@@ -13,6 +12,5 @@ public class MessageHolder {
     public Object message3 = null;
     public Object[] messages = null;
 
-    public MessageHolder() {
-    }
+    public MessageHolder() {}
 }

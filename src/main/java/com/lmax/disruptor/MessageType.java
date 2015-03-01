@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.subscription;
+package com.lmax.disruptor;
 /**
  * @author dorkbox, llc
  *         Date: 2/2/15

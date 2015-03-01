@@ -3,11 +3,10 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.MultiMBassador;
+import junit.framework.Assert;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
-import junit.framework.Assert;
 
 /**
  * @author dorkbox, llc Date: 2/2/15
@@ -41,9 +40,10 @@ public class PerformanceTest {
         Listener listener1 = new Listener();
         bus.subscribe(listener1);
 
-        long num = Long.MAX_VALUE;
-        while (num-- > 0) {
-            bus.publishAsync("s");
+
+        long num = 0;
+        while (num < Long.MAX_VALUE) {
+            bus.publishAsync(num++);
         }
 
 //        bus.publish("s", "s");
@@ -60,10 +60,15 @@ public class PerformanceTest {
     @SuppressWarnings("unused")
     public static class Listener {
         @Handler
-        public void handleSync(String o1) {
+        public void handleSync(Long o1) {
             count++;
-//            System.err.println("match String");
         }
+
+//        @Handler
+//        public void handleSync(String o1) {
+//            count++;
+////            System.err.println("match String");
+//        }
 
 //        @Handler
 //        public void handleSync(String o1, String o2) {
