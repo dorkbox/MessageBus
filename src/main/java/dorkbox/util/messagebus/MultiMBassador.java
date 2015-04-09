@@ -8,7 +8,10 @@ import java.util.concurrent.TimeUnit;
 import com.lmax.disruptor.MessageHolder;
 
 import dorkbox.util.messagebus.common.DeadMessage;
+import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
+import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
+import dorkbox.util.messagebus.common.simpleq.HandlerFactory;
 import dorkbox.util.messagebus.common.simpleq.SimpleQueue;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
@@ -42,7 +45,7 @@ public class MultiMBassador implements IMessageBus {
 
 //    private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
 //    private final DisruptorQueue dispatchQueue;
-    private final SimpleQueue dispatchQueue;
+    private final SimpleQueue<MessageHolder> dispatchQueue;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -62,8 +65,7 @@ public class MultiMBassador implements IMessageBus {
      * By default, will permit subTypes and VarArg matching, and will use all CPUs available for dispatching async messages
      */
     public MultiMBassador() {
-        this(Runtime.getRuntime().availableProcessors()/2);
-//        this(2);
+        this(Runtime.getRuntime().availableProcessors());
     }
 
     /**
@@ -87,7 +89,15 @@ public class MultiMBassador implements IMessageBus {
         this.numberOfThreads = numberOfThreads;
 
 //        this.dispatchQueue = new DisruptorQueue(this, numberOfThreads);
-        this.dispatchQueue = new SimpleQueue(numberOfThreads);
+
+        HandlerFactory<MessageHolder> factory = new HandlerFactory<MessageHolder>() {
+            @Override
+            public MessageHolder newInstance() {
+                return new MessageHolder();
+            }
+        };
+
+        this.dispatchQueue = new SimpleQueue<MessageHolder>(numberOfThreads, factory);
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -96,14 +106,14 @@ public class MultiMBassador implements IMessageBus {
         for (int i = 0; i < numberOfThreads; i++) {
             // each thread will run forever and process incoming message publication requests
             Runnable runnable = new Runnable() {
-                @SuppressWarnings("null")
                 @Override
                 public void run() {
 //                    TransferQueue<Runnable> IN_QUEUE = MultiMBassador.this.dispatchQueue;
                     SimpleQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
 //                    Runnable event = null;
-                    MessageHolder event = null;
                     int spins;
+
+                    MessageHolder messageHolder = new MessageHolder();
 
                     while (true) {
                         try {
@@ -115,13 +125,13 @@ public class MultiMBassador implements IMessageBus {
 //                                    --spins;
 //                                    LockSupport.parkNanos(1L);
 //                                } else {
-                                    event = IN_QUEUE.take();
+                                    IN_QUEUE.take(messageHolder);
 //                                    break;
 //                                }
 //                            }
 
-                            Object message1 = event.message1;
-                            IN_QUEUE.release(event);
+                            Object message1 = messageHolder.message1;
+//                            IN_QUEUE.release(event);
 //                            event.run();
                             publish(message1);
 
@@ -183,22 +193,33 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-        Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
+        StrongConcurrentSetV8<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
         boolean subsPublished = false;
+
+        ISetEntry<Subscription> current;
+        Subscription sub;
 
         // Run subscriptions
         if (subscriptions != null && !subscriptions.isEmpty()) {
-            for (Subscription sub : subscriptions) {
+            current = subscriptions.head;
+            while (current != null) {
+                sub = current.getValue();
+                current = current.next();
+
                 // this catches all exception types
                 subsPublished |= sub.publishToSubscription(this, message);
             }
         }
 
         if (!this.forceExactMatches) {
-            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+            StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
             if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-                for (Subscription sub : superSubscriptions) {
+                current = superSubscriptions.head;
+                while (current != null) {
+                    sub = current.getValue();
+                    current = current.next();
+
                     // this catches all exception types
                     subsPublished |= sub.publishToSubscription(this, message);
                 }
@@ -209,18 +230,22 @@ public class MultiMBassador implements IMessageBus {
             if (!messageClass.isArray()) {
                 Object[] asArray = null;
 
-                Collection<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
+                StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
                     asArray[0] = message;
 
-                    for (Subscription sub : varargSubscriptions) {
+                    current = varargSubscriptions.head;
+                    while (current != null) {
+                        sub = current.getValue();
+                        current = current.next();
+
                         // this catches all exception types
                         subsPublished |= sub.publishToSubscription(this, asArray);
                     }
                 }
 
-                Collection<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
+                StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
                     if (asArray == null) {
@@ -228,7 +253,11 @@ public class MultiMBassador implements IMessageBus {
                         asArray[0] = message;
                     }
 
-                    for (Subscription sub : varargSuperSubscriptions) {
+                    current = varargSuperSubscriptions.head;
+                    while (current != null) {
+                        sub = current.getValue();
+                        current = current.next();
+
                         // this catches all exception types
                         subsPublished |= sub.publishToSubscription(this, asArray);
                     }
@@ -238,10 +267,15 @@ public class MultiMBassador implements IMessageBus {
 
         if (!subsPublished) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            StrongConcurrentSetV8<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
-                for (Subscription sub : deadSubscriptions) {
+
+                current = deadSubscriptions.head;
+                while (current != null) {
+                    sub = current.getValue();
+                    current = current.next();
+
                     // this catches all exception types
                     sub.publishToSubscription(this, deadMessage);
                 }

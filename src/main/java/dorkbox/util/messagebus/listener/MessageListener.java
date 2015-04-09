@@ -1,7 +1,5 @@
 package dorkbox.util.messagebus.listener;
 
-import java.util.Collection;
-
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 
 /**
@@ -20,7 +18,7 @@ import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
  */
 public class MessageListener {
 
-    private final Collection<MessageHandler> handlers;
+    private final StrongConcurrentSetV8<MessageHandler> handlers;
     private Class<?> listenerDefinition;
 
     public MessageListener(Class<?> listenerDefinition, int size) {
@@ -37,7 +35,7 @@ public class MessageListener {
         return this.handlers.add(messageHandler);
     }
 
-    public Collection<MessageHandler> getHandlers() {
+    public StrongConcurrentSetV8<MessageHandler> getHandlers() {
         return this.handlers;
     }
 }

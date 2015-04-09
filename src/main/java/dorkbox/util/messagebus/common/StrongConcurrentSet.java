@@ -40,7 +40,7 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
                 if (this.current == null) {
                     return null;
                 }
-               else {
+                else {
                     T value = this.current.getValue();
                     this.current = this.current.next();
                     return value;

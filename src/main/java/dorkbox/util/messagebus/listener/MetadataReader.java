@@ -1,9 +1,9 @@
 package dorkbox.util.messagebus.listener;
 
 import java.lang.reflect.Method;
-import java.util.Collection;
 
 import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.ReflectionUtils;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 
@@ -12,6 +12,8 @@ import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
  *
  * @author bennidi
  *         Date: 11/16/12
+ * @author dorkbox
+ *         Date: 2/2/15
  */
 public class MetadataReader {
 
@@ -20,11 +22,18 @@ public class MetadataReader {
     public MessageListener getMessageListener(Class<?> target) {
 
         // get all handlers (this will include all (inherited) methods directly annotated using @Handler)
-        Collection<Method> allHandlers = ReflectionUtils.getMethods(target);
+        StrongConcurrentSetV8<Method> allHandlers = ReflectionUtils.getMethods(target);
 
         // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-        Collection<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F, 1);
-        for (Method handler : allHandlers) {
+        StrongConcurrentSetV8<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F, 1);
+
+
+        ISetEntry<Method> current = allHandlers.head;
+        Method handler;
+        while (current != null) {
+            handler = current.getValue();
+            current = current.next();
+
             if (!ReflectionUtils.containsOverridingMethod(allHandlers, handler)) {
                 bottomMostHandlers.add(handler);
             }
@@ -34,7 +43,12 @@ public class MetadataReader {
 
         // for each handler there will be no overriding method that specifies @Handler annotation
         // but an overriding method does inherit the listener configuration of the overwritten method
-        for (Method handler : bottomMostHandlers) {
+
+        current = bottomMostHandlers.head;
+        while (current != null) {
+            handler = current.getValue();
+            current = current.next();
+
             Handler handlerConfig = ReflectionUtils.getAnnotation(handler, Handler.class);
             if (handlerConfig == null || !handlerConfig.enabled()) {
                 continue; // disabled or invalid listeners are ignored

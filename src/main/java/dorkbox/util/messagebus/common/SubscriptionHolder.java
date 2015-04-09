@@ -1,10 +1,8 @@
 package dorkbox.util.messagebus.common;
 
-import java.util.Collection;
-
 import dorkbox.util.messagebus.subscription.Subscription;
 
-public class SubscriptionHolder extends ThreadLocal<Collection<Subscription>> {
+public class SubscriptionHolder extends ThreadLocal<StrongConcurrentSetV8<Subscription>> {
 
     private final int stripeSize;
     private final float loadFactor;
@@ -17,7 +15,7 @@ public class SubscriptionHolder extends ThreadLocal<Collection<Subscription>> {
     }
 
     @Override
-    protected Collection<Subscription> initialValue() {
+    protected StrongConcurrentSetV8<Subscription> initialValue() {
         return new StrongConcurrentSetV8<Subscription>(16, this.loadFactor, this.stripeSize);
     }
 }

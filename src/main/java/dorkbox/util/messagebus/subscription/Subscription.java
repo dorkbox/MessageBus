@@ -1,11 +1,11 @@
 package dorkbox.util.messagebus.subscription;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
 
+import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
@@ -96,14 +96,20 @@ public class Subscription {
      * @return true if there were listeners for this publication, false if there was nothing
      */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
-        Collection<Object> listeners = this.listeners;
+        StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
             MethodAccess handler = this.handlerMetadata.getHandler();
             int handleIndex = this.handlerMetadata.getMethodIndex();
             IHandlerInvocation invocation = this.invocation;
 
-            for (Object listener : listeners) {
+
+            ISetEntry<Object> current = listeners.head;
+            Object listener;
+            while (current != null) {
+                listener = current.getValue();
+                current = current.next();
+
                 try {
                     invocation.invoke(listener, handler, handleIndex, message);
                 } catch (IllegalAccessException e) {
@@ -150,14 +156,20 @@ public class Subscription {
      * @return true if there were listeners for this publication, false if there was nothing
      */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
-        Collection<Object> listeners = this.listeners;
+        StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
             MethodAccess handler = this.handlerMetadata.getHandler();
             int handleIndex = this.handlerMetadata.getMethodIndex();
             IHandlerInvocation invocation = this.invocation;
 
-            for (Object listener : listeners) {
+
+            ISetEntry<Object> current = listeners.head;
+            Object listener;
+            while (current != null) {
+                listener = current.getValue();
+                current = current.next();
+
                 try {
                     invocation.invoke(listener, handler, handleIndex, message1, message2);
                 } catch (IllegalAccessException e) {
@@ -208,14 +220,20 @@ public class Subscription {
      * @return true if there were listeners for this publication, false if there was nothing
      */
     public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
-        Collection<Object> listeners = this.listeners;
+        StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
             MethodAccess handler = this.handlerMetadata.getHandler();
             int handleIndex = this.handlerMetadata.getMethodIndex();
             IHandlerInvocation invocation = this.invocation;
 
-            for (Object listener : listeners) {
+
+            ISetEntry<Object> current = listeners.head;
+            Object listener;
+            while (current != null) {
+                listener = current.getValue();
+                current = current.next();
+
                 try {
                     invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
                 } catch (IllegalAccessException e) {

@@ -4,7 +4,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.Set;
 
 import dorkbox.util.messagebus.annotations.Handler;
 
@@ -17,11 +16,11 @@ import dorkbox.util.messagebus.annotations.Handler;
  */
 public class ReflectionUtils {
 
-    public static Collection<Method> getMethods(Class<?> target) {
+    public static StrongConcurrentSetV8<Method> getMethods(Class<?> target) {
         return getMethods(target, new StrongConcurrentSetV8<Method>(16, .8F, 1));
     }
 
-    public static Collection<Method> getMethods(Class<?> target, Collection<Method> methods) {
+    public static StrongConcurrentSetV8<Method> getMethods(Class<?> target, StrongConcurrentSetV8<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -66,8 +65,8 @@ public class ReflectionUtils {
      * @param from The root class to start with
      * @return A set of classes, each representing a super type of the root class
      */
-    public static Set<Class<?>> getSuperTypes(Class<?> from) {
-        Set<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F, 1);
+    public static StrongConcurrentSetV8<Class<?>> getSuperTypes(Class<?> from) {
+        StrongConcurrentSetV8<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F, 1);
 
         collectInterfaces( from, superclasses );
 
@@ -79,7 +78,7 @@ public class ReflectionUtils {
         return superclasses;
     }
 
-    public static void collectInterfaces( Class<?> from, Set<Class<?>> accumulator ) {
+    public static void collectInterfaces( Class<?> from, StrongConcurrentSetV8<Class<?>> accumulator ) {
         for ( Class<?> intface : from.getInterfaces() ) {
             accumulator.add( intface );
             collectInterfaces( intface, accumulator );
@@ -87,8 +86,14 @@ public class ReflectionUtils {
     }
 
     //
-    public static boolean containsOverridingMethod(final Collection<Method> allMethods, final Method methodToCheck) {
-        for (Method method : allMethods) {
+    public static boolean containsOverridingMethod(final StrongConcurrentSetV8<Method> allMethods, final Method methodToCheck) {
+
+        ISetEntry<Method> current = allMethods.head;
+        Method method;
+        while (current != null) {
+            method = current.getValue();
+            current = current.next();
+
             if (isOverriddenBy(methodToCheck, method)) {
                 return true;
             }
