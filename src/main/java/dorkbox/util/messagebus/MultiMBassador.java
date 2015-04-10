@@ -449,7 +449,7 @@ public class MultiMBassador implements IMessageBus {
 
             try {
 //                this.dispatchQueue.transfer(runnable);
-                this.dispatchQueue.transfer(message);
+                this.dispatchQueue.put(message);
             } catch (InterruptedException e) {
                 handlePublicationError(new PublicationError()
                     .setMessage("Error while adding an asynchronous message")
@@ -470,7 +470,7 @@ public class MultiMBassador implements IMessageBus {
             };
 
             try {
-                this.dispatchQueue.transfer(runnable);
+                this.dispatchQueue.put(runnable);
             } catch (InterruptedException e) {
                 handlePublicationError(new PublicationError()
                     .setMessage("Error while adding an asynchronous message")
@@ -492,7 +492,7 @@ public class MultiMBassador implements IMessageBus {
 
 
             try {
-                this.dispatchQueue.transfer(runnable);
+                this.dispatchQueue.put(runnable);
             } catch (InterruptedException e) {
                 handlePublicationError(new PublicationError()
                     .setMessage("Error while adding an asynchronous message")

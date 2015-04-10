@@ -2,7 +2,7 @@ package dorkbox.util.messagebus.common.simpleq;
 
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueueConsumerField;
 
-public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<Node<M>> {
+public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Node> {
 
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
@@ -20,19 +20,11 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
     long p40, p41, p42, p43, p44, p45, p46;
     long p30, p31, p32, p33, p34, p35, p36, p37;
 
-    private final Node<M> newInstance;
-
-
     /** Creates a {@code EliminationStack} that is initially empty. */
-    public MpmcExchangerQueueAlt(final HandlerFactory<M> factory, final int size) {
+    public MpmcExchangerQueueAlt(final int size) {
         super(size);
 
-
-        this.newInstance = new Node<M>(factory.newInstance());
-
-        //////////////
         // pre-fill our data structures
-        //////////////
 
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
@@ -45,29 +37,33 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
 
             // on 64bit(no compressed oops) JVM this is the same as seqOffset
             final long elementOffset = calcElementOffset(currentProducerIndex, mask);
-            spElement(elementOffset, this.newInstance);
+            spElement(elementOffset, new Node());
         }
-
-        pSeqOffset = calcSequenceOffset(0, mask);
-        soSequence(sBuffer, pSeqOffset, 0); // StoreStore
     }
 
     /**
      * PRODUCER
      * @return null iff queue is full
      */
-    public Node<M> put() {
+    public void put(Object item) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = this.mask + 1;
         final long[] sBuffer = this.sequenceBuffer;
 
+        long currentConsumerIndex;
         long currentProducerIndex;
         long pSeqOffset;
         long cIndex = Long.MAX_VALUE;// start with bogus value, hope we don't need it
 
         while (true) {
+            // Order matters!
+            // Loading consumer before producer allows for producer increments after consumer index is read.
+            // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
+            // nothing we can do to make this an exact method.
+//            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
             currentProducerIndex = lvProducerIndex(); // LoadLoad
+
             pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
             final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
             final long delta = seq - currentProducerIndex;
@@ -79,13 +75,14 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentProducerIndex, mask);
-                    final Node<M> e = lpElement(offset);
+                    final Node e = lpElement(offset);
+                    e.setMessage1(item);
 
                     // increment sequence by 1, the value expected by consumer
                     // (seeing this value from a producer will lead to retry 2)
                     soSequence(sBuffer, pSeqOffset, currentProducerIndex + 1); // StoreStore
 
-                    return e;
+                    return;
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // poll has not moved this value forward
@@ -107,17 +104,25 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
      * CONSUMER
      * @return null iff empty
      */
-    public Node<M> take() {
+    public Object take() {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
 
         long currentConsumerIndex;
+        long currentProducerIndex;
         long cSeqOffset;
         long pIndex = -1; // start with bogus value, hope we don't need it
 
         while (true) {
+            // Order matters!
+            // Loading consumer before producer allows for producer increments after consumer index is read.
+            // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
+            // nothing we can do to make this an exact method.
             currentConsumerIndex = lvConsumerIndex(); // LoadLoad
+//            currentProducerIndex = lvProducerIndex(); // LoadLoad
+
+
             cSeqOffset = calcSequenceOffset(currentConsumerIndex, mask);
             final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
             final long delta = seq - (currentConsumerIndex + 1);
@@ -128,13 +133,13 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentConsumerIndex, mask);
-                    final Node<M> e = lpElement(offset);
+                    final Node e = lpElement(offset);
 
                     // Move sequence ahead by capacity, preparing it for next offer
                     // (seeing this value from a consumer will lead to retry 2)
                     soSequence(sBuffer, cSeqOffset, currentConsumerIndex + mask + 1); // StoreStore
 
-                    return e;
+                    return e.getMessage1();
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // slot has not been moved by producer
@@ -165,17 +170,17 @@ public final class MpmcExchangerQueueAlt<M> extends MpmcArrayQueueConsumerField<
     }
 
     @Override
-    public boolean offer(Node<M> message) {
+    public boolean offer(Node message) {
         return false;
     }
 
     @Override
-    public Node<M> poll() {
+    public Node poll() {
         return null;
     }
 
     @Override
-    public Node<M> peek() {
+    public Node peek() {
         return null;
     }
 

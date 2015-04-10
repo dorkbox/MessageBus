@@ -19,6 +19,8 @@ import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE
 import java.util.AbstractQueue;
 import java.util.Iterator;
 
+import dorkbox.util.messagebus.common.simpleq.Node;
+
 abstract class ConcurrentCircularArrayQueueL0Pad<E> extends AbstractQueue<E> implements MessagePassingQueue<E> {
     long p00, p01, p02, p03, p04, p05, p06, p07;
     long p30, p31, p32, p33, p34, p35, p36, p37;
@@ -27,7 +29,7 @@ abstract class ConcurrentCircularArrayQueueL0Pad<E> extends AbstractQueue<E> imp
 /**
  * A concurrent access enabling class used by circular array based queues this class exposes an offset computation
  * method along with differently memory fenced load/store methods into the underlying array. The class is pre-padded and
- * the array is padded on either side to help with False sharing prvention. It is expected theat subclasses handle post
+ * the array is padded on either side to help with False sharing prevention. It is expected that subclasses handle post
  * padding.
  * <p>
  * Offset calculation is separate from access to enable the reuse of a give compute offset.
@@ -41,8 +43,8 @@ abstract class ConcurrentCircularArrayQueueL0Pad<E> extends AbstractQueue<E> imp
  * @param <E>
  */
 public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircularArrayQueueL0Pad<E> {
-    protected static final int SPARSE_SHIFT = Integer.getInteger("sparse.shift", 0);
-    protected static final int BUFFER_PAD = 32;
+    protected static final int SPARSE_SHIFT = Integer.getInteger("sparse.shift", 2);
+    protected static final int BUFFER_PAD;
     private static final long REF_ARRAY_BASE;
     private static final int REF_ELEMENT_SHIFT;
     static {
@@ -54,6 +56,8 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
         } else {
             throw new IllegalStateException("Unknown pointer size");
         }
+
+        BUFFER_PAD = 128 / scale;
         // Including the buffer pad in the array base offset
         REF_ARRAY_BASE = UnsafeAccess.UNSAFE.arrayBaseOffset(Object[].class)
                 + (BUFFER_PAD << REF_ELEMENT_SHIFT - SPARSE_SHIFT);
@@ -67,7 +71,7 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
         int actualCapacity = Pow2.roundToPowerOfTwo(capacity);
         this.mask = actualCapacity - 1;
         // pad data on either end with some empty slots.
-        this.buffer = (E[]) new Object[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
+        this.buffer = (E[]) new Node[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
     }
 
     /**

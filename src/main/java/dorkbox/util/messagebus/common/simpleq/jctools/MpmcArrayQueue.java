@@ -14,6 +14,7 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
 
+
 /**
  * A Multi-Producer-Multi-Consumer queue based on a {@link ConcurrentCircularArrayQueue}. This implies that
  * any and all threads may call the offer/poll/peek methods and correctness is maintained. <br>
@@ -34,11 +35,8 @@ package dorkbox.util.messagebus.common.simpleq.jctools;
  * <li>Power of 2 capacity: Actual elements buffer (and sequence buffer) is the closest power of 2 larger or
  * equal to the requested capacity.
  * </ol>
- *
- * @param <E>
- *            type of the element stored in the {@link java.util.Queue}
  */
-public class MpmcArrayQueue<E> extends MpmcArrayQueueConsumerField<E> {
+public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
 
@@ -67,7 +65,7 @@ public class MpmcArrayQueue<E> extends MpmcArrayQueueConsumerField<E> {
     }
 
     @Override
-    public boolean offer(final E e) {
+    public boolean offer(final Object e) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = mask + 1;
@@ -118,7 +116,7 @@ public class MpmcArrayQueue<E> extends MpmcArrayQueueConsumerField<E> {
      * and must test producer index when next element is not visible.
      */
     @Override
-    public E poll() {
+    public Object poll() {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
@@ -139,7 +137,7 @@ public class MpmcArrayQueue<E> extends MpmcArrayQueueConsumerField<E> {
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentConsumerIndex, mask);
-                    final E e = lpElement(offset);
+                    final Object e = lpElement(offset);
                     spElement(offset, null);
 
                     // Move sequence ahead by capacity, preparing it for next offer
@@ -162,9 +160,9 @@ public class MpmcArrayQueue<E> extends MpmcArrayQueueConsumerField<E> {
     }
 
     @Override
-    public E peek() {
+    public Object peek() {
         long currConsumerIndex;
-        E e;
+        Object e;
         do {
             currConsumerIndex = lvConsumerIndex();
             // other consumers may have grabbed the element, or queue might be empty

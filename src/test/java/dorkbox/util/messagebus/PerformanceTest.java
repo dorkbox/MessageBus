@@ -103,7 +103,7 @@ public class PerformanceTest {
             long s = System.nanoTime();
             try {
                 do {
-                    producer.transfer(TEST_VALUE);
+                    producer.put(TEST_VALUE);
                 } while (0 != --i);
             } catch (InterruptedException ignored) {
             }

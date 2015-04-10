@@ -21,7 +21,6 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
     long p30, p31, p32, p33, p34, p35, p36, p37;
 
 
-
     /** Creates a {@code EliminationStack} that is initially empty. */
     public MpmcExchangerQueue(final HandlerFactory<M> factory, final int size) {
         super(size);
@@ -33,32 +32,23 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
-
-        long currentProducerIndex;
         long pSeqOffset;
+        long currentProducerIndex;
 
         for (currentProducerIndex = 0; currentProducerIndex < size; currentProducerIndex++) {
             pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
-            final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-            final long delta = seq - currentProducerIndex;
 
-            if (delta == 0) {
-                // this is expected if we see this first time around
-                // Successful CAS: full barrier
-
-                // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                final long elementOffset = calcElementOffset(currentProducerIndex, mask);
-                spElement(elementOffset, new Node<M>(factory.newInstance()));
-            } else {
-                // something is seriously wrong. This should never happen.
-                throw new RuntimeException("Unable to prefill exchangerQueue");
-            }
+            // on 64bit(no compressed oops) JVM this is the same as seqOffset
+            final long elementOffset = calcElementOffset(currentProducerIndex, mask);
+            spElement(elementOffset, new Node<M>(factory.newInstance()));
         }
+
+        pSeqOffset = calcSequenceOffset(0, mask);
+        soSequence(sBuffer, pSeqOffset, 0); // StoreStore
     }
 
     /**
      * PRODUCER
-     * @return null iff queue is full
      */
     public Node<M> put() {
         // local load of field to avoid repeated loads after volatile reads
@@ -76,7 +66,7 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
             // Loading consumer before producer allows for producer increments after consumer index is read.
             // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
             // nothing we can do to make this an exact method.
-            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
+//            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
             currentProducerIndex = lvProducerIndex(); // LoadLoad
 
             pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
@@ -90,7 +80,6 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentProducerIndex, mask);
-
                     final Node<M> e = lpElement(offset);
 
                     // increment sequence by 1, the value expected by consumer
@@ -104,8 +93,8 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
                     currentProducerIndex - capacity <= cIndex && // test against cached cIndex
                     currentProducerIndex - capacity <= (cIndex = lvConsumerIndex())) { // test against latest cIndex
                  // Extra check required to ensure [Queue.offer == false iff queue is full]
-
-                 return null;
+//                 return null;
+                busySpin();
             }
 
             // another producer has moved the sequence by one, retry 2
@@ -117,7 +106,6 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
 
     /**
      * CONSUMER
-     * @return null iff empty
      */
     public Node<M> take() {
         // local load of field to avoid repeated loads after volatile reads
@@ -135,7 +123,8 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
             // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
             // nothing we can do to make this an exact method.
             currentConsumerIndex = lvConsumerIndex(); // LoadLoad
-            currentProducerIndex = lvProducerIndex(); // LoadLoad
+//            currentProducerIndex = lvProducerIndex(); // LoadLoad
+
 
             cSeqOffset = calcSequenceOffset(currentConsumerIndex, mask);
             final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
@@ -160,9 +149,10 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
                     currentConsumerIndex >= pIndex && // test against cached pIndex
                     currentConsumerIndex == (pIndex = lvProducerIndex())) { // update pIndex if we must
                 // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
+//                return null;
 
                 // contention. we WILL have data in the Q, we just got to it too quickly
-                return null;
+                busySpin();
             }
 
             // another consumer beat us and moved sequence ahead, retry 2
@@ -170,7 +160,7 @@ public final class MpmcExchangerQueue<M> extends MpmcArrayQueueConsumerField<Nod
         }
     }
 
-    private void busySpin() {
+    private static final void busySpin() {
         // busy spin for the amount of time (roughly) of a CPU context switch
         int spins = SPINS;
         for (;;) {
