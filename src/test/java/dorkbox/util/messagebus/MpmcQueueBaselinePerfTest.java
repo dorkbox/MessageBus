@@ -15,6 +15,9 @@
  */
 package dorkbox.util.messagebus;
 
+import org.openjdk.jol.info.ClassLayout;
+import org.openjdk.jol.util.VMSupport;
+
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueue;
 
 public class MpmcQueueBaselinePerfTest {
@@ -25,6 +28,9 @@ public class MpmcQueueBaselinePerfTest {
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
     public static void main(final String[] args) throws Exception {
+        System.out.println(VMSupport.vmDetails());
+        System.out.println(ClassLayout.parseClass(Integer.class).toPrintable());
+
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
         final MpmcArrayQueue queue = new MpmcArrayQueue(QUEUE_CAPACITY);
 

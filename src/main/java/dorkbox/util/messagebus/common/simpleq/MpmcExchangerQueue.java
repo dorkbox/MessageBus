@@ -1,8 +1,46 @@
 package dorkbox.util.messagebus.common.simpleq;
 
+import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueueConsumerField;
 
-public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Node> {
+public final class MpmcExchangerQueue extends MpmcArrayQueueConsumerField<Node> {
+
+    private final static long THREAD;
+    private static final long TYPE_OFFSET;
+    private static final long ITEM1_OFFSET;
+
+    static {
+        try {
+            TYPE_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("nodeType"));
+           ITEM1_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
+           THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final void setMessage1(Object node, Object item) {
+        UNSAFE.putObject(node, ITEM1_OFFSET, item);
+    }
+
+    private static final Object getMessage1(Object node) {
+        return UNSAFE.getObject(node, ITEM1_OFFSET);
+    }
+
+    public final Thread get() {
+        return (Thread) UNSAFE.getObject(this, THREAD);
+    }
+
+
+    public final void set(Thread newValue) {
+        UNSAFE.putOrderedObject(this, THREAD, newValue);
+    }
+
+    protected final boolean compareAndSet(Object expect, Object newValue) {
+        return UNSAFE.compareAndSwapObject(this, THREAD, expect, newValue);
+    }
+
+
 
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
@@ -21,31 +59,27 @@ public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Nod
     long p30, p31, p32, p33, p34, p35, p36, p37;
 
     /** Creates a {@code EliminationStack} that is initially empty. */
-    public MpmcExchangerQueueAlt(final int size) {
+    public MpmcExchangerQueue(final int size) {
         super(size);
 
         // pre-fill our data structures
 
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
-        final long[] sBuffer = this.sequenceBuffer;
-        long pSeqOffset;
         long currentProducerIndex;
 
         for (currentProducerIndex = 0; currentProducerIndex < size; currentProducerIndex++) {
-            pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
-
             // on 64bit(no compressed oops) JVM this is the same as seqOffset
             final long elementOffset = calcElementOffset(currentProducerIndex, mask);
-            spElement(elementOffset, new Node());
+            soElement(elementOffset, new Node());
         }
     }
 
     /**
      * PRODUCER
-     * @return null iff queue is full
      */
     public void put(Object item) {
+
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = this.mask + 1;
@@ -61,7 +95,7 @@ public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Nod
             // Loading consumer before producer allows for producer increments after consumer index is read.
             // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
             // nothing we can do to make this an exact method.
-//            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
+            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
             currentProducerIndex = lvProducerIndex(); // LoadLoad
 
             pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
@@ -75,8 +109,9 @@ public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Nod
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentProducerIndex, mask);
-                    final Node e = lpElement(offset);
-                    e.setMessage1(item);
+                    Object lpElement = lpElement(offset);
+                    setMessage1(lpElement, item);
+//                    spElement(offset, item);
 
                     // increment sequence by 1, the value expected by consumer
                     // (seeing this value from a producer will lead to retry 2)
@@ -110,7 +145,7 @@ public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Nod
         final long[] sBuffer = this.sequenceBuffer;
 
         long currentConsumerIndex;
-        long currentProducerIndex;
+//        long currentProducerIndex;
         long cSeqOffset;
         long pIndex = -1; // start with bogus value, hope we don't need it
 
@@ -133,13 +168,14 @@ public final class MpmcExchangerQueueAlt extends MpmcArrayQueueConsumerField<Nod
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentConsumerIndex, mask);
-                    final Node e = lpElement(offset);
+                    final Object e = lpElement(offset);
+                    Object item = getMessage1(e);
 
                     // Move sequence ahead by capacity, preparing it for next offer
                     // (seeing this value from a consumer will lead to retry 2)
                     soSequence(sBuffer, cSeqOffset, currentConsumerIndex + mask + 1); // StoreStore
 
-                    return e.getMessage1();
+                    return item;
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // slot has not been moved by producer

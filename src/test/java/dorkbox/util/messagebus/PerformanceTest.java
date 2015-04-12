@@ -4,10 +4,8 @@
 package dorkbox.util.messagebus;
 
 import junit.framework.Assert;
-
-import com.lmax.disruptor.MessageHolder;
-
-import dorkbox.util.messagebus.common.simpleq.HandlerFactory;
+import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.simpleq.SimpleQueue;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
@@ -18,7 +16,6 @@ import dorkbox.util.messagebus.error.PublicationError;
 public class PerformanceTest {
     // 15 == 32 * 1024
     public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
-    public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
@@ -35,16 +32,14 @@ public class PerformanceTest {
     };
 
     public static void main(String[] args) throws Exception {
+//        testSpeed();
+        tesCorrectness();
+    }
+
+    private static void testSpeed() throws Exception {
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
 
-        HandlerFactory<MessageHolder> factory = new HandlerFactory<MessageHolder>() {
-            @Override
-            public MessageHolder newInstance() {
-                return new MessageHolder();
-            }
-        };
-
-        final SimpleQueue<MessageHolder> queue = new SimpleQueue<MessageHolder>(QUEUE_CAPACITY, factory);
+        final SimpleQueue queue = new SimpleQueue (QUEUE_CAPACITY, 1 << 14);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -59,20 +54,18 @@ public class PerformanceTest {
         System.out.format("summary,QueuePerfTest,%s,%d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-    private static long performanceRun(int runNumber, SimpleQueue<MessageHolder> queue) throws Exception {
+    private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
 //        for (int i=0;i<CONCURRENCY_LEVEL;i++) {
             Producer p = new Producer(queue);
             Thread thread = new Thread(p);
             thread.start(); // producer will timestamp start
 //        }
 
-        SimpleQueue<MessageHolder> consumer = queue;
-//        Node<Integer> result;
+        SimpleQueue consumer = queue;
         int i = REPETITIONS;
-        int queueEmpty = 0;
-        MessageHolder messageHolder = new MessageHolder();
+        Object result;
         do {
-            consumer.take(messageHolder);
+            result = consumer.take();
         } while (0 != --i);
         long end = System.nanoTime();
 
@@ -80,72 +73,62 @@ public class PerformanceTest {
         long duration = end - p.start;
         long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
         String qName = queue.getClass().getSimpleName();
-        Integer finalMessage = (Integer) messageHolder.message1;
-        System.out.format("%d - ops/sec=%,d - %s result=%d failed.poll=%d failed.offer=%d\n", runNumber, ops,
-                qName, finalMessage, queueEmpty, p.queueFull);
+        System.out.format("%d - ops/sec=%,d - %s result=%d\n", runNumber, ops, qName, result);
         return ops;
     }
 
     public static class Producer implements Runnable {
-        private final SimpleQueue<MessageHolder> queue;
-        int queueFull = 0;
+        private final SimpleQueue queue;
         long start;
 
-        public Producer(SimpleQueue<MessageHolder> queue) {
+        public Producer(SimpleQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            SimpleQueue<MessageHolder> producer = this.queue;
+            SimpleQueue producer = this.queue;
             int i = REPETITIONS;
-            int f = 0;
             long s = System.nanoTime();
-            try {
-                do {
-                    producer.put(TEST_VALUE);
-                } while (0 != --i);
-            } catch (InterruptedException ignored) {
-            }
-            this.queueFull = f;
+            do {
+                producer.put(i);
+            } while (0 != --i);
             this.start = s;
         }
     }
 
+    private static void tesCorrectness() {
+        final MultiMBassador bus = new MultiMBassador(CONCURRENCY_LEVEL);
+        bus.addErrorHandler(TestFailingHandler);
 
+
+        Listener listener1 = new Listener();
+        bus.subscribe(listener1);
+
+
+        ConcurrentExecutor.runConcurrent(new Runnable() {
+            @Override
+            public void run() {
+                long num = 0;
+                while (num < Long.MAX_VALUE) {
+                    bus.publishAsync(num++);
+                }
+            }}, CONCURRENCY_LEVEL);
+
+
+        bus.shutdown();
+        System.err.println("Count: " + count);
+    }
 
     public PerformanceTest() {
     }
 
-//    public void testMultiMessageSending() {
-//        final MultiMBassador bus = new MultiMBassador(4);
-//        bus.addErrorHandler(TestFailingHandler);
-//
-//
-//        Listener listener1 = new Listener();
-//        bus.subscribe(listener1);
-//
-//
-//        ConcurrentExecutor.runConcurrent(new Runnable() {
-//            @Override
-//            public void run() {
-//                long num = 0;
-//                while (num < Long.MAX_VALUE) {
-//                    bus.publishAsync(num++);
-//                }
-//            }}, 4);
-//
-//
-//        bus.shutdown();
-//        System.err.println("Count: " + count);
-//    }
-//
-//    @SuppressWarnings("unused")
-//    public static class Listener {
-//        @Handler
-//        public void handleSync(Long o1) {
-////            System.err.println(Long.toString(o1));
-//              count++;
-//        }
-//    }
+    @SuppressWarnings("unused")
+    public static class Listener {
+        @Handler
+        public void handleSync(Long o1) {
+//            System.err.println(Long.toString(o1));
+              count++;
+        }
+    }
 }

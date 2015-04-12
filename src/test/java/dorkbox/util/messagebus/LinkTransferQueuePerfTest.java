@@ -15,15 +15,17 @@
  */
 package dorkbox.util.messagebus;
 
+import java.util.concurrent.LinkedTransferQueue;
+
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.simpleq.MpmcExchangerQueue;
 import dorkbox.util.messagebus.common.simpleq.Node;
 
-public class MpmcQueueAltPerfTest {
+public class LinkTransferQueuePerfTest {
     // 15 == 32 * 1024
     public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
+    public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
@@ -34,7 +36,7 @@ public class MpmcQueueAltPerfTest {
 
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
 
-        final MpmcExchangerQueue queue = new MpmcExchangerQueue(QUEUE_CAPACITY);
+        final LinkedTransferQueue<Integer> queue = new LinkedTransferQueue<Integer>();
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -50,16 +52,17 @@ public class MpmcQueueAltPerfTest {
     }
 
 
-    private static long performanceRun(int runNumber, MpmcExchangerQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, LinkedTransferQueue<Integer> queue) throws Exception {
 //        for (int i=0;i<CONCURRENCY_LEVEL;i++) {
             Producer p = new Producer(queue);
             Thread thread = new Thread(p);
             thread.start(); // producer will timestamp start
 //        }
 
-        MpmcExchangerQueue consumer = queue;
+            LinkedTransferQueue<Integer> consumer = queue;
         Object result;
         int i = REPETITIONS;
+        int queueEmpty = 0;
         do {
             result = consumer.take();
         } while (0 != --i);
@@ -69,30 +72,38 @@ public class MpmcQueueAltPerfTest {
         long duration = end - p.start;
         long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
         String qName = queue.getClass().getSimpleName();
-        System.out.format("%d - ops/sec=%,d - %s result=%d\n", runNumber, ops, qName, result);
+        System.out.format("%d - ops/sec=%,d - %s result=%d failed.poll=%d failed.offer=%d\n", runNumber, ops,
+                qName, result, queueEmpty, p.queueFull);
         return ops;
     }
 
-    private static final Integer val = Integer.valueOf(234);
-
-
     public static class Producer implements Runnable {
-        private final MpmcExchangerQueue queue;
+        private final LinkedTransferQueue<Integer> queue;
+        int queueFull = 0;
         long start;
 
-        public Producer(MpmcExchangerQueue queue) {
+        public Producer(LinkedTransferQueue<Integer> queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-          MpmcExchangerQueue producer = this.queue;
-          int i = REPETITIONS;
-          long s = System.nanoTime();
-          do {
-              producer.put(val);
-          } while (0 != --i);
-          this.start = s;
+            LinkedTransferQueue<Integer> producer = this.queue;
+            int i = REPETITIONS;
+            int f = 0;
+            long s = System.nanoTime();
+
+            try {
+                do {
+                    producer.transfer(TEST_VALUE);
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                // log.error(e);
+            }
+            this.queueFull = f;
+            this.start = s;
         }
     }
 }

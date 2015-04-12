@@ -36,7 +36,7 @@ package dorkbox.util.messagebus.common.simpleq.jctools;
  * equal to the requested capacity.
  * </ol>
  */
-public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
+public class MpmcArrayQueue<T> extends MpmcArrayQueueConsumerField<T> {
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
 
@@ -65,7 +65,7 @@ public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
     }
 
     @Override
-    public boolean offer(final Object e) {
+    public boolean offer(final T e) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = mask + 1;
@@ -116,7 +116,7 @@ public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
      * and must test producer index when next element is not visible.
      */
     @Override
-    public Object poll() {
+    public T poll() {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
@@ -137,7 +137,7 @@ public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(currentConsumerIndex, mask);
-                    final Object e = lpElement(offset);
+                    final T e = lpElement(offset);
                     spElement(offset, null);
 
                     // Move sequence ahead by capacity, preparing it for next offer
@@ -160,9 +160,9 @@ public class MpmcArrayQueue extends MpmcArrayQueueConsumerField<Object> {
     }
 
     @Override
-    public Object peek() {
+    public T peek() {
         long currConsumerIndex;
-        Object e;
+        T e;
         do {
             currConsumerIndex = lvConsumerIndex();
             // other consumers may have grabbed the element, or queue might be empty

@@ -45,7 +45,7 @@ public class MultiMBassador implements IMessageBus {
 
 //    private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
 //    private final DisruptorQueue dispatchQueue;
-    private final SimpleQueue<MessageHolder> dispatchQueue;
+    private final SimpleQueue dispatchQueue;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -97,7 +97,7 @@ public class MultiMBassador implements IMessageBus {
             }
         };
 
-        this.dispatchQueue = new SimpleQueue<MessageHolder>(numberOfThreads, factory);
+        this.dispatchQueue = new SimpleQueue(numberOfThreads, 1<<14);
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -113,10 +113,8 @@ public class MultiMBassador implements IMessageBus {
 //                    Runnable event = null;
                     int spins;
 
-                    MessageHolder messageHolder = new MessageHolder();
-
+                    Object message1;
                     while (true) {
-                        try {
 //                            spins = maxSpins;
 //                            while ((event = IN_QUEUE.poll()) == null) {
 //                                if (spins > 100) {
@@ -125,19 +123,15 @@ public class MultiMBassador implements IMessageBus {
 //                                    --spins;
 //                                    LockSupport.parkNanos(1L);
 //                                } else {
-                                    IN_QUEUE.take(messageHolder);
+                            message1 = IN_QUEUE.take();
 //                                    break;
 //                                }
 //                            }
 
-                            Object message1 = messageHolder.message1;
 //                            IN_QUEUE.release(event);
 //                            event.run();
                             publish(message1);
 
-                        } catch (InterruptedException e) {
-                            return;
-                        }
                     }
                 }
             };
@@ -447,15 +441,8 @@ public class MultiMBassador implements IMessageBus {
 //                }
 //            };
 
-            try {
 //                this.dispatchQueue.transfer(runnable);
                 this.dispatchQueue.put(message);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message));
-            }
         }
     }
 
@@ -469,14 +456,7 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
                 this.dispatchQueue.put(runnable);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2));
-            }
         }
     }
 
@@ -491,14 +471,7 @@ public class MultiMBassador implements IMessageBus {
             };
 
 
-            try {
                 this.dispatchQueue.put(runnable);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2, message3));
-            }
         }
     }
 

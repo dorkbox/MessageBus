@@ -86,7 +86,7 @@ public final class NodePool<E> {
 
     /** A marker indicating that a thread is waiting in that slot to be transfered an element. */
     @SuppressWarnings("rawtypes")
-    private static final Node WAITER = new Node(null);
+    private static final Node WAITER = new Node();
 
     private static int ceilingNextPowerOfTwo(int x) {
         // From Hacker's Delight, Chapter 3, Harry S. Warren Jr.

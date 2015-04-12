@@ -19,8 +19,6 @@ import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE
 import java.util.AbstractQueue;
 import java.util.Iterator;
 
-import dorkbox.util.messagebus.common.simpleq.Node;
-
 abstract class ConcurrentCircularArrayQueueL0Pad<E> extends AbstractQueue<E> implements MessagePassingQueue<E> {
     long p00, p01, p02, p03, p04, p05, p06, p07;
     long p30, p31, p32, p33, p34, p35, p36, p37;
@@ -71,7 +69,7 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
         int actualCapacity = Pow2.roundToPowerOfTwo(capacity);
         this.mask = actualCapacity - 1;
         // pad data on either end with some empty slots.
-        this.buffer = (E[]) new Node[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
+        this.buffer = (E[]) new Object[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
     }
 
     /**
@@ -89,6 +87,7 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
     protected static final long calcElementOffset(long index, long mask) {
         return REF_ARRAY_BASE + ((index & mask) << REF_ELEMENT_SHIFT);
     }
+
     /**
      * A plain store (no ordering/fences) of an element to a given offset
      *
