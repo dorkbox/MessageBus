@@ -101,11 +101,11 @@ public class MpmcArrayQueue<T> extends MpmcArrayQueueConsumerField<T> {
                     currentProducerIndex - capacity <= cIndex && // test against cached cIndex
                     currentProducerIndex - capacity <= (cIndex = lvConsumerIndex())) { // test against latest cIndex
                  // Extra check required to ensure [Queue.offer == false iff queue is full]
-//                 return false;
-                busySpin();
+                 return false;
             }
 
             // another producer has moved the sequence by one, retry 2
+            busySpin();
         }
     }
 
@@ -151,11 +151,11 @@ public class MpmcArrayQueue<T> extends MpmcArrayQueueConsumerField<T> {
                     currentConsumerIndex >= pIndex && // test against cached pIndex
                     currentConsumerIndex == (pIndex = lvProducerIndex())) { // update pIndex if we must
                 // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
-//                return null;
-                busySpin();
+                return null;
             }
 
             // another consumer beat us and moved sequence ahead, retry 2
+            // only producer will busy spin
         }
     }
 

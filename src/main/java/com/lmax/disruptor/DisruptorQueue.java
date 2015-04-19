@@ -68,7 +68,7 @@ public class DisruptorQueue {
         try {
 //            System.err.println("+(" + seq + ") " + message1);
             MessageHolder eventJob = ringBuffer.get(seq);
-            eventJob.messageType = MessageType.ONE;
+            eventJob.messageType = MessageTypeOLD.ONE;
             eventJob.message1 = message1;
 //            eventJob.message2 = message2;
 //            eventJob.message3 = message3;

@@ -12,8 +12,8 @@ public final class MpmcExchangerQueue extends MpmcArrayQueueConsumerField<Node> 
     static {
         try {
             TYPE_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("nodeType"));
-           ITEM1_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
-           THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
+            ITEM1_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
+            THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
         } catch (NoSuchFieldException e) {
             throw new RuntimeException(e);
         }

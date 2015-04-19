@@ -6,7 +6,6 @@ package dorkbox.util.messagebus;
 import junit.framework.Assert;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
-import dorkbox.util.messagebus.common.simpleq.SimpleQueue;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 
@@ -19,7 +18,7 @@ public class PerformanceTest {
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
-    public static final int CONCURRENCY_LEVEL = 1;
+    public static final int CONCURRENCY_LEVEL = 2;
 
     private static long count = 0;
 
@@ -32,72 +31,6 @@ public class PerformanceTest {
     };
 
     public static void main(String[] args) throws Exception {
-//        testSpeed();
-        tesCorrectness();
-    }
-
-    private static void testSpeed() throws Exception {
-        System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
-
-        final SimpleQueue queue = new SimpleQueue (QUEUE_CAPACITY, 1 << 14);
-
-        final long[] results = new long[20];
-        for (int i = 0; i < 20; i++) {
-            System.gc();
-            results[i] = performanceRun(i, queue);
-        }
-        // only average last 10 results for summary
-        long sum = 0;
-        for (int i = 10; i < 20; i++) {
-            sum += results[i];
-        }
-        System.out.format("summary,QueuePerfTest,%s,%d\n", queue.getClass().getSimpleName(), sum / 10);
-    }
-
-    private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
-//        for (int i=0;i<CONCURRENCY_LEVEL;i++) {
-            Producer p = new Producer(queue);
-            Thread thread = new Thread(p);
-            thread.start(); // producer will timestamp start
-//        }
-
-        SimpleQueue consumer = queue;
-        int i = REPETITIONS;
-        Object result;
-        do {
-            result = consumer.take();
-        } while (0 != --i);
-        long end = System.nanoTime();
-
-        thread.join();
-        long duration = end - p.start;
-        long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
-        String qName = queue.getClass().getSimpleName();
-        System.out.format("%d - ops/sec=%,d - %s result=%d\n", runNumber, ops, qName, result);
-        return ops;
-    }
-
-    public static class Producer implements Runnable {
-        private final SimpleQueue queue;
-        long start;
-
-        public Producer(SimpleQueue queue) {
-            this.queue = queue;
-        }
-
-        @Override
-        public void run() {
-            SimpleQueue producer = this.queue;
-            int i = REPETITIONS;
-            long s = System.nanoTime();
-            do {
-                producer.put(i);
-            } while (0 != --i);
-            this.start = s;
-        }
-    }
-
-    private static void tesCorrectness() {
         final MultiMBassador bus = new MultiMBassador(CONCURRENCY_LEVEL);
         bus.addErrorHandler(TestFailingHandler);
 

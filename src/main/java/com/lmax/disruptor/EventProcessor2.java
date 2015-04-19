@@ -21,7 +21,7 @@ public class EventProcessor2 implements WorkHandlerEarlyRelease<MessageHolder> {
 
     @Override
     public void onEvent(long sequence, MessageHolder event) throws Exception {
-        MessageType messageType = event.messageType;
+        MessageTypeOLD messageType = event.messageType;
         switch (messageType) {
             case ONE: {
                 Object message1 = event.message1;
