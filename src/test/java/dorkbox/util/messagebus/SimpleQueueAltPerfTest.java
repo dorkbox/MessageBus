@@ -23,7 +23,7 @@ import dorkbox.util.messagebus.common.simpleq.SimpleQueue;
 
 public class SimpleQueueAltPerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 10;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);

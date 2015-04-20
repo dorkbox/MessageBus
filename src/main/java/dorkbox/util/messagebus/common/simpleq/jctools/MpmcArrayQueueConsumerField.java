@@ -21,6 +21,10 @@ public abstract class MpmcArrayQueueConsumerField<E> extends MpmcArrayQueueL2Pad
         return this.consumerIndex;
     }
 
+    protected final long lpConsumerIndex() {
+        return UNSAFE.getLong(this, C_INDEX_OFFSET);
+    }
+
     protected final boolean casConsumerIndex(long expect, long newValue) {
         return UNSAFE.compareAndSwapLong(this, C_INDEX_OFFSET, expect, newValue);
     }

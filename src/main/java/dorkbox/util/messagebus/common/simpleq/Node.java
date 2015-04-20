@@ -1,6 +1,5 @@
 package dorkbox.util.messagebus.common.simpleq;
 
-import com.lmax.disruptor.MessageType;
 
 // mpmc sparse.shift = 2, for this to be fast.
 
@@ -9,12 +8,11 @@ abstract class PrePad {
 }
 
 abstract class ColdItems {
-    public short type = MessageType.ONE;
-    public boolean isConsumer = false;
+//    public short type = MessageType.ONE;
     public Object item1 = null;
-    public Object item2 = null;
-    public Object item3 = null;
-    public Object[] item4 = null;
+//    public Object item2 = null;
+//    public Object item3 = null;
+//    public Object[] item4 = null;
 }
 
 abstract class Pad0 extends ColdItems {
@@ -22,7 +20,7 @@ abstract class Pad0 extends ColdItems {
 }
 
 abstract class HotItem1 extends ColdItems {
-    public volatile Thread thread;
+//    public volatile Thread thread;
 }
 
 public class Node extends HotItem1 {
