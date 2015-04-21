@@ -65,6 +65,7 @@ public class LinkedArrayList extends PadA1 {
 
     final Object lvHead() {
         return UNSAFE.getObjectVolatile(this, HEAD);
+//        return this.head;
     }
 
     final Object lpHead() {
@@ -76,48 +77,51 @@ public class LinkedArrayList extends PadA1 {
     }
 
     final Object lpTail() {
-        return UNSAFE.getObject(this, TAIL);
+        return lpTail(this);
     }
 
-    final Object lpNext(Object node) {
+    static final Object lpTail(Object source) {
+        return UNSAFE.getObject(source, TAIL);
+    }
+
+    static final Object lpNext(Object node) {
         return UNSAFE.getObject(node, NEXT);
     }
 
     final boolean advanceTail(Object expected, Object newTail) {
-//        if (expected == lvTail()) {
-            return UNSAFE.compareAndSwapObject(this, TAIL, expected, newTail);
-//        }
-//        return false;
+        final Object that = this;
+        return advanceTail(that, lpTail(that), expected, newTail);
+    }
+
+    static final boolean advanceTail(Object source, Object objectActualTail, Object expected, Object newTail) {
+        return expected == objectActualTail && UNSAFE.compareAndSwapObject(source, TAIL, expected, newTail);
     }
 
     final boolean advanceHead(Object expected, Object newHead) {
-//        if (expected == lvHead()) {
-            return UNSAFE.compareAndSwapObject(this, HEAD, expected, newHead);
-//        }
-//        return false;
+        return expected == lpHead() && UNSAFE.compareAndSwapObject(this, HEAD, expected, newHead);
     }
 
-    final Object lvThread(Object node) {
+    static final Object lvThread(Object node) {
         return UNSAFE.getObjectVolatile(node, THREAD);
     }
 
-    final Object lpThread(Object node) {
+    static final Object lpThread(Object node) {
         return UNSAFE.getObject(node, THREAD);
     }
 
-    final void spThread(Object node, Thread thread) {
+    static final void spThread(Object node, Thread thread) {
         UNSAFE.putObject(node, THREAD, thread);
     }
 
-    final boolean casThread(Object node, Object expected, Object newThread) {
+    static final boolean casThread(Object node, Object expected, Object newThread) {
         return UNSAFE.compareAndSwapObject(node, THREAD, expected, newThread);
     }
 
-    final boolean lpType(Object node) {
+    static final boolean lpType(Object node) {
         return UNSAFE.getBoolean(node, IS_CONSUMER);
     }
 
-    final void spType(Object node, boolean isConsumer) {
+    static final void spType(Object node, boolean isConsumer) {
         UNSAFE.putBoolean(node, IS_CONSUMER, isConsumer);
     }
 

@@ -31,7 +31,7 @@ public final class SimpleQueue extends LinkedArrayList {
      * This is greater than timed value because untimed waits spin
      * faster since they don't need to check times on each spin.
      */
-    static final int maxUntimedSpins = maxTimedSpins * 64;
+    static final int maxUntimedSpins = maxTimedSpins * 32;
     static final int negMaxUntimedSpins = -maxUntimedSpins;
 
     /**
@@ -77,8 +77,17 @@ public final class SimpleQueue extends LinkedArrayList {
             //      BOTH can think that the queue is empty, resulting in a deadlock between threads
             // it is ALSO possible that the consumer pops the previous node, and so we thought it was not-empty, when
             //      in reality, it is.
-            final boolean empty = head == lpNext(tail);
-            final boolean sameMode = lpType(tail) == isConsumer;
+            boolean empty = head == lpNext(tail);
+            boolean sameMode = lpType(tail) == isConsumer;
+
+            // check to make sure we are not "double dipping" on our head
+            thread = lpThread(head);
+            if (empty && thread != null) {
+                empty = false;
+            } else if (sameMode && thread == null) {
+                busySpin();
+                continue;
+            }
 
             // empty or same mode = push+park onto queue
             if (empty || sameMode) {
@@ -94,26 +103,13 @@ public final class SimpleQueue extends LinkedArrayList {
                     continue;
                 }
 
-                thread = lpThread(head);
-                if (thread != null) {
-                    if (empty) {
-                        busySpin();
-                        continue;
-                    }
-                } else {
-                    if (sameMode) {
-                        busySpin();
-                        continue;
-                    }
-                }
-
                 if (isConsumer) {
                     spType(tNext, isConsumer);
                     spThread(tNext, Thread.currentThread());
 
                     if (!advanceTail(tail, tNext)) { // FULL barrier
                         // failed to link in
-                        busySpin();
+//                        busySpin();
                         continue;
                     }
 
@@ -121,23 +117,24 @@ public final class SimpleQueue extends LinkedArrayList {
 
                     // this will only advance head if necessary
 //                    advanceHead(tail, tNext);
-                    return lpItem1(tNext);
+                    Object lpItem1 = lpItem1(tNext);
+                    spItem1(tNext, null);
+                    return lpItem1;
                 } else {
+                    // producer
                     spType(tNext, isConsumer);
                     spItem1(tNext, item);
-
                     spThread(tNext, Thread.currentThread());
 
                     if (!advanceTail(tail, tNext)) { // FULL barrier
                         // failed to link in
-                        busySpin();
                         continue;
                     }
 
                     park(tNext, timed, nanos);
 
                     // this will only advance head if necessary
-//                    advanceHead(tail, tNext);
+                    advanceHead(tail, tNext);
                     return null;
                 }
             }
@@ -153,61 +150,55 @@ public final class SimpleQueue extends LinkedArrayList {
 
                 thread = lpThread(head);
                 if (isConsumer) {
-                    Object returnVal;
-//                    while (true) {
-                        returnVal = lpItem1(head);
+                    Object returnVal = lpItem1(head);
 
-                        // is already cancelled/fulfilled
-                        if (thread == null ||
-                            !casThread(head, thread, null)) { // FULL barrier
+                    // is already cancelled/fulfilled
+                    if (thread == null ||
+                        !casThread(head, thread, null)) { // FULL barrier
 
-                            // move head forward to look for next "ready" node
-                            if (!advanceHead(head, next)) { // FULL barrier
-                                busySpin();
-//                                head = next;
-//                                next = lpNext(head);
-                            }
+                        // head was already used by a different thread
+                        advanceHead(head, next); // FULL barrier
 
-//                            thread = lpThread(head);
+                        continue;
+                    }
 
-                            continue;
-                        }
-
-//                        break;
-//                    }
-
+                    spItem1(head, null);
                     LockSupport.unpark((Thread) thread);
 
-                    advanceHead(head, next);  // FULL barrier
+                    advanceHead(head, next); // FULL barrier
+
                     return returnVal;
                 } else {
-//                    while (true) {
-                        spItem1(head, item); // StoreStore
+                    // producer
+                    spItem1(head, item); // StoreStore
 
-                        // is already cancelled/fulfilled
-                        if (thread == null ||
-                            !casThread(head, thread, null)) { // FULL barrier
+                    // is already cancelled/fulfilled
+                    if (thread == null ||
+                        !casThread(head, thread, null)) { // FULL barrier
 
-                            // move head forward to look for next "ready" node
-                            if (!advanceHead(head, next)) { // FULL barrier
-//                                head = next;
-//                                next = lpNext(head);
-                                busySpin();
-                            }
+                        // head was already used by a different thread
+                        advanceHead(head, next); // FULL barrier
 
-//                            thread = lpThread(head);
-
-                            continue;
-                        }
-
-//                        break;
-//                    }
+                        continue;
+                    }
 
                     LockSupport.unpark((Thread) thread);
 
                     advanceHead(head, next);  // FULL barrier
                     return null;
                 }
+            }
+        }
+    }
+
+    private static final void busySpin2() {
+        // busy spin for the amount of time (roughly) of a CPU context switch
+        int spins = maxUntimedSpins;
+        for (;;) {
+            if (spins > 0) {
+                --spins;
+            } else {
+                break;
             }
         }
     }
@@ -243,13 +234,13 @@ public final class SimpleQueue extends LinkedArrayList {
         // busy spin for the amount of time (roughly) of a CPU context switch
         // then park (if necessary)
         for (;;) {
-            if (lvThread(myNode) == null) {
+            if (lpThread(myNode) == null) {
                 return;
-            } else if (spins > 0) {
-                --spins;
+//            } else if (spins > 0) {
+//                --spins;
             } else if (spins > negMaxUntimedSpins) {
                 --spins;
-                LockSupport.parkNanos(1);
+//                LockSupport.parkNanos(1);
             } else {
                 // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
                 LockSupport.park();
