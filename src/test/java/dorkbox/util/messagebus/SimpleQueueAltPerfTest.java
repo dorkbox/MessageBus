@@ -45,7 +45,7 @@ public class SimpleQueueAltPerfTest {
         for (int i = 10; i < 20; i++) {
             sum += results[i];
         }
-        System.out.format("summary,QueuePerfTest,%s,%d\n", queue.getClass().getSimpleName(), sum / 10);
+        System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
     private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
@@ -65,6 +65,7 @@ public class SimpleQueueAltPerfTest {
         long duration = end - p.start;
         long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
         String qName = queue.getClass().getSimpleName();
+
         System.out.format("%d - ops/sec=%,d - %s result=%d\n", runNumber, ops, qName, result);
         return ops;
     }

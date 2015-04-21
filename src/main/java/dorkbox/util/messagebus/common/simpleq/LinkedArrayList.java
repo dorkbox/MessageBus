@@ -2,14 +2,33 @@ package dorkbox.util.messagebus.common.simpleq;
 
 import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 
-public class LinkedArrayList {
+
+abstract class HotItemA1 extends PrePad {
+    public volatile Node head;
+}
+
+abstract class PadA0 extends HotItemA1 {
+    volatile long y0, y1, y2, y4, y5, y6 = 7L;
+    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+}
+
+abstract class HotItemA2 extends PadA0 {
+    public volatile Node tail;
+}
+
+abstract class PadA1 extends HotItemA2 {
+    volatile long y0, y1, y2, y4, y5, y6 = 7L;
+    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+}
+
+
+public class LinkedArrayList extends PadA1 {
 
     private static final long HEAD;
     private static final long TAIL;
 
     private static final long NEXT;
     private static final long IS_CONSUMER;
-    private static final long IS_READY;
     private static final long THREAD;
 
     private static final long ITEM1;
@@ -21,7 +40,6 @@ public class LinkedArrayList {
 
             NEXT = UNSAFE.objectFieldOffset(Node.class.getField("next"));
             IS_CONSUMER = UNSAFE.objectFieldOffset(Node.class.getField("isConsumer"));
-            IS_READY = UNSAFE.objectFieldOffset(Node.class.getField("isReady"));
             THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
             ITEM1 = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
         } catch (NoSuchFieldException e) {
@@ -66,17 +84,17 @@ public class LinkedArrayList {
     }
 
     final boolean advanceTail(Object expected, Object newTail) {
-        if (expected == lvTail()) {
+//        if (expected == lvTail()) {
             return UNSAFE.compareAndSwapObject(this, TAIL, expected, newTail);
-        }
-        return false;
+//        }
+//        return false;
     }
 
     final boolean advanceHead(Object expected, Object newHead) {
-        if (expected == lvHead()) {
+//        if (expected == lvHead()) {
             return UNSAFE.compareAndSwapObject(this, HEAD, expected, newHead);
-        }
-        return false;
+//        }
+//        return false;
     }
 
     final Object lvThread(Object node) {
@@ -103,35 +121,28 @@ public class LinkedArrayList {
         UNSAFE.putBoolean(node, IS_CONSUMER, isConsumer);
     }
 
-    final boolean lpIsReady(Object node) {
-        return UNSAFE.getBoolean(node, IS_READY);
-    }
+    final static int SPARSE = 1;
 
-    final void spIsReady(Object node, boolean isReady) {
-        UNSAFE.putBoolean(node, IS_READY, isReady);
-    }
-
-
-
-    public Node head;
-    public Node tail;
-
-    private Node[] buffer;
 
     public LinkedArrayList(int size) {
-        this.buffer = new Node[size];
+        size = size*SPARSE;
+
+        Node[] buffer = new Node[size];
 
         // pre-fill our data structures. This just makes sure to have happy memory. we use linkedList style iteration
-        for (int i=0; i < size; i++) {
-            this.buffer[i] = new Node();
-            if (i > 0) {
-                this.buffer[i-1].next = this.buffer[i];
+        int previous = -1;
+        int current = 0;
+        for (; current < size; current+=SPARSE) {
+            buffer[current] = new Node();
+            if (current > 0) {
+                buffer[previous].next = buffer[current];
             }
+            previous = current;
         }
 
-        this.buffer[size-1].next = this.buffer[0];
+        buffer[previous].next = buffer[0];
 
-        this.tail = this.buffer[0];
+        this.tail = buffer[0];
         this.head = this.tail.next;
     }
 }
