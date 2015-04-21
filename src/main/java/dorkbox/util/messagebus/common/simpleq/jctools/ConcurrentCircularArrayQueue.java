@@ -41,7 +41,7 @@ abstract class ConcurrentCircularArrayQueueL0Pad<E> extends AbstractQueue<E> imp
  * @param <E>
  */
 public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircularArrayQueueL0Pad<E> {
-    protected static final int SPARSE_SHIFT = Integer.getInteger("sparse.shift", 2);
+    protected static final int SPARSE_SHIFT = Integer.getInteger("sparse.shift", 0);
     protected static final int BUFFER_PAD;
     private static final long REF_ARRAY_BASE;
     private static final int REF_ELEMENT_SHIFT;
@@ -186,6 +186,10 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
         return lpElement(this.buffer, offset);
     }
 
+    protected final Object lpElementNoCast(long offset) {
+        return lpElementNoCast(this.buffer, offset);
+    }
+
     /**
      * A plain load (no ordering/fences) of an element from a given offset.
      *
@@ -196,6 +200,17 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
     @SuppressWarnings("unchecked")
     protected final E lpElement(E[] buffer, long offset) {
         return (E) UNSAFE.getObject(buffer, offset);
+    }
+
+    /**
+     * A plain load (no ordering/fences) of an element from a given offset.
+     *
+     * @param buffer this.buffer
+     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
+     * @return the element at the offset
+     */
+    protected final Object lpElementNoCast(E[] buffer, long offset) {
+        return UNSAFE.getObject(buffer, offset);
     }
 
     /**
