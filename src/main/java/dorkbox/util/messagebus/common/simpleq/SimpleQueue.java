@@ -1,9 +1,10 @@
 package dorkbox.util.messagebus.common.simpleq;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
-public final class SimpleQueue extends LinkedArrayList {
+import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
+
+public final class SimpleQueue {
 
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
@@ -40,18 +41,17 @@ public final class SimpleQueue extends LinkedArrayList {
      */
     static final long spinForTimeoutThreshold = 1000L;
 
-    long p40, p41, p42, p43, p44, p45, p46;
-    long p30, p31, p32, p33, p34, p35, p36, p37;
+    private MpmcExchangerQueue queue;
 
     public SimpleQueue(final int size) {
-        super(size);
+        this.queue = new MpmcExchangerQueue(Pow2.roundToPowerOfTwo(size));
     }
 
     /**
      * PRODUCER
      */
     public void put(Object item) throws InterruptedException {
-        xfer(item, false, 0);
+        this.queue.xfer(item, false, 0, MpmcExchangerQueue.TYPE_PRODUCER);
     }
 
 
@@ -59,136 +59,138 @@ public final class SimpleQueue extends LinkedArrayList {
      * CONSUMER
      */
     public Object take() throws InterruptedException {
-        return xfer(null, false, 0);
+//        this.queue.xfer(123, false, 0, MpmcExchangerQueue.TYPE_PRODUCER);
+//        return 123;
+        return this.queue.xfer(null, false, 0, MpmcExchangerQueue.TYPE_CONSUMER);
     }
 
-    private Object xfer(Object item, boolean timed, long nanos) throws InterruptedException {
-        final boolean isConsumer= item == null;
-
-        while (true) {
-            // empty or same mode = push+park onto queue
-            // complimentary mode = unpark+pop off queue
-
-            final Object tail = lvTail(); // LoadLoad
-            final Object head = lvHead(); // LoadLoad
-            Object thread;
-
+    private Object xfer(Object item, boolean timed, long nanos, byte incomingType) throws InterruptedException {
+        return null;
+//        while (true) {
+//             empty or same mode = push+park onto queue
+//             complimentary mode = unpark+pop off queue
+//
+//            Object thread;
+//
             // it is possible that two threads check the queue at the exact same time,
             //      BOTH can think that the queue is empty, resulting in a deadlock between threads
             // it is ALSO possible that the consumer pops the previous node, and so we thought it was not-empty, when
             //      in reality, it is.
-            boolean empty = head == lpNext(tail);
-            boolean sameMode = lpType(tail) == isConsumer;
-
-            // check to make sure we are not "double dipping" on our head
-            thread = lpThread(head);
-            if (empty && thread != null) {
-                empty = false;
-            } else if (sameMode && thread == null) {
-                busySpin();
-                continue;
-            }
-
-            // empty or same mode = push+park onto queue
-            if (empty || sameMode) {
-                if (timed && nanos <= 0) {
-                    // can't wait
-                    return null;
-                }
-
-                final Object tNext = lpNext(tail);
-                if (tail != lvTail()) { // LoadLoad
-                    // inconsistent read
-                    busySpin();
-                    continue;
-                }
-
-                if (isConsumer) {
-                    spType(tNext, isConsumer);
-                    spThread(tNext, Thread.currentThread());
-
-                    if (!advanceTail(tail, tNext)) { // FULL barrier
-                        // failed to link in
-//                        busySpin();
-                        continue;
-                    }
-
-                    park(tNext, timed, nanos);
-
-                    // this will only advance head if necessary
+//            final boolean empty = this.queue.isEmpty(); // LoadLoad
+//            boolean sameMode;
+//            if (!empty) {
+//                sameMode = this.queue.getLastMessageType() == isConsumer;
+//            }
+//
+//            // check to make sure we are not "double dipping" on our head
+////            thread = lpThread(head);
+////            if (empty && thread != null) {
+////                empty = false;
+////            } else if (sameMode && thread == null) {
+////                busySpin();
+////                continue;
+////            }
+//
+//            // empty or same mode = push+park onto queue
+//            if (empty || sameMode) {
+//                if (timed && nanos <= 0) {
+//                    // can't wait
+//                    return null;
+//                }
+//
+//                final Object tNext = lpNext(tail);
+//                if (tail != lvTail()) { // LoadLoad
+//                    // inconsistent read
+//                    busySpin();
+//                    continue;
+//                }
+//
+//                if (isConsumer) {
+//                    spType(tNext, isConsumer);
+//                    spThread(tNext, Thread.currentThread());
+//
+//                    if (!advanceTail(tail, tNext)) { // FULL barrier
+//                        // failed to link in
+////                        busySpin();
+//                        continue;
+//                    }
+//
+//                    park(tNext, timed, nanos);
+//
+//                    // this will only advance head if necessary
+////                    advanceHead(tail, tNext);
+//                    Object lpItem1 = lpItem1(tNext);
+//                    spItem1(tNext, null);
+//                    return lpItem1;
+//                } else {
+//                    // producer
+//                    spType(tNext, isConsumer);
+//                    spItem1(tNext, item);
+//                    spThread(tNext, Thread.currentThread());
+//
+//                    if (!advanceTail(tail, tNext)) { // FULL barrier
+//                        // failed to link in
+//                        continue;
+//                    }
+//
+//                    park(tNext, timed, nanos);
+//
+//                    // this will only advance head if necessary
 //                    advanceHead(tail, tNext);
-                    Object lpItem1 = lpItem1(tNext);
-                    spItem1(tNext, null);
-                    return lpItem1;
-                } else {
-                    // producer
-                    spType(tNext, isConsumer);
-                    spItem1(tNext, item);
-                    spThread(tNext, Thread.currentThread());
-
-                    if (!advanceTail(tail, tNext)) { // FULL barrier
-                        // failed to link in
-                        continue;
-                    }
-
-                    park(tNext, timed, nanos);
-
-                    // this will only advance head if necessary
-                    advanceHead(tail, tNext);
-                    return null;
-                }
-            }
-            // complimentary mode = unpark+pop off queue
-            else {
-                Object next = lpNext(head);
-
-                if (tail != lvTail() || head != lvHead()) { // LoadLoad
-                    // inconsistent read
-                    busySpin();
-                    continue;
-                }
-
-                thread = lpThread(head);
-                if (isConsumer) {
-                    Object returnVal = lpItem1(head);
-
-                    // is already cancelled/fulfilled
-                    if (thread == null ||
-                        !casThread(head, thread, null)) { // FULL barrier
-
-                        // head was already used by a different thread
-                        advanceHead(head, next); // FULL barrier
-
-                        continue;
-                    }
-
-                    spItem1(head, null);
-                    LockSupport.unpark((Thread) thread);
-
-                    advanceHead(head, next); // FULL barrier
-
-                    return returnVal;
-                } else {
-                    // producer
-                    spItem1(head, item); // StoreStore
-
-                    // is already cancelled/fulfilled
-                    if (thread == null ||
-                        !casThread(head, thread, null)) { // FULL barrier
-
-                        // head was already used by a different thread
-                        advanceHead(head, next); // FULL barrier
-
-                        continue;
-                    }
-
-                    LockSupport.unpark((Thread) thread);
-
-                    advanceHead(head, next);  // FULL barrier
-                    return null;
-                }
-            }
-        }
+//                    return null;
+//                }
+//            }
+//            // complimentary mode = unpark+pop off queue
+//            else {
+//                Object next = lpNext(head);
+//
+//                if (tail != lvTail() || head != lvHead()) { // LoadLoad
+//                    // inconsistent read
+//                    busySpin();
+//                    continue;
+//                }
+//
+//                thread = lpThread(head);
+//                if (isConsumer) {
+//                    Object returnVal = lpItem1(head);
+//
+//                    // is already cancelled/fulfilled
+//                    if (thread == null ||
+//                        !casThread(head, thread, null)) { // FULL barrier
+//
+//                        // head was already used by a different thread
+//                        advanceHead(head, next); // FULL barrier
+//
+//                        continue;
+//                    }
+//
+//                    spItem1(head, null);
+//                    LockSupport.unpark((Thread) thread);
+//
+//                    advanceHead(head, next); // FULL barrier
+//
+//                    return returnVal;
+//                } else {
+//                    // producer
+//                    spItem1(head, item); // StoreStore
+//
+//                    // is already cancelled/fulfilled
+//                    if (thread == null ||
+//                        !casThread(head, thread, null)) { // FULL barrier
+//
+//                        // head was already used by a different thread
+//                        advanceHead(head, next); // FULL barrier
+//
+//                        continue;
+//                    }
+//
+//                    LockSupport.unpark((Thread) thread);
+//
+//                    advanceHead(head, next);  // FULL barrier
+//                    return null;
+//                }
+//            }
+//        }
     }
 
     private static final void busySpin2() {
@@ -215,44 +217,44 @@ public final class SimpleQueue extends LinkedArrayList {
         }
     }
 
-    private final void park(Object myNode, boolean timed, long nanos) throws InterruptedException {
-//        long lastTime = timed ? System.nanoTime() : 0;
-//        int spins = timed ? maxTimedSpins : maxUntimedSpins;
-        int spins = maxUntimedSpins;
-        Thread myThread = Thread.currentThread();
-
-//                    if (timed) {
-//                        long now = System.nanoTime();
-//                        nanos -= now - lastTime;
-//                        lastTime = now;
-//                        if (nanos <= 0) {
-////                            s.tryCancel(e);
-//                            continue;
-//                        }
-//                    }
-
-        // busy spin for the amount of time (roughly) of a CPU context switch
-        // then park (if necessary)
-        for (;;) {
-            if (lpThread(myNode) == null) {
-                return;
-//            } else if (spins > 0) {
+//    private final void park(Object myNode, boolean timed, long nanos) throws InterruptedException {
+////        long lastTime = timed ? System.nanoTime() : 0;
+////        int spins = timed ? maxTimedSpins : maxUntimedSpins;
+//        int spins = maxUntimedSpins;
+//        Thread myThread = Thread.currentThread();
+//
+////                    if (timed) {
+////                        long now = System.nanoTime();
+////                        nanos -= now - lastTime;
+////                        lastTime = now;
+////                        if (nanos <= 0) {
+//////                            s.tryCancel(e);
+////                            continue;
+////                        }
+////                    }
+//
+//        // busy spin for the amount of time (roughly) of a CPU context switch
+//        // then park (if necessary)
+//        for (;;) {
+//            if (lpThread(myNode) == null) {
+//                return;
+////            } else if (spins > 0) {
+////                --spins;
+//            } else if (spins > negMaxUntimedSpins) {
 //                --spins;
-            } else if (spins > negMaxUntimedSpins) {
-                --spins;
-//                LockSupport.parkNanos(1);
-            } else {
-                // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
-                LockSupport.park();
-
-                if (myThread.isInterrupted()) {
-                    casThread(myNode, myThread, null);
-                    Thread.interrupted();
-                    throw new InterruptedException();
-                }
-            }
-        }
-    }
+////                LockSupport.parkNanos(1);
+//            } else {
+//                // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
+//                LockSupport.park();
+//
+//                if (myThread.isInterrupted()) {
+//                    casThread(myNode, myThread, null);
+//                    Thread.interrupted();
+//                    throw new InterruptedException();
+//                }
+//            }
+//        }
+//    }
 
 //    @Override
 //    public boolean isEmpty() {

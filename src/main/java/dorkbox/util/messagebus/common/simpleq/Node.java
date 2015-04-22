@@ -13,6 +13,7 @@ abstract class ColdItems extends PrePad {
 //    private static AtomicInteger count = new AtomicInteger();
 //    public final int ID = count.getAndIncrement();
 
+//    public boolean isConsumer = false;
 //    public short type = MessageType.ONE;
     public Object item1 = null;
 //    public Object item2 = null;
@@ -26,7 +27,6 @@ abstract class Pad0 extends ColdItems {
 }
 
 abstract class HotItem1 extends Pad0 {
-//    public transient volatile boolean isConsumer = false;
 }
 
 abstract class Pad1 extends HotItem1 {
