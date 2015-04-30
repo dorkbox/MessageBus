@@ -1,13 +1,13 @@
-package dorkbox.util.messagebus.common.simpleq;
+package dorkbox.util.messagebus.common.simpleq.jctools;
 
 import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.LockSupport;
 
-import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueueConsumerField;
+import dorkbox.util.messagebus.common.simpleq.Node;
 
-public final class MpmcExchangerQueue extends MpmcArrayQueueConsumerField<Node> {
+public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<Node> {
 
     public static final int TYPE_FREE = 0;
     public static final int TYPE_CONSUMER = 1;
@@ -84,7 +84,7 @@ public final class MpmcExchangerQueue extends MpmcArrayQueueConsumerField<Node> 
     long p30, p31, p32, p33, p34, p35, p36, p37;
 
     /** Creates a {@code EliminationStack} that is initially empty. */
-    public MpmcExchangerQueue(final int size) {
+    public MpmcArrayTransferQueue(final int size) {
         super(size);
 
         // pre-fill our data structures

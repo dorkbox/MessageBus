@@ -2,6 +2,7 @@ package dorkbox.util.messagebus.common.simpleq;
 
 import java.util.concurrent.TimeUnit;
 
+import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayTransferQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
 
 public final class SimpleQueue {
@@ -41,17 +42,17 @@ public final class SimpleQueue {
      */
     static final long spinForTimeoutThreshold = 1000L;
 
-    private MpmcExchangerQueue queue;
+    private MpmcArrayTransferQueue queue;
 
     public SimpleQueue(final int size) {
-        this.queue = new MpmcExchangerQueue(Pow2.roundToPowerOfTwo(size));
+        this.queue = new MpmcArrayTransferQueue(Pow2.roundToPowerOfTwo(size));
     }
 
     /**
      * PRODUCER
      */
     public void put(Object item) throws InterruptedException {
-        this.queue.xfer(item, false, 0, MpmcExchangerQueue.TYPE_PRODUCER);
+        this.queue.xfer(item, false, 0, MpmcArrayTransferQueue.TYPE_PRODUCER);
     }
 
 
@@ -61,7 +62,7 @@ public final class SimpleQueue {
     public Object take() throws InterruptedException {
 //        this.queue.xfer(123, false, 0, MpmcExchangerQueue.TYPE_PRODUCER);
 //        return 123;
-        return this.queue.xfer(null, false, 0, MpmcExchangerQueue.TYPE_CONSUMER);
+        return this.queue.xfer(null, false, 0, MpmcArrayTransferQueue.TYPE_CONSUMER);
     }
 
     private Object xfer(Object item, boolean timed, long nanos, byte incomingType) throws InterruptedException {
