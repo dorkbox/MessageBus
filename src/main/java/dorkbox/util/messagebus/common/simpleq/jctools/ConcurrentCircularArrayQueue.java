@@ -64,8 +64,6 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
     protected final long mask;
     // @Stable :(
     protected final E[] buffer;
-    protected final Boolean[] typeBuffer;
-    protected final Thread[] threadBuffer;
 
     @SuppressWarnings("unchecked")
     public ConcurrentCircularArrayQueue(int capacity) {
@@ -73,8 +71,6 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
         this.mask = actualCapacity - 1;
         // pad data on either end with some empty slots.
         this.buffer = (E[]) new Object[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
-        this.typeBuffer = new Boolean[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
-        this.threadBuffer = new Thread[(actualCapacity << SPARSE_SHIFT) + BUFFER_PAD * 2];
     }
 
     /**
@@ -99,39 +95,8 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
      * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
      * @param e a kitty
      */
-    protected final void spElement(long offset, E e) {
+    protected final void spElement(long offset, Object e) {
         UNSAFE.putObject(this.buffer, offset, e);
-    }
-
-    /**
-     * A plain store (no ordering/fences) of an element TYPE to a given offset
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @param e a kitty
-     */
-    protected final void spElementType(long offset, int e) {
-        UNSAFE.putInt(this.typeBuffer, offset, e);
-    }
-
-    /**
-     * An ordered store(store + StoreStore barrier) of an element TYPE to a given offset
-     *
-     * @param buffer this.buffer
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @param e an orderly kitty
-     */
-    protected final void soElementType(long offset, int e) {
-        UNSAFE.putOrderedInt(this.typeBuffer, offset, e);
-    }
-
-    /**
-     * A plain store (no ordering/fences) of an element THREAD to a given offset
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @param e a kitty
-     */
-    protected final void spElementThread(long offset, Thread e) {
-        UNSAFE.putObject(this.threadBuffer, offset, e);
     }
 
     /**
@@ -166,36 +131,6 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
     }
 
     /**
-     * A plain load (no ordering/fences) of an element TYPE from a given offset.
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @return the element at the offset
-     */
-    protected final int lpElementType(long offset) {
-        return UNSAFE.getInt(this.typeBuffer, offset);
-    }
-
-    /**
-     * A volatile load (load + LoadLoad barrier) of an element TYPE from a given offset.
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @return the element at the offset
-     */
-    protected final int lvElementType(long offset) {
-        return UNSAFE.getIntVolatile(this.typeBuffer, offset);
-    }
-
-    /**
-     * A plain load (no ordering/fences) of an element THREAD from a given offset.
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @return the element at the offset
-     */
-    protected final Object lpElementThread(long offset) {
-        return UNSAFE.getObject(this.threadBuffer, offset);
-    }
-
-    /**
      * A volatile load (load + LoadLoad barrier) of an element from a given offset.
      *
      * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
@@ -204,24 +139,6 @@ public abstract class ConcurrentCircularArrayQueue<E> extends ConcurrentCircular
     @SuppressWarnings("unchecked")
     protected final E lvElement(long offset) {
         return (E) UNSAFE.getObjectVolatile(this.buffer, offset);
-    }
-
-    /**
-     * A volatile load (load + LoadLoad barrier) of an element THREAD from a given offset.
-     *
-     * @param offset computed via {@link ConcurrentCircularArrayQueue#calcElementOffset(long)}
-     * @return the element at the offset
-     */
-    protected final Object lvElementThread(long offset) {
-        return UNSAFE.getObjectVolatile(this.threadBuffer, offset);
-    }
-
-    protected final boolean casElementThread(long offset, Object expect, Object newValue) {
-        return UNSAFE.compareAndSwapObject(this.threadBuffer, offset, expect, newValue);
-    }
-
-    protected final boolean casElementType(long offset, int expect, int newValue) {
-        return UNSAFE.compareAndSwapInt(this.typeBuffer, offset, expect, newValue);
     }
 
     @Override

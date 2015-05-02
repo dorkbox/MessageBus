@@ -1,11 +1,81 @@
 package dorkbox.util.messagebus.common.simpleq;
 
+import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
+
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayTransferQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
 
 public final class SimpleQueue {
+    public static final int TYPE_EMPTY = 0;
+    public static final int TYPE_CONSUMER = 1;
+    public static final int TYPE_PRODUCER = 2;
+
+    private static final long ITEM1_OFFSET;
+    private static final long THREAD;
+    private static final long TYPE;
+
+    static {
+        try {
+            TYPE = UNSAFE.objectFieldOffset(Node.class.getField("type"));
+            ITEM1_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
+            THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final void spItem1(Object node, Object item) {
+        UNSAFE.putObject(node, ITEM1_OFFSET, item);
+    }
+
+    private static final void soItem1(Object node, Object item) {
+        UNSAFE.putOrderedObject(node, ITEM1_OFFSET, item);
+    }
+
+    private static final Object lpItem1(Object node) {
+        return UNSAFE.getObject(node, ITEM1_OFFSET);
+    }
+
+    private static final Object lvItem1(Object node) {
+        return UNSAFE.getObjectVolatile(node, ITEM1_OFFSET);
+    }
+
+
+    private static final void spType(Object node, int type) {
+        UNSAFE.putInt(node, TYPE, type);
+    }
+
+    private static final void soType(Object node, int type) {
+        UNSAFE.putOrderedInt(node, TYPE, type);
+    }
+
+    private static final int lpType(Object node) {
+        return UNSAFE.getInt(node, TYPE);
+    }
+
+    private static final void spThread(Object node, Object thread) {
+        UNSAFE.putObject(node, THREAD, thread);
+    }
+
+    private static final void soThread(Object node, Object thread) {
+        UNSAFE.putOrderedObject(node, THREAD, thread);
+    }
+
+    private static final Object lpThread(Object node) {
+        return UNSAFE.getObject(node, THREAD);
+    }
+
+    private static final Object lvThread(Object node) {
+        return UNSAFE.getObjectVolatile(node, THREAD);
+    }
+
+    private static final boolean casThread(Object node, Object expect, Object newValue) {
+        return UNSAFE.compareAndSwapObject(node, THREAD, expect, newValue);
+    }
+
 
     /** The number of CPUs */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
@@ -43,16 +113,78 @@ public final class SimpleQueue {
     static final long spinForTimeoutThreshold = 1000L;
 
     private MpmcArrayTransferQueue queue;
+    private MpmcArrayTransferQueue pool;
 
     public SimpleQueue(final int size) {
-        this.queue = new MpmcArrayTransferQueue(Pow2.roundToPowerOfTwo(size));
+        int roundToPowerOfTwo = Pow2.roundToPowerOfTwo(size);
+
+        this.queue = new MpmcArrayTransferQueue(roundToPowerOfTwo);
+        this.pool = new MpmcArrayTransferQueue(roundToPowerOfTwo);
+
+        for (int i=0;i<roundToPowerOfTwo;i++) {
+            this.pool.put(new Node(), false, 0);
+        }
     }
 
     /**
      * PRODUCER
      */
     public void put(Object item) throws InterruptedException {
-        this.queue.xfer(item, false, 0, MpmcArrayTransferQueue.TYPE_PRODUCER);
+        final MpmcArrayTransferQueue queue = this.queue;
+        final MpmcArrayTransferQueue pool = this.pool;
+        final Thread myThread = Thread.currentThread();
+
+        while (true) {
+
+            int lastType = queue.peekLast();
+
+            switch (lastType) {
+                case TYPE_EMPTY:
+                case TYPE_CONSUMER:
+//                case TYPE_EMPTY: {
+//                    // empty = push+park onto queue
+//                    final Object node = pool.take(false, 0);
+//
+//                    final Thread myThread = Thread.currentThread();
+//                    spType(node, TYPE_PRODUCER);
+//                    spThread(node, myThread);
+//                    spItem1(node, item);
+//
+////                    queue.put(node, false, 0);
+//                    if (!queue.putIfEmpty(node, false, 0)) {
+//                        pool.put(node, false, 0);
+//                        continue;
+//                    }
+//                    park(node, myThread, false, 0);
+//
+//                    return;
+//                }
+                case TYPE_PRODUCER: {
+                    // same mode = push+park onto queue
+                    final Object node = pool.take(false, 0);
+                    spType(node, TYPE_PRODUCER);
+                    spThread(node, myThread);
+                    spItem1(node, item);
+
+                    queue.put(node, false, 0);
+                    park(node, myThread, false, 0);
+
+                    return;
+                }
+//                case TYPE_CONSUMER: {
+//                  // complimentary mode = unpark+pop off queue
+//                  final Object node = queue.take(false, 0);
+//
+//                  final Object thread = lpThread(node);
+//                  spItem1(node, item);
+//                  soThread(node, null);
+//
+//                  pool.put(node, false, 0);
+//                  unpark(thread);
+//                  return;
+//                }
+            }
+        }
     }
 
 
@@ -60,138 +192,63 @@ public final class SimpleQueue {
      * CONSUMER
      */
     public Object take() throws InterruptedException {
-//        this.queue.xfer(123, false, 0, MpmcExchangerQueue.TYPE_PRODUCER);
-//        return 123;
-        return this.queue.xfer(null, false, 0, MpmcArrayTransferQueue.TYPE_CONSUMER);
-    }
+        final MpmcArrayTransferQueue queue = this.queue;
+        final MpmcArrayTransferQueue pool = this.pool;
+        final Thread myThread = Thread.currentThread();
 
-    private Object xfer(Object item, boolean timed, long nanos, byte incomingType) throws InterruptedException {
-        return null;
-//        while (true) {
-//             empty or same mode = push+park onto queue
-//             complimentary mode = unpark+pop off queue
+        while (true) {
+            int lastType = queue.peekLast();
+
+            switch (lastType) {
+                case TYPE_EMPTY:
+                case TYPE_CONSUMER:
+//                case TYPE_EMPTY: {
+//                    // empty = push+park onto queue
+//                    final Object node = pool.take(false, 0);
 //
-//            Object thread;
+//                    final Thread myThread = Thread.currentThread();
+//                    spType(node, TYPE_CONSUMER);
+//                    spThread(node, myThread);
 //
-            // it is possible that two threads check the queue at the exact same time,
-            //      BOTH can think that the queue is empty, resulting in a deadlock between threads
-            // it is ALSO possible that the consumer pops the previous node, and so we thought it was not-empty, when
-            //      in reality, it is.
-//            final boolean empty = this.queue.isEmpty(); // LoadLoad
-//            boolean sameMode;
-//            if (!empty) {
-//                sameMode = this.queue.getLastMessageType() == isConsumer;
-//            }
-//
-//            // check to make sure we are not "double dipping" on our head
-////            thread = lpThread(head);
-////            if (empty && thread != null) {
-////                empty = false;
-////            } else if (sameMode && thread == null) {
-////                busySpin();
-////                continue;
-////            }
-//
-//            // empty or same mode = push+park onto queue
-//            if (empty || sameMode) {
-//                if (timed && nanos <= 0) {
-//                    // can't wait
-//                    return null;
-//                }
-//
-//                final Object tNext = lpNext(tail);
-//                if (tail != lvTail()) { // LoadLoad
-//                    // inconsistent read
-//                    busySpin();
-//                    continue;
-//                }
-//
-//                if (isConsumer) {
-//                    spType(tNext, isConsumer);
-//                    spThread(tNext, Thread.currentThread());
-//
-//                    if (!advanceTail(tail, tNext)) { // FULL barrier
-//                        // failed to link in
-////                        busySpin();
+////                    queue.put(node, false, 0);
+//                    if (!queue.putIfEmpty(node, false, 0)) {
+//                        pool.put(node, false, 0);
 //                        continue;
 //                    }
+//                    park(node, myThread, false, 0);
 //
-//                    park(tNext, timed, nanos);
-//
-//                    // this will only advance head if necessary
-////                    advanceHead(tail, tNext);
-//                    Object lpItem1 = lpItem1(tNext);
-//                    spItem1(tNext, null);
+//                    Object lpItem1 = lpItem1(node);
 //                    return lpItem1;
-//                } else {
-//                    // producer
-//                    spType(tNext, isConsumer);
-//                    spItem1(tNext, item);
-//                    spThread(tNext, Thread.currentThread());
-//
-//                    if (!advanceTail(tail, tNext)) { // FULL barrier
-//                        // failed to link in
-//                        continue;
-//                    }
-//
-//                    park(tNext, timed, nanos);
-//
-//                    // this will only advance head if necessary
-//                    advanceHead(tail, tNext);
-//                    return null;
 //                }
-//            }
-//            // complimentary mode = unpark+pop off queue
-//            else {
-//                Object next = lpNext(head);
+//                case TYPE_CONSUMER: {
+//                    // same mode = push+park onto queue
+//                    final Object node = pool.take(false, 0);
 //
-//                if (tail != lvTail() || head != lvHead()) { // LoadLoad
-//                    // inconsistent read
-//                    busySpin();
-//                    continue;
+//                    final Thread myThread = Thread.currentThread();
+//                    spType(node, TYPE_PRODUCER);
+//                    spThread(node, myThread);
+//
+//                    queue.put(node, false, 0);
+//                    park(node, myThread, false, 0);
+//
+//                    Object lpItem1 = lpItem1(node);
+//                    return lpItem1;
 //                }
-//
-//                thread = lpThread(head);
-//                if (isConsumer) {
-//                    Object returnVal = lpItem1(head);
-//
-//                    // is already cancelled/fulfilled
-//                    if (thread == null ||
-//                        !casThread(head, thread, null)) { // FULL barrier
-//
-//                        // head was already used by a different thread
-//                        advanceHead(head, next); // FULL barrier
-//
-//                        continue;
-//                    }
-//
-//                    spItem1(head, null);
-//                    LockSupport.unpark((Thread) thread);
-//
-//                    advanceHead(head, next); // FULL barrier
-//
-//                    return returnVal;
-//                } else {
-//                    // producer
-//                    spItem1(head, item); // StoreStore
-//
-//                    // is already cancelled/fulfilled
-//                    if (thread == null ||
-//                        !casThread(head, thread, null)) { // FULL barrier
-//
-//                        // head was already used by a different thread
-//                        advanceHead(head, next); // FULL barrier
-//
-//                        continue;
-//                    }
-//
-//                    LockSupport.unpark((Thread) thread);
-//
-//                    advanceHead(head, next);  // FULL barrier
-//                    return null;
-//                }
-//            }
-//        }
+                case TYPE_PRODUCER: {
+                    // complimentary mode = unpark+pop off queue
+                    final Object node = queue.take(false, 0);
+
+                    final Object thread = lpThread(node);
+                    final Object lvItem1 = lpItem1(node);
+
+                    soThread(node, null);
+                    unpark(node, thread);
+
+                    pool.put(node, false, 0);
+                    return lvItem1;
+                }
+            }
+        }
     }
 
     private static final void busySpin2() {
@@ -218,45 +275,6 @@ public final class SimpleQueue {
         }
     }
 
-//    private final void park(Object myNode, boolean timed, long nanos) throws InterruptedException {
-////        long lastTime = timed ? System.nanoTime() : 0;
-////        int spins = timed ? maxTimedSpins : maxUntimedSpins;
-//        int spins = maxUntimedSpins;
-//        Thread myThread = Thread.currentThread();
-//
-////                    if (timed) {
-////                        long now = System.nanoTime();
-////                        nanos -= now - lastTime;
-////                        lastTime = now;
-////                        if (nanos <= 0) {
-//////                            s.tryCancel(e);
-////                            continue;
-////                        }
-////                    }
-//
-//        // busy spin for the amount of time (roughly) of a CPU context switch
-//        // then park (if necessary)
-//        for (;;) {
-//            if (lpThread(myNode) == null) {
-//                return;
-////            } else if (spins > 0) {
-////                --spins;
-//            } else if (spins > negMaxUntimedSpins) {
-//                --spins;
-////                LockSupport.parkNanos(1);
-//            } else {
-//                // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
-//                LockSupport.park();
-//
-//                if (myThread.isInterrupted()) {
-//                    casThread(myNode, myThread, null);
-//                    Thread.interrupted();
-//                    throw new InterruptedException();
-//                }
-//            }
-//        }
-//    }
-
 //    @Override
 //    public boolean isEmpty() {
 //        // Order matters!
@@ -274,5 +292,54 @@ public final class SimpleQueue {
 
     public void tryTransfer(Runnable runnable, long timeout, TimeUnit unit) throws InterruptedException {
         // TODO Auto-generated method stub
+    }
+
+    public final void park(final Object node, final Thread myThread, final boolean timed, final long nanos) throws InterruptedException {
+        if (casThread(node, null, myThread)) {
+            // we won against the other thread
+
+//          long lastTime = timed ? System.nanoTime() : 0;
+//          int spins = timed ? maxTimedSpins : maxUntimedSpins;
+          int spins = SPINS;
+
+//                      if (timed) {
+//                          long now = System.nanoTime();
+//                          nanos -= now - lastTime;
+//                          lastTime = now;
+//                          if (nanos <= 0) {
+////                              s.tryCancel(e);
+//                              continue;
+//                          }
+//                      }
+
+          // busy spin for the amount of time (roughly) of a CPU context switch
+          // then park (if necessary)
+          for (;;) {
+              if (lvThread(node) != myThread) {
+                  return;
+              } else if (spins > 0) {
+                  --spins;
+////              } else if (spins > negMaxUntimedSpins) {
+////                  --spins;
+////                  LockSupport.parkNanos(1);
+              } else {
+                  // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
+                  LockSupport.park();
+
+//                  if (myThread.isInterrupted()) {
+//                      casThread(node, myThread, null);
+//                      Thread.interrupted();
+//                      throw new InterruptedException();
+//                  }
+              }
+          }
+    }
+  }
+
+    public void unpark(Object node, Object thread) {
+        if (casThread(node, thread, Thread.currentThread())) {
+        } else {
+            UNSAFE.unpark(thread);
+        }
     }
 }

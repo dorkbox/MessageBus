@@ -71,35 +71,35 @@ public class MpmcArrayQueue<T> extends MpmcArrayQueueConsumerField<T> {
         final long capacity = mask + 1;
         final long[] sBuffer = this.sequenceBuffer;
 
-        long currentProducerIndex;
+        long producerIndex;
         long pSeqOffset;
-        long cIndex = Long.MAX_VALUE;// start with bogus value, hope we don't need it
+        long consumerIndex = Long.MAX_VALUE;// start with bogus value, hope we don't need it
 
         while (true) {
-            currentProducerIndex = lvProducerIndex(); // LoadLoad
-            pSeqOffset = calcSequenceOffset(currentProducerIndex, mask);
+            producerIndex = lvProducerIndex(); // LoadLoad
+            pSeqOffset = calcSequenceOffset(producerIndex, mask);
             final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-            final long delta = seq - currentProducerIndex;
+            final long delta = seq - producerIndex;
 
             if (delta == 0) {
                 // this is expected if we see this first time around
-                if (casProducerIndex(currentProducerIndex, currentProducerIndex + 1)) {
+                if (casProducerIndex(producerIndex, producerIndex + 1)) {
                     // Successful CAS: full barrier
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                    final long offset = calcElementOffset(currentProducerIndex, mask);
+                    final long offset = calcElementOffset(producerIndex, mask);
                     spElement(offset, e);
 
                     // increment sequence by 1, the value expected by consumer
                     // (seeing this value from a producer will lead to retry 2)
-                    soSequence(sBuffer, pSeqOffset, currentProducerIndex + 1); // StoreStore
+                    soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
 
                     return true;
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // poll has not moved this value forward
-                    currentProducerIndex - capacity <= cIndex && // test against cached cIndex
-                    currentProducerIndex - capacity <= (cIndex = lvConsumerIndex())) { // test against latest cIndex
+                    producerIndex - capacity <= consumerIndex && // test against cached cIndex
+                    producerIndex - capacity <= (consumerIndex = lvConsumerIndex())) { // test against latest cIndex
                  // Extra check required to ensure [Queue.offer == false iff queue is full]
                  return false;
             }
@@ -121,35 +121,35 @@ public class MpmcArrayQueue<T> extends MpmcArrayQueueConsumerField<T> {
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
 
-        long currentConsumerIndex;
+        long consumerIndex;
         long cSeqOffset;
-        long pIndex = -1; // start with bogus value, hope we don't need it
+        long producerIndex = -1; // start with bogus value, hope we don't need it
 
         while (true) {
-            currentConsumerIndex = lvConsumerIndex(); // LoadLoad
-            cSeqOffset = calcSequenceOffset(currentConsumerIndex, mask);
+            consumerIndex = lvConsumerIndex(); // LoadLoad
+            cSeqOffset = calcSequenceOffset(consumerIndex, mask);
             final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-            final long delta = seq - (currentConsumerIndex + 1);
+            final long delta = seq - (consumerIndex + 1);
 
             if (delta == 0) {
-                if (casConsumerIndex(currentConsumerIndex, currentConsumerIndex + 1)) {
+                if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
                     // Successful CAS: full barrier
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                    final long offset = calcElementOffset(currentConsumerIndex, mask);
+                    final long offset = calcElementOffset(consumerIndex, mask);
                     final T e = lpElement(offset);
                     spElement(offset, null);
 
                     // Move sequence ahead by capacity, preparing it for next offer
                     // (seeing this value from a consumer will lead to retry 2)
-                    soSequence(sBuffer, cSeqOffset, currentConsumerIndex + mask + 1);// StoreStore
+                    soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
 
                     return e;
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // slot has not been moved by producer
-                    currentConsumerIndex >= pIndex && // test against cached pIndex
-                    currentConsumerIndex == (pIndex = lvProducerIndex())) { // update pIndex if we must
+                    consumerIndex >= producerIndex && // test against cached pIndex
+                    consumerIndex == (producerIndex = lvProducerIndex())) { // update pIndex if we must
                 // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
                 return null;
             }
