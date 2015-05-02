@@ -5,14 +5,12 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
-import com.lmax.disruptor.MessageHolder;
-
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.ISetEntry;
+import dorkbox.util.messagebus.common.LinkedTransferQueue;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
-import dorkbox.util.messagebus.common.simpleq.HandlerFactory;
-import dorkbox.util.messagebus.common.simpleq.SimpleQueue;
+import dorkbox.util.messagebus.common.TransferQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
@@ -44,9 +42,8 @@ public class MultiMBassador implements IMessageBus {
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
-//    private final TransferQueue<Runnable> dispatchQueue = new LinkedTransferQueue<Runnable>();
-//    private final DisruptorQueue dispatchQueue;
-    private final SimpleQueue dispatchQueue;
+    private final TransferQueue<Runnable> dispatchQueue;
+//    private final SimpleQueue dispatchQueue;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -91,16 +88,8 @@ public class MultiMBassador implements IMessageBus {
 
         this.numberOfThreads = numberOfThreads;
 
-//        this.dispatchQueue = new DisruptorQueue(this, numberOfThreads);
-
-        HandlerFactory<MessageHolder> factory = new HandlerFactory<MessageHolder>() {
-            @Override
-            public MessageHolder newInstance() {
-                return new MessageHolder();
-            }
-        };
-
-        this.dispatchQueue = new SimpleQueue(numberOfThreads);
+        this.dispatchQueue = new LinkedTransferQueue<Runnable>();
+//        this.dispatchQueue = new SimpleQueue(numberOfThreads);
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -111,7 +100,8 @@ public class MultiMBassador implements IMessageBus {
             Runnable runnable = new Runnable() {
                 @Override
                 public void run() {
-                    SimpleQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
+//                    SimpleQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
+                    TransferQueue<Runnable> IN_QUEUE = MultiMBassador.this.dispatchQueue;
 
                     Object message1;
                     try {
@@ -160,8 +150,8 @@ public class MultiMBassador implements IMessageBus {
 
     @Override
     public boolean hasPendingMessages() {
-//        return this.dispatchQueue.getWaitingConsumerCount() != this.numberOfThreads;
-        return this.dispatchQueue.hasPendingMessages();
+        return this.dispatchQueue.getWaitingConsumerCount() != this.numberOfThreads;
+//        return this.dispatchQueue.hasPendingMessages();
     }
 
     @Override
@@ -424,16 +414,16 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publishAsync(final Object message) {
         if (message != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message);
-//                }
-//            };
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    MultiMBassador.this.publish(message);
+                }
+            };
 
             try {
-//              this.dispatchQueue.transfer(runnable);
-              this.dispatchQueue.put(message);
+              this.dispatchQueue.transfer(runnable);
+//              this.dispatchQueue.put(message);
           } catch (InterruptedException e) {
               handlePublicationError(new PublicationError()
                   .setMessage("Error while adding an asynchronous message")
