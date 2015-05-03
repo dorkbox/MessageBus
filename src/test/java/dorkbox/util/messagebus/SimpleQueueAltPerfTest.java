@@ -20,12 +20,12 @@ import dorkbox.util.messagebus.common.simpleq.jctools.SimpleQueue;
 
 public class SimpleQueueAltPerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 10;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
-    private static final int concurrency = 2;
+    private static final int concurrency = 8;
 
     public static void main(final String[] args) throws Exception {
         System.out.println(VMSupport.vmDetails());
@@ -88,7 +88,7 @@ public class SimpleQueueAltPerfTest {
 
 
         long duration = end - start;
-        long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
+        long ops = REPETITIONS * 1_000_000_000L / duration;
         String qName = queue.getClass().getSimpleName();
 
         System.out.format("%d - ops/sec=%,d - %s\n", runNumber, ops, qName);

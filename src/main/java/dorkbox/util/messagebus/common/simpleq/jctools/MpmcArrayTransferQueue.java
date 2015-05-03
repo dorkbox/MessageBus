@@ -1,7 +1,6 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.locks.LockSupport;
 
 import dorkbox.util.messagebus.common.simpleq.Node;
 
@@ -35,67 +34,6 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
     /** Creates a {@code EliminationStack} that is initially empty. */
     public MpmcArrayTransferQueue(final int size) {
         super(size);
-//
-//        // pre-fill our data structures
-//
-//        // local load of field to avoid repeated loads after volatile reads
-//        final long mask = this.mask;
-//        long currentProducerIndex;
-//
-//        for (currentProducerIndex = 0; currentProducerIndex < size; currentProducerIndex++) {
-//            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-//            final long elementOffset = calcElementOffset(currentProducerIndex, mask);
-//            soElement(elementOffset, new Node());
-//        }
-    }
-
-    /**
-     * Only put an element into the queue if the queue is empty
-     * @param item
-     * @param timed
-     * @param nanos
-     * @return the offset that the item was placed into
-     */
-    public boolean putExact(long producerIndex, final Object item, final boolean timed, final long nanos) {
-        // local load of field to avoid repeated loads after volatile reads
-        final long mask = this.mask;
-//        final long capacity = mask + 1;
-        final long[] sBuffer = this.sequenceBuffer;
-
-        long pSeqOffset;
-//        long consumerIndex = Long.MAX_VALUE;// start with bogus value, hope we don't need it
-
-
-        pSeqOffset = calcSequenceOffset(producerIndex, mask);
-        final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-        final long delta = seq - producerIndex;
-
-        if (delta == 0) {
-            // this is expected if we see this first time around
-            if (casProducerIndex(producerIndex, producerIndex + 1)) {
-                // Successful CAS: full barrier
-
-                // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                final long offset = calcElementOffset(producerIndex, mask);
-                spElement(offset, item);
-
-
-                // increment sequence by 1, the value expected by consumer
-                // (seeing this value from a producer will lead to retry 2)
-                soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
-
-                return true;
-            }
-            // failed cas, retry 1
-//        } else if (delta < 0 && // poll has not moved this value forward
-//                producerIndex - capacity <= consumerIndex && // test against cached cIndex
-//                producerIndex - capacity <= (consumerIndex = lvConsumerIndex())) { // test against latest cIndex
-//
-//              // Extra check required to ensure [Queue.offer == false iff queue is full]
-//              return false;
-        }
-
-        return false;
     }
 
     /**
@@ -149,45 +87,6 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
             // another producer has moved the sequence by one, retry 2
             busySpin();
         }
-    }
-
-    public Object takeExact(long consumerIndex, final boolean timed, final long nanos) {
-        // local load of field to avoid repeated loads after volatile reads
-        final long mask = this.mask;
-        final long[] sBuffer = this.sequenceBuffer;
-
-        long cSeqOffset;
-//        long producerIndex = -1; // start with bogus value, hope we don't need it
-
-        cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-        final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-        final long delta = seq - (consumerIndex + 1);
-
-        if (delta == 0) {
-            if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
-                // Successful CAS: full barrier
-
-                // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                final long offset = calcElementOffset(consumerIndex, mask);
-                final Object e = lpElementNoCast(offset);
-                spElement(offset, null);
-
-                // Move sequence ahead by capacity, preparing it for next offer
-                // (seeing this value from a consumer will lead to retry 2)
-                soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
-
-                return e;
-            }
-            // failed cas, retry 1
-//        } else if (delta < 0 && // slot has not been moved by producer
-//                consumerIndex >= producerIndex && // test against cached pIndex
-//                consumerIndex == (producerIndex = lvProducerIndex())) { // update pIndex if we must
-//            // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
-//             return null;
-        }
-
-        // another consumer beat us and moved sequence ahead, retry 2
-        return null;
     }
 
     public Object take(final boolean timed, final long nanos) {
@@ -494,18 +393,19 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
 //    }
 
     private static final void busySpin() {
-        ThreadLocalRandom randomYields = null; // bound if needed
-        randomYields = ThreadLocalRandom.current();
+        ThreadLocalRandom randomYields = ThreadLocalRandom.current();
 
         // busy spin for the amount of time (roughly) of a CPU context switch
-        int spins = spinsFor();
-//        int spins = 512;
+//        int spins = spinsFor();
+        int spins = CHAINED_SPINS;
         for (;;) {
             if (spins > 0) {
-                --spins;
                 if (randomYields.nextInt(CHAINED_SPINS) == 0) {
-                    LockSupport.parkNanos(1); // occasionally yield
+//                    LockSupport.parkNanos(1); // occasionally yield
+//                    Thread.yield();
+                    break;
                 }
+                --spins;
             } else {
                 break;
             }

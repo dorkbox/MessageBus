@@ -7,7 +7,7 @@ package dorkbox.util.messagebus.common.simpleq;
 
 abstract class PrePad {
 //    volatile long y0, y1, y2, y4, y5, y6 = 7L;
-//    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+    volatile long z0, z1, z2, z4, z5, z6 = 7L;
 }
 
 abstract class ColdItems extends PrePad {
