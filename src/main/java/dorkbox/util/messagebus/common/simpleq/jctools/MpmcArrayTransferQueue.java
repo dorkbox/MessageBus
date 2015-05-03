@@ -1,31 +1,11 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
-import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
-
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.LockSupport;
 
 import dorkbox.util.messagebus.common.simpleq.Node;
 
 public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<Node> {
-
-    public static final int TYPE_EMPTY = 0;
-    public static final int TYPE_CONSUMER = 1;
-    public static final int TYPE_PRODUCER = 2;
-
-    private static final long TYPE;
-
-    static {
-        try {
-            TYPE = UNSAFE.objectFieldOffset(Node.class.getField("type"));
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static final int lpType(Object node) {
-        return UNSAFE.getInt(node, TYPE);
-    }
 
     /** The number of CPUs */
     private static final boolean MP = Runtime.getRuntime().availableProcessors() > 1;
@@ -76,56 +56,46 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
      * @param nanos
      * @return the offset that the item was placed into
      */
-    public boolean putIfEmpty(final Object item, final boolean timed, final long nanos) {
+    public boolean putExact(long producerIndex, final Object item, final boolean timed, final long nanos) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
-        final long capacity = mask + 1;
+//        final long capacity = mask + 1;
         final long[] sBuffer = this.sequenceBuffer;
 
-        long producerIndex;
         long pSeqOffset;
-        long consumerIndex;
+//        long consumerIndex = Long.MAX_VALUE;// start with bogus value, hope we don't need it
 
-        while (true) {
-            // consumer has to be first
-            consumerIndex = lvConsumerIndex(); // LoadLoad
-            producerIndex = lvProducerIndex(); // LoadLoad
 
-            if (consumerIndex != producerIndex) {
-                return false;
+        pSeqOffset = calcSequenceOffset(producerIndex, mask);
+        final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
+        final long delta = seq - producerIndex;
+
+        if (delta == 0) {
+            // this is expected if we see this first time around
+            if (casProducerIndex(producerIndex, producerIndex + 1)) {
+                // Successful CAS: full barrier
+
+                // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                final long offset = calcElementOffset(producerIndex, mask);
+                spElement(offset, item);
+
+
+                // increment sequence by 1, the value expected by consumer
+                // (seeing this value from a producer will lead to retry 2)
+                soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
+
+                return true;
             }
-
-            pSeqOffset = calcSequenceOffset(producerIndex, mask);
-            final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-            final long delta = seq - producerIndex;
-
-            if (delta == 0) {
-                // this is expected if we see this first time around
-                if (casProducerIndex(producerIndex, producerIndex + 1)) {
-                    // Successful CAS: full barrier
-
-                    // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                    final long offset = calcElementOffset(producerIndex, mask);
-                    spElement(offset, item);
-
-
-                    // increment sequence by 1, the value expected by consumer
-                    // (seeing this value from a producer will lead to retry 2)
-                    soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
-
-                    return true;
-                }
-                // failed cas, retry 1
-            } else if (delta < 0 && // poll has not moved this value forward
-                    producerIndex - capacity <= consumerIndex && // test against cached cIndex
-                    producerIndex - capacity <= (consumerIndex = lvConsumerIndex())) { // test against latest cIndex
-                 // Extra check required to ensure [Queue.offer == false iff queue is full]
-                 // return false;
-            }
-
-            // another producer has moved the sequence by one, retry 2
-            busySpin();
+            // failed cas, retry 1
+//        } else if (delta < 0 && // poll has not moved this value forward
+//                producerIndex - capacity <= consumerIndex && // test against cached cIndex
+//                producerIndex - capacity <= (consumerIndex = lvConsumerIndex())) { // test against latest cIndex
+//
+//              // Extra check required to ensure [Queue.offer == false iff queue is full]
+//              return false;
         }
+
+        return false;
     }
 
     /**
@@ -181,6 +151,45 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
         }
     }
 
+    public Object takeExact(long consumerIndex, final boolean timed, final long nanos) {
+        // local load of field to avoid repeated loads after volatile reads
+        final long mask = this.mask;
+        final long[] sBuffer = this.sequenceBuffer;
+
+        long cSeqOffset;
+//        long producerIndex = -1; // start with bogus value, hope we don't need it
+
+        cSeqOffset = calcSequenceOffset(consumerIndex, mask);
+        final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
+        final long delta = seq - (consumerIndex + 1);
+
+        if (delta == 0) {
+            if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
+                // Successful CAS: full barrier
+
+                // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                final long offset = calcElementOffset(consumerIndex, mask);
+                final Object e = lpElementNoCast(offset);
+                spElement(offset, null);
+
+                // Move sequence ahead by capacity, preparing it for next offer
+                // (seeing this value from a consumer will lead to retry 2)
+                soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
+
+                return e;
+            }
+            // failed cas, retry 1
+//        } else if (delta < 0 && // slot has not been moved by producer
+//                consumerIndex >= producerIndex && // test against cached pIndex
+//                consumerIndex == (producerIndex = lvProducerIndex())) { // update pIndex if we must
+//            // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
+//             return null;
+        }
+
+        // another consumer beat us and moved sequence ahead, retry 2
+        return null;
+    }
+
     public Object take(final boolean timed, final long nanos) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
@@ -213,15 +222,15 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
                 }
                 // failed cas, retry 1
             } else if (delta < 0 && // slot has not been moved by producer
-                    consumerIndex >= producerIndex && // test against cached pIndex
-                    consumerIndex == (producerIndex = lvProducerIndex())) { // update pIndex if we must
+                            consumerIndex >= producerIndex && // test against cached pIndex
+                            consumerIndex == (producerIndex = lvProducerIndex())) { // update pIndex if we must
                 // strict empty check, this ensures [Queue.poll() == null iff isEmpty()]
-//                return null;
+                // return null;
                 busySpin(); // empty, so busy spin
             }
 
             // another consumer beat us and moved sequence ahead, retry 2
-            // only producer will busy spin
+            busySpin();
         }
     }
 
@@ -541,26 +550,26 @@ public final class MpmcArrayTransferQueue extends MpmcArrayQueueConsumerField<No
        return null;
     }
 
-    public int peekLast() {
-        long currConsumerIndex;
-        long currProducerIndex;
-
-        while (true) {
-            currConsumerIndex = lvConsumerIndex();
-            currProducerIndex = lvProducerIndex();
-
-            if (currConsumerIndex == currProducerIndex) {
-                return TYPE_EMPTY;
-            }
-
-            final Object lpElementNoCast = lpElementNoCast(calcElementOffset(currConsumerIndex));
-            if (lpElementNoCast == null) {
-                continue;
-            }
-
-            return lpType(lpElementNoCast);
-        }
-    }
+//    public int peekLast() {
+//        long currConsumerIndex;
+//        long currProducerIndex;
+//
+//        while (true) {
+//            currConsumerIndex = lvConsumerIndex();
+//            currProducerIndex = lvProducerIndex();
+//
+//            if (currConsumerIndex == currProducerIndex) {
+//                return TYPE_EMPTY;
+//            }
+//
+//            final Object lpElementNoCast = lpElementNoCast(calcElementOffset(currConsumerIndex));
+//            if (lpElementNoCast == null) {
+//                continue;
+//            }
+//
+//            return lpType(lpElementNoCast);
+//        }
+//    }
 
     @Override
     public int size() {

@@ -1,14 +1,17 @@
 /*
  * Copyright 2012 Real Logic Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
- * obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package dorkbox.util.messagebus;
 
@@ -16,11 +19,11 @@ import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
 import dorkbox.util.messagebus.common.simpleq.Node;
-import dorkbox.util.messagebus.common.simpleq.jctools.SimpleQueue;
+import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayTransferQueue;
 
-public class SimpleQueueAltPerfTest {
+public class MpmcQueueAltConcurrentPerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
@@ -32,7 +35,7 @@ public class SimpleQueueAltPerfTest {
         System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
 
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-        final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
+        final MpmcArrayTransferQueue queue = new MpmcArrayTransferQueue(1 << 17);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -47,7 +50,7 @@ public class SimpleQueueAltPerfTest {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-    private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, MpmcArrayTransferQueue queue) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -96,51 +99,43 @@ public class SimpleQueueAltPerfTest {
     }
 
     public static class Producer implements Runnable {
-        private final SimpleQueue queue;
+        private final MpmcArrayTransferQueue queue;
         volatile long start;
 
-        public Producer(SimpleQueue queue) {
+        public Producer(MpmcArrayTransferQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            SimpleQueue producer = this.queue;
+            MpmcArrayTransferQueue producer = this.queue;
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
-            try {
-                do {
-                    producer.put(TEST_VALUE);
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            do {
+                producer.put(TEST_VALUE, false, 0);
+            } while (0 != --i);
         }
     }
 
     public static class Consumer implements Runnable {
-        private final SimpleQueue queue;
+        private final MpmcArrayTransferQueue queue;
         Object result;
         volatile long end;
 
-        public Consumer(SimpleQueue queue) {
+        public Consumer(MpmcArrayTransferQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            SimpleQueue consumer = this.queue;
+            MpmcArrayTransferQueue consumer = this.queue;
             Object result = null;
             int i = REPETITIONS;
 
-            try {
-                do {
-                    result = consumer.take();
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            do {
+                result = consumer.take(false, 0);
+            } while (0 != --i);
 
             this.result = result;
             this.end = System.nanoTime();

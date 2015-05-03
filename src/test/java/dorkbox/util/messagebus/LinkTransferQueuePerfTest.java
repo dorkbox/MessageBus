@@ -24,7 +24,7 @@ import dorkbox.util.messagebus.common.simpleq.Node;
 
 public class LinkTransferQueuePerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
@@ -53,13 +53,11 @@ public class LinkTransferQueuePerfTest {
 
 
     private static long performanceRun(int runNumber, LinkedTransferQueue<Integer> queue) throws Exception {
-//        for (int i=0;i<CONCURRENCY_LEVEL;i++) {
-            Producer p = new Producer(queue);
-            Thread thread = new Thread(p);
-            thread.start(); // producer will timestamp start
-//        }
+        Producer p = new Producer(queue);
+        Thread thread = new Thread(p);
+        thread.start(); // producer will timestamp start
 
-            LinkedTransferQueue<Integer> consumer = queue;
+        LinkedTransferQueue<Integer> consumer = queue;
         Object result;
         int i = REPETITIONS;
         int queueEmpty = 0;

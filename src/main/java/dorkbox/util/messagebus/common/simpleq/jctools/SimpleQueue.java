@@ -1,12 +1,10 @@
-package dorkbox.util.messagebus.common.simpleq;
+package dorkbox.util.messagebus.common.simpleq.jctools;
 
 import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 
-import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayTransferQueue;
-import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
+import dorkbox.util.messagebus.common.simpleq.Node;
 
 public final class SimpleQueue {
     public static final int TYPE_EMPTY = 0;
@@ -133,56 +131,81 @@ public final class SimpleQueue {
         final MpmcArrayTransferQueue queue = this.queue;
         final MpmcArrayTransferQueue pool = this.pool;
         final Thread myThread = Thread.currentThread();
+        Object node = null;
+
+        // local load of field to avoid repeated loads after volatile reads
+        final long mask = queue.mask;
+        final long[] sBuffer = queue.sequenceBuffer;
+
+        long cSeqOffset;
+
+        long currConsumerIndex;
+        long currProducerIndex;
+        int lastType;
 
         while (true) {
+            currConsumerIndex = queue.lvConsumerIndex();
+            currProducerIndex = queue.lvProducerIndex();
 
-            int lastType = queue.peekLast();
+            if (currConsumerIndex == currProducerIndex) {
+                lastType = TYPE_EMPTY;
+            } else {
+                cSeqOffset = ConcurrentSequencedCircularArrayQueue.calcSequenceOffset(currConsumerIndex, mask);
+                final long seq = queue.lvSequence(sBuffer, cSeqOffset); // LoadLoad
+                final long delta = seq - (currConsumerIndex + 1);
+
+                if (delta == 0) {
+                    final Object lpElementNoCast = queue.lpElementNoCast(queue.calcElementOffset(currConsumerIndex));
+                    if (lpElementNoCast == null) {
+                        continue;
+                    }
+
+                    lastType = lpType(lpElementNoCast);
+                } else {
+                    continue;
+                }
+            }
 
             switch (lastType) {
                 case TYPE_EMPTY:
-                case TYPE_CONSUMER:
-//                case TYPE_EMPTY: {
-//                    // empty = push+park onto queue
-//                    final Object node = pool.take(false, 0);
-//
-//                    final Thread myThread = Thread.currentThread();
-//                    spType(node, TYPE_PRODUCER);
-//                    spThread(node, myThread);
-//                    spItem1(node, item);
-//
-////                    queue.put(node, false, 0);
-//                    if (!queue.putIfEmpty(node, false, 0)) {
-//                        pool.put(node, false, 0);
-//                        continue;
-//                    }
-//                    park(node, myThread, false, 0);
-//
-//                    return;
-//                }
                 case TYPE_PRODUCER: {
-                    // same mode = push+park onto queue
-                    final Object node = pool.take(false, 0);
-                    spType(node, TYPE_PRODUCER);
-                    spThread(node, myThread);
-                    spItem1(node, item);
+                    // empty or same mode = push+park onto queue
+                    if (node == null) {
+                        node = pool.take(false, 0);
 
-                    queue.put(node, false, 0);
+                        spType(node, TYPE_PRODUCER);
+                        spThread(node, myThread);
+                        spItem1(node, item);
+                    }
+
+                    if (!queue.putExact(currProducerIndex, node, false, 0)) {
+                        // whoops, inconsistent state
+//                        busySpin2();
+                        continue;
+                    }
                     park(node, myThread, false, 0);
 
                     return;
                 }
-//                case TYPE_CONSUMER: {
-//                  // complimentary mode = unpark+pop off queue
-//                  final Object node = queue.take(false, 0);
-//
-//                  final Object thread = lpThread(node);
-//                  spItem1(node, item);
-//                  soThread(node, null);
-//
-//                  pool.put(node, false, 0);
-//                  unpark(thread);
-//                  return;
-//                }
+                case TYPE_CONSUMER: {
+                  // complimentary mode = pop+unpark off queue
+                  if (node != null) {
+                      pool.put(node, false, 0);
+                  }
+
+                  node = queue.takeExact(currConsumerIndex, false, 0);
+                  if (node == null) {
+                      // whoops, inconsistent state
+//                      busySpin2();
+                      continue;
+                  }
+
+                  soItem1(node, item);
+                  unpark(node);
+
+                  pool.put(node, false, 0);
+                  return;
+                }
             }
         }
     }
@@ -195,54 +218,79 @@ public final class SimpleQueue {
         final MpmcArrayTransferQueue queue = this.queue;
         final MpmcArrayTransferQueue pool = this.pool;
         final Thread myThread = Thread.currentThread();
+        Object node = null;
+
+
+        // local load of field to avoid repeated loads after volatile reads
+        final long mask = queue.mask;
+        final long[] sBuffer = queue.sequenceBuffer;
+
+        long cSeqOffset;
+        long currConsumerIndex;
+        long currProducerIndex;
+        int lastType;
 
         while (true) {
-            int lastType = queue.peekLast();
+            currConsumerIndex = queue.lvConsumerIndex();
+            currProducerIndex = queue.lvProducerIndex();
+
+            if (currConsumerIndex == currProducerIndex) {
+                lastType = TYPE_EMPTY;
+            } else {
+                cSeqOffset = ConcurrentSequencedCircularArrayQueue.calcSequenceOffset(currConsumerIndex, mask);
+                final long seq = queue.lvSequence(sBuffer, cSeqOffset); // LoadLoad
+                final long delta = seq - (currConsumerIndex + 1);
+
+                if (delta == 0) {
+                    final Object lpElementNoCast = queue.lpElementNoCast(queue.calcElementOffset(currConsumerIndex));
+                    if (lpElementNoCast == null) {
+                        continue;
+                    }
+
+                    lastType = lpType(lpElementNoCast);
+                } else {
+                    continue;
+                }
+            }
+
 
             switch (lastType) {
                 case TYPE_EMPTY:
                 case TYPE_CONSUMER:
-//                case TYPE_EMPTY: {
-//                    // empty = push+park onto queue
-//                    final Object node = pool.take(false, 0);
-//
-//                    final Thread myThread = Thread.currentThread();
-//                    spType(node, TYPE_CONSUMER);
-//                    spThread(node, myThread);
-//
-////                    queue.put(node, false, 0);
-//                    if (!queue.putIfEmpty(node, false, 0)) {
-//                        pool.put(node, false, 0);
-//                        continue;
-//                    }
-//                    park(node, myThread, false, 0);
-//
-//                    Object lpItem1 = lpItem1(node);
-//                    return lpItem1;
-//                }
-//                case TYPE_CONSUMER: {
-//                    // same mode = push+park onto queue
-//                    final Object node = pool.take(false, 0);
-//
-//                    final Thread myThread = Thread.currentThread();
-//                    spType(node, TYPE_PRODUCER);
-//                    spThread(node, myThread);
-//
-//                    queue.put(node, false, 0);
-//                    park(node, myThread, false, 0);
-//
-//                    Object lpItem1 = lpItem1(node);
-//                    return lpItem1;
-//                }
+                {
+                    // empty or same mode = push+park onto queue
+                    if (node == null) {
+                        node = pool.take(false, 0);
+
+                        spType(node, TYPE_CONSUMER);
+                        spThread(node, myThread);
+                    }
+
+                    if (!queue.putExact(currProducerIndex, node, false, 0)) {
+                        // whoops, inconsistent state
+//                        busySpin2();
+                        continue;
+                    }
+                    park(node, myThread, false, 0);
+
+                    Object item1 = lvItem1(node);
+                    return item1;
+                }
                 case TYPE_PRODUCER: {
-                    // complimentary mode = unpark+pop off queue
-                    final Object node = queue.take(false, 0);
+                    // complimentary mode = pop+unpark off queue
+                    if (node != null) {
+                        pool.put(node, false, 0);
+                    }
 
-                    final Object thread = lpThread(node);
+                    node = queue.takeExact(currConsumerIndex, false, 0);
+                    if (node == null) {
+                        // whoops, inconsistent state
+//                        busySpin2();
+                        continue;
+                    }
+
                     final Object lvItem1 = lpItem1(node);
-
-                    soThread(node, null);
-                    unpark(node, thread);
+                    unpark(node);
 
                     pool.put(node, false, 0);
                     return lvItem1;
@@ -295,12 +343,12 @@ public final class SimpleQueue {
     }
 
     public final void park(final Object node, final Thread myThread, final boolean timed, final long nanos) throws InterruptedException {
-        if (casThread(node, null, myThread)) {
+//        if (casThread(node, null, myThread)) {
             // we won against the other thread
 
 //          long lastTime = timed ? System.nanoTime() : 0;
 //          int spins = timed ? maxTimedSpins : maxUntimedSpins;
-          int spins = SPINS;
+          int spins = maxTimedSpins;
 
 //                      if (timed) {
 //                          long now = System.nanoTime();
@@ -315,31 +363,33 @@ public final class SimpleQueue {
           // busy spin for the amount of time (roughly) of a CPU context switch
           // then park (if necessary)
           for (;;) {
-              if (lvThread(node) != myThread) {
+              if (lpThread(node) == null) {
                   return;
               } else if (spins > 0) {
                   --spins;
-////              } else if (spins > negMaxUntimedSpins) {
-////                  --spins;
-////                  LockSupport.parkNanos(1);
+//              } else if (spins > negMaxUntimedSpins) {
+//                  --spins;
+//                  UNSAFE.park(false, 1L);
               } else {
                   // park can return for NO REASON. Subsequent loops will hit this if it has not been ACTUALLY unlocked.
-                  LockSupport.park();
+                  UNSAFE.park(false, 0L);
 
-//                  if (myThread.isInterrupted()) {
+                  if (myThread.isInterrupted()) {
 //                      casThread(node, myThread, null);
-//                      Thread.interrupted();
-//                      throw new InterruptedException();
-//                  }
+                      Thread.interrupted();
+                      throw new InterruptedException();
+                  }
               }
           }
-    }
+//        }
   }
 
-    public void unpark(Object node, Object thread) {
-        if (casThread(node, thread, Thread.currentThread())) {
-        } else {
-            UNSAFE.unpark(thread);
-        }
+    public void unpark(Object node) {
+        final Object thread = lpThread(node);
+        soThread(node, null);
+        UNSAFE.unpark(thread);
+
+//        if (thread != null && casThread(node, thread, Thread.currentThread())) {
+//        }
     }
 }
