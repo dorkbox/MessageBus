@@ -12,20 +12,21 @@
  */
 package dorkbox.util.messagebus;
 
+import java.util.concurrent.LinkedTransferQueue;
+
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.LinkedTransferQueue;
-import dorkbox.util.messagebus.common.simpleq.Node;
+import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
 public class LinkTransferQueueConcurrentPerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 10;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
-    private static final int concurrency = 8;
+    private static final int concurrency = 2;
 
     public static void main(final String[] args) throws Exception {
         System.out.println(VMSupport.vmDetails());

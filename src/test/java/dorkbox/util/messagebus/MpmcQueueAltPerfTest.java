@@ -18,9 +18,9 @@ package dorkbox.util.messagebus;
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.simpleq.Node;
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayTransferQueue;
+import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
 public class MpmcQueueAltPerfTest {
     // 15 == 32 * 1024

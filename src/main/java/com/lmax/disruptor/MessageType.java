@@ -4,8 +4,8 @@ package com.lmax.disruptor;
  *         Date: 2/2/15
  */
 public class MessageType {
-    public static final short ONE = 1;
-    public static final short TWO = 2;
-    public static final short THREE = 3;
-    public static final short ARRAY = 4;
+    public static final int ONE = 1;
+    public static final int TWO = 2;
+    public static final int THREE = 3;
+    public static final int ARRAY = 4;
 }

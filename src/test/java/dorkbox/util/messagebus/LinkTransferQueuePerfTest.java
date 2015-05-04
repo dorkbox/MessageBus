@@ -20,7 +20,7 @@ import java.util.concurrent.LinkedTransferQueue;
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.simpleq.Node;
+import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
 public class LinkTransferQueuePerfTest {
     // 15 == 32 * 1024

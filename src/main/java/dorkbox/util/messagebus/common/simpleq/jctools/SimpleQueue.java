@@ -1,106 +1,35 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.lpItem1;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.lpThread;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.lpType;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.lvItem1;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.lvThread;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.soItem1;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.soThread;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spItem1;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spThread;
+import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spType;
 import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 
+import java.util.Collection;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-
-import dorkbox.util.messagebus.common.simpleq.Node;
-
-public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
-    public static final int TYPE_EMPTY = 0;
-    public static final int TYPE_CONSUMER = 1;
-    public static final int TYPE_PRODUCER = 2;
-
-    private static final long ITEM1_OFFSET;
-    private static final long THREAD;
-    private static final long TYPE;
-
-    static {
-        try {
-            TYPE = UNSAFE.objectFieldOffset(Node.class.getField("type"));
-            ITEM1_OFFSET = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
-            THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static final void spItem1(Object node, Object item) {
-        UNSAFE.putObject(node, ITEM1_OFFSET, item);
-    }
-
-    private static final void soItem1(Object node, Object item) {
-        UNSAFE.putOrderedObject(node, ITEM1_OFFSET, item);
-    }
-
-    private static final Object lpItem1(Object node) {
-        return UNSAFE.getObject(node, ITEM1_OFFSET);
-    }
-
-    private static final Object lvItem1(Object node) {
-        return UNSAFE.getObjectVolatile(node, ITEM1_OFFSET);
-    }
+import java.util.concurrent.TransferQueue;
 
 
-    private static final void spType(Object node, int type) {
-        UNSAFE.putInt(node, TYPE, type);
-    }
+public final class SimpleQueue extends MpmcArrayQueueConsumerField<Object> implements TransferQueue<Object> {
+    private static final int TYPE_EMPTY = 0;
+    private static final int TYPE_CONSUMER = 1;
+    private static final int TYPE_PRODUCER = 2;
 
-    private static final int lpType(Object node) {
-        return UNSAFE.getInt(node, TYPE);
-    }
-
-    private static final void spThread(Object node, Object thread) {
-        UNSAFE.putObject(node, THREAD, thread);
-    }
-
-    private static final void soThread(Object node, Object thread) {
-        UNSAFE.putOrderedObject(node, THREAD, thread);
-    }
-
-    private static final Object lpThread(Object node) {
-        return UNSAFE.getObject(node, THREAD);
-    }
-
-    private static final Object lvThread(Object node) {
-        return UNSAFE.getObjectVolatile(node, THREAD);
-    }
-
-    /** The number of CPUs */
+    /** Is it multi-processor? */
     private static final boolean MP = Runtime.getRuntime().availableProcessors() > 1;
 
-    /**
-     * The number of times to spin (with randomly interspersed calls
-     * to Thread.yield) on multiprocessor before blocking when a node
-     * is apparently the first waiter in the queue.  See above for
-     * explanation. Must be a power of two. The value is empirically
-     * derived -- it works pretty well across a variety of processors,
-     * numbers of CPUs, and OSes.
-     */
-    private static final int FRONT_SPINS   = 1 << 7;
+    private static int INPROGRESS_SPINS = MP ? 32 : 0;
+    private static int PUSH_SPINS = MP ? 512 : 0;
+    private static int POP_SPINS = MP ? 512 : 0;
 
-    /**
-     * The number of times to spin before blocking when a node is
-     * preceded by another node that is apparently spinning.  Also
-     * serves as an increment to FRONT_SPINS on phase changes, and as
-     * base average frequency for yielding during spins. Must be a
-     * power of two.
-     */
-    private static final int CHAINED_SPINS = FRONT_SPINS >>> 1;
-
-
-    /** The number of CPUs */
-    private static final int NCPU = Runtime.getRuntime().availableProcessors();
-
-    /**
-     * The number of times to spin (doing nothing except polling a memory location) before giving up while waiting to eliminate an
-     * operation. Should be zero on uniprocessors. On multiprocessors, this value should be large enough so that two threads exchanging
-     * items as fast as possible block only when one of them is stalled (due to GC or preemption), but not much longer, to avoid wasting CPU
-     * resources. Seen differently, this value is a little over half the number of cycles of an average context switch time on most systems.
-     * The value here is approximately the average of those across a range of tested systems.
-     */
-    private static final int SPINS = MP ? 0 : 512; // orig: 2000
 
     /**
      * The number of times to spin before blocking in timed waits.
@@ -109,26 +38,26 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
      * seems not to vary with number of CPUs (beyond 2) so is just
      * a constant.
      */
-    static final int maxTimedSpins = NCPU < 2 ? 0 : 32;
+    private static int PARK_TIMED_SPINS = MP ? 32 : 0;
 
     /**
      * The number of times to spin before blocking in untimed waits.
      * This is greater than timed value because untimed waits spin
      * faster since they don't need to check times on each spin.
      */
-    static final int maxUntimedSpins = maxTimedSpins * 16;
-    static final int negMaxUntimedSpins = -maxUntimedSpins;
+    private static int PARK_UNTIMED_SPINS = PARK_TIMED_SPINS * 16;
 
     /**
      * The number of nanoseconds for which it is faster to spin
      * rather than to use timed park. A rough estimate suffices.
      */
-    static final long spinForTimeoutThreshold = 1000L;
-    private int size;
+    private static final long SPIN_THRESHOLD = 1000L;
 
-    public SimpleQueue(final int size) {
-        super(1 << 17);
-        this.size = size;
+    private final int consumerCount;
+
+    public SimpleQueue(final int consumerCount) {
+        super(Pow2.roundToPowerOfTwo(consumerCount*Runtime.getRuntime().availableProcessors()));
+        this.consumerCount = consumerCount;
     }
 
     private final static ThreadLocal<Object> nodeThreadLocal = new ThreadLocal<Object>() {
@@ -140,9 +69,12 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
 
 
     /**
-     * PRODUCER
+     * PRODUCER method
+     * <p>
+     * Place an item on the queue, and wait (if necessary) for a corresponding consumer to take it. This will wait as long as necessary.
      */
-    public void put(Object item) throws InterruptedException {
+    @Override
+    public final void transfer(final Object item) {
 
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
@@ -164,7 +96,7 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                 previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
-                    busySpin_InProgress();
+                    busySpin(INPROGRESS_SPINS);
                     continue;
                 }
 
@@ -207,7 +139,7 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                     }
 
                     // whoops, inconsistent state
-                    busySpin_pushConflict();
+                    busySpin(PUSH_SPINS);
                     continue;
                 }
                 case TYPE_CONSUMER: {
@@ -237,7 +169,7 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                     }
 
                     // whoops, inconsistent state
-                    busySpin_popConflict();
+                    busySpin(POP_SPINS);
                     continue;
                 }
             }
@@ -247,7 +179,8 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
     /**
      * CONSUMER
      */
-    public Object take() throws InterruptedException {
+    @Override
+    public final Object take() {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
@@ -268,7 +201,7 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                 previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
-                    busySpin_InProgress();
+                    busySpin(INPROGRESS_SPINS);
                     continue;
                 }
 
@@ -313,7 +246,7 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                     }
 
                     // whoops, inconsistent state
-                    busySpin_pushConflict();
+                    busySpin(PUSH_SPINS);
                     continue;
                 }
                 case TYPE_PRODUCER: {
@@ -343,138 +276,90 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
                     }
 
                     // whoops, inconsistent state
-                    busySpin_popConflict();
+                    busySpin(POP_SPINS);
                     continue;
                 }
             }
         }
     }
 
-    /**
-     * Spin for when the current thread is waiting for the item to be set. The producer index has incremented, but the
-     * item isn't present yet.
-     * @param random
-     */
-    private static final void busySpin_InProgress() {
-//        ThreadLocalRandom randomYields = ThreadLocalRandom.current();
-//
-//        if (randomYields.nextInt(1) != 0) {
-//////      LockSupport.parkNanos(1); // occasionally yield
-//      Thread.yield();
-//////      break;
-//        }
-
-        // busy spin for the amount of time (roughly) of a CPU context switch
-        int spins = 128;
+    private static final void busySpin(int spins) {
         for (;;) {
             if (spins > 0) {
-//                if (randomYields.nextInt(CHAINED_SPINS) == 0) {
-////                  LockSupport.parkNanos(1); // occasionally yield
-//                  Thread.yield();
-////                  break;
-//                }
                 --spins;
             } else {
-                break;
+                return;
             }
         }
     }
 
-    private static final void busySpin_pushConflict() {
-//        ThreadLocalRandom randomYields = ThreadLocalRandom.current();
+    @SuppressWarnings("null")
+    private final void park(final Object node, final Thread myThread, final boolean timed, long nanos) {
+        long lastTime = timed ? System.nanoTime() : 0L;
+        int spins = -1; // initialized after first item and cancel checks
+        ThreadLocalRandom randomYields = null; // bound if needed
 
-        // busy spin for the amount of time (roughly) of a CPU context switch
-        int spins = 256;
         for (;;) {
-            if (spins > 0) {
-//                if (randomYields.nextInt(1) != 0) {
-//////                    LockSupport.parkNanos(1); // occasionally yield
-//                    Thread.yield();
-////                    break;
-//                }
-                --spins;
-            } else {
-                break;
-            }
-        }
-    }
+            if (lvThread(node) == null) {
+                return;
+            } else if (myThread.isInterrupted() || timed && nanos <= 0) {
+                return;
+            } else if (spins < 0) {
+                if (timed) {
+                    spins = PARK_TIMED_SPINS;
+                } else {
+                    spins = PARK_UNTIMED_SPINS;
+                }
 
-    private static final void busySpin_popConflict() {
-//        ThreadLocalRandom randomYields = ThreadLocalRandom.current();
-
-        // busy spin for the amount of time (roughly) of a CPU context switch
-        int spins = 64;
-        for (;;) {
-            if (spins > 0) {
-//                if (randomYields.nextInt(1) != 0) {
-//////                    LockSupport.parkNanos(1); // occasionally yield
-//                    Thread.yield();
-////                    break;
-//                }
-                --spins;
-            } else {
-                break;
-            }
-        }
-    }
-
-    private static final void busySpin2() {
-        ThreadLocalRandom randomYields = ThreadLocalRandom.current();
-
-        // busy spin for the amount of time (roughly) of a CPU context switch
-        int spins = 64;
-        for (;;) {
-            if (spins > 0) {
-                if (randomYields.nextInt(1) != 0) {
-////                    LockSupport.parkNanos(1); // occasionally yield
-                    Thread.yield();
-//                    break;
+                if (spins > 0) {
+                    randomYields = ThreadLocalRandom.current();
+                }
+            } else if (spins > 0) {
+                if (randomYields.nextInt(256) == 0) {
+                    Thread.yield();  // occasionally yield
                 }
                 --spins;
-            } else {
-                break;
-            }
-        }
-    }
-
-    private static final void busySpin(ThreadLocalRandom random) {
-        // busy spin for the amount of time (roughly) of a CPU context switch
-//        int spins = spinsFor();
-        int spins = 128;
-        for (;;) {
-            if (spins > 0) {
-                --spins;
-                if (random.nextInt(CHAINED_SPINS) == 0) {
-////                    LockSupport.parkNanos(1); // occasionally yield
-//                    Thread.yield();
-                    break;
+            } else if (timed) {
+                long now = System.nanoTime();
+                long remaining = nanos -= now - lastTime;
+                if (remaining > 0) {
+                    if (remaining < SPIN_THRESHOLD) {
+                        busySpin(PARK_UNTIMED_SPINS);
+                    } else {
+                        UNSAFE.park(false, nanos);
+                    }
                 }
+                lastTime = now;
             } else {
-                break;
+                // park can return for NO REASON (must check for thread values)
+                UNSAFE.park(false, 0L);
             }
         }
     }
 
-//    @Override
-//    public boolean isEmpty() {
-//        // Order matters!
-//        // Loading consumer before producer allows for producer increments after consumer index is read.
-//        // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
-//        // nothing we can do to make this an exact method.
-//        return lvConsumerIndex() == lvProducerIndex();
-//    }
+    private final void unpark(Object node) {
+        final Object thread = lpThread(node);
+        soThread(node, null);
+        UNSAFE.unpark(thread);
+    }
 
-    public boolean hasPendingMessages() {
+    @Override
+    public final boolean isEmpty() {
+        // Order matters!
+        // Loading consumer before producer allows for producer increments after consumer index is read.
+        // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
+        // nothing we can do to make this an exact method.
+        return lvConsumerIndex() == lvProducerIndex();
+    }
+
+    public final boolean hasPendingMessages() {
         // count the number of consumers waiting, it should be the same as the number of threads configured
-//        return this.consumersWaiting.size() == this.numberConsumerThreads;
-//        return false;
-
         long consumerIndex = lvConsumerIndex();
         long producerIndex = lvProducerIndex();
 
         if (consumerIndex != producerIndex) {
             final Object previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
-            if (previousElement != null && lpType(previousElement) == TYPE_CONSUMER && consumerIndex + this.size == producerIndex) {
+            if (previousElement != null && lpType(previousElement) == TYPE_CONSUMER && consumerIndex + this.consumerCount == producerIndex) {
                 return false;
             }
         }
@@ -482,75 +367,158 @@ public final class SimpleQueue extends MpmcArrayQueueConsumerField<Node> {
         return true;
     }
 
-    public void tryTransfer(Runnable runnable, long timeout, TimeUnit unit) throws InterruptedException {
-        // TODO Auto-generated method stub
+
+
+
+
+
+
+
+    public void tryTransfer(Runnable runnable, long timeout, TimeUnit unit) {
     }
 
-    public final void park(final Object node, final Thread myThread, final boolean timed, final long nanos) throws InterruptedException {
-        ThreadLocalRandom randomYields = null; // bound if needed
-
-
-//          long lastTime = timed ? System.nanoTime() : 0;
-//          int spins = timed ? maxTimedSpins : maxUntimedSpins;
-//          int spins = maxTimedSpins;
-          int spins = 51200;
-
-//                      if (timed) {
-//                          long now = System.nanoTime();
-//                          nanos -= now - lastTime;
-//                          lastTime = now;
-//                          if (nanos <= 0) {
-////                              s.tryCancel(e);
-//                              continue;
-//                          }
-//                      }
-
-      for (;;) {
-          if (lvThread(node) == null) {
-              return;
-          } else if (spins > 0) {
-//              if (randomYields == null) {
-//                  randomYields = ThreadLocalRandom.current();
-//              } else if (randomYields.nextInt(spins) == 0) {
-//                  Thread.yield();  // occasionally yield
-//              }
-              --spins;
-          } else if (myThread.isInterrupted()) {
-              Thread.interrupted();
-              throw new InterruptedException();
-          } else {
-              // park can return for NO REASON (must check for thread values)
-              UNSAFE.park(false, 0L);
-          }
-      }
-  }
-
-    public void unpark(Object node) {
-        final Object thread = lpThread(node);
-        soThread(node, null);
-        UNSAFE.unpark(thread);
-    }
 
     @Override
-    public boolean offer(Node message) {
+    public boolean offer(Object message) {
         // TODO Auto-generated method stub
         return false;
     }
 
     @Override
-    public Node poll() {
+    public Object poll() {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Node peek() {
-        // TODO Auto-generated method stub
-        return null;
+    public Object peek() {
+        long currConsumerIndex;
+        Object e;
+        do {
+            currConsumerIndex = lvConsumerIndex();
+            // other consumers may have grabbed the element, or queue might be empty
+            e = lpElementNoCast(calcElementOffset(currConsumerIndex));
+            // only return null if queue is empty
+        } while (e == null && currConsumerIndex != lvProducerIndex());
+        return e;
     }
 
     @Override
     public int size() {
+        /*
+         * It is possible for a thread to be interrupted or reschedule between the read of the producer and
+         * consumer indices, therefore protection is required to ensure size is within valid range. In the
+         * event of concurrent polls/offers to this method the size is OVER estimated as we read consumer
+         * index BEFORE the producer index.
+         */
+        long after = lvConsumerIndex();
+        while (true) {
+            final long before = after;
+            final long currentProducerIndex = lvProducerIndex();
+            after = lvConsumerIndex();
+            if (before == after) {
+                return (int) (currentProducerIndex - after);
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    @Override
+    public void put(Object e) throws InterruptedException {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public boolean offer(Object e, long timeout, TimeUnit unit) throws InterruptedException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public Object poll(long timeout, TimeUnit unit) throws InterruptedException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public int remainingCapacity() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public int drainTo(Collection c) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public int drainTo(Collection c, int maxElements) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public Object[] toArray(Object[] a) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean containsAll(Collection c) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean addAll(Collection c) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean removeAll(Collection c) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean retainAll(Collection c) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean tryTransfer(Object e) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean tryTransfer(Object e, long timeout, TimeUnit unit) throws InterruptedException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public boolean hasWaitingConsumer() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public int getWaitingConsumerCount() {
         // TODO Auto-generated method stub
         return 0;
     }

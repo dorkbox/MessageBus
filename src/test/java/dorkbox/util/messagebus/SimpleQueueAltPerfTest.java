@@ -1,50 +1,70 @@
-/*
- * Copyright 2012 Real Logic Ltd.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
- * obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
- */
 package dorkbox.util.messagebus;
 
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.simpleq.Node;
+import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 import dorkbox.util.messagebus.common.simpleq.jctools.SimpleQueue;
 
 public class SimpleQueueAltPerfTest {
-    // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 10;
+    public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
-    public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
+    public static final int QUEUE_CAPACITY = 1 << 17;
 
-    private static final int concurrency = 8;
+    private static final int concurrency = 2;
 
     public static void main(final String[] args) throws Exception {
         System.out.println(VMSupport.vmDetails());
         System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
 
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-        final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
 
-        final long[] results = new long[20];
-        for (int i = 0; i < 20; i++) {
+        final int warmupRuns = 2;
+        final int runs = 5;
+
+        long average = 0;
+
+        final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
+        average = averageRun(warmupRuns, runs, queue);
+
+//        SimpleQueue.INPROGRESS_SPINS = 64;
+//        SimpleQueue.POP_SPINS = 512;
+//        SimpleQueue.PUSH_SPINS = 512;
+//        SimpleQueue.PARK_SPINS = 512;
+//
+//        for (int i = 128; i< 10000;i++) {
+//            int full = 2*i;
+//
+//            final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
+//            SimpleQueue.PARK_SPINS = full;
+//
+//
+//            long newAverage = averageRun(warmupRuns, runs, queue);
+//            if (newAverage > average) {
+//                average = newAverage;
+//                System.err.println("Best value: " + i + "  : " + newAverage);
+//            }
+//        }
+
+
+        System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
+    }
+
+    private static long averageRun(int warmUpRuns, int sumCount, SimpleQueue queue) throws Exception {
+        int runs = warmUpRuns + sumCount;
+        final long[] results = new long[runs];
+        for (int i = 0; i < runs; i++) {
             System.gc();
             results[i] = performanceRun(i, queue);
         }
-        // only average last 10 results for summary
+        // only average last X results for summary
         long sum = 0;
-        for (int i = 10; i < 20; i++) {
+        for (int i = warmUpRuns; i < runs; i++) {
             sum += results[i];
         }
-        System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
+
+        return sum/sumCount;
     }
 
     private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
@@ -109,13 +129,9 @@ public class SimpleQueueAltPerfTest {
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
-            try {
-                do {
-                    producer.put(TEST_VALUE);
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            do {
+                producer.transfer(TEST_VALUE);
+            } while (0 != --i);
         }
     }
 
@@ -134,13 +150,9 @@ public class SimpleQueueAltPerfTest {
             Object result = null;
             int i = REPETITIONS;
 
-            try {
-                do {
-                    result = consumer.take();
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            do {
+                result = consumer.take();
+            } while (0 != --i);
 
             this.result = result;
             this.end = System.nanoTime();

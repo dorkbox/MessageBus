@@ -24,19 +24,6 @@ import dorkbox.util.messagebus.subscription.Subscription;
  */
 public class MultiMBassador implements IMessageBus {
 
-    /** The number of CPUs, for spin control */
-    private static final int NCPUS = Runtime.getRuntime().availableProcessors();
-
-    /**
-     * The number of times to spin before blocking.
-     *
-     * The value is empirically derived -- it works well across a
-     * variety of processors and OSes. Empirically, the best value
-     * seems not to vary with number of CPUs (beyond 2) so is just
-     * a constant.
-     */
-    private static final int maxSpins = NCPUS < 2 ? 0 : 32*16;
-
     // error handling is first-class functionality
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
@@ -103,15 +90,10 @@ public class MultiMBassador implements IMessageBus {
 //                    TransferQueue<Runnable> IN_QUEUE = MultiMBassador.this.dispatchQueue;
 
                     Object message1;
-                    try {
-                        while (true) {
-                            message1 = IN_QUEUE.take();
-                            publish(message1);
-                        }
-                  } catch (InterruptedException e) {
-                      Thread.interrupted();
-                      return;
-                  }
+                    while (true) {
+                        message1 = IN_QUEUE.take();
+                        publish(message1);
+                    }
                 }
             };
 
@@ -413,22 +395,22 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publishAsync(final Object message) {
         if (message != null) {
-            Runnable runnable = new Runnable() {
-                @Override
-                public void run() {
-                    MultiMBassador.this.publish(message);
-                }
-            };
+//            Runnable runnable = new Runnable() {
+//                @Override
+//                public void run() {
+//                    MultiMBassador.this.publish(message);
+//                }
+//            };
 
-            try {
+//            try {
 //              this.dispatchQueue.transfer(runnable);
-              this.dispatchQueue.put(message);
-          } catch (InterruptedException e) {
-              handlePublicationError(new PublicationError()
-                  .setMessage("Error while adding an asynchronous message")
-                  .setCause(e)
-                  .setPublishedObject(message));
-          }
+              this.dispatchQueue.transfer(message);
+//          } catch (InterruptedException e) {
+//              handlePublicationError(new PublicationError()
+//                  .setMessage("Error while adding an asynchronous message")
+//                  .setCause(e)
+//                  .setPublishedObject(message));
+//          }
         }
     }
 
@@ -442,14 +424,14 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
-                this.dispatchQueue.put(runnable);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2));
-            }
+//            try {
+                this.dispatchQueue.transfer(runnable);
+//            } catch (InterruptedException e) {
+//                handlePublicationError(new PublicationError()
+//                    .setMessage("Error while adding an asynchronous message")
+//                    .setCause(e)
+//                    .setPublishedObject(message1, message2));
+//            }
         }
     }
 
@@ -464,14 +446,14 @@ public class MultiMBassador implements IMessageBus {
             };
 
 
-            try {
-                this.dispatchQueue.put(runnable);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2, message3));
-            }
+//            try {
+                this.dispatchQueue.transfer(runnable);
+//            } catch (InterruptedException e) {
+//                handlePublicationError(new PublicationError()
+//                    .setMessage("Error while adding an asynchronous message")
+//                    .setCause(e)
+//                    .setPublishedObject(message1, message2, message3));
+//            }
         }
     }
 
@@ -485,14 +467,14 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
+//            try {
                 this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message));
-            }
+//            } catch (InterruptedException e) {
+//                handlePublicationError(new PublicationError()
+//                    .setMessage("Error while adding an asynchronous message")
+//                    .setCause(e)
+//                    .setPublishedObject(message));
+//            }
         }
     }
     @Override
@@ -505,14 +487,14 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
+//            try {
                 this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2));
-            }
+//            } catch (InterruptedException e) {
+//                handlePublicationError(new PublicationError()
+//                    .setMessage("Error while adding an asynchronous message")
+//                    .setCause(e)
+//                    .setPublishedObject(message1, message2));
+//            }
         }
     }
 
@@ -527,14 +509,14 @@ public class MultiMBassador implements IMessageBus {
                 }
             };
 
-            try {
+//            try {
                 this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-            } catch (InterruptedException e) {
-                handlePublicationError(new PublicationError()
-                    .setMessage("Error while adding an asynchronous message")
-                    .setCause(e)
-                    .setPublishedObject(message1, message2, message3));
-            }
+//            } catch (InterruptedException e) {
+//                handlePublicationError(new PublicationError()
+//                    .setMessage("Error while adding an asynchronous message")
+//                    .setCause(e)
+//                    .setPublishedObject(message1, message2, message3));
+//            }
         }
     }
 }
