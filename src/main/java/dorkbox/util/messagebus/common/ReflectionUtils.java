@@ -17,10 +17,12 @@ import dorkbox.util.messagebus.annotations.Handler;
 public class ReflectionUtils {
 
     public static StrongConcurrentSetV8<Method> getMethods(Class<?> target) {
-        return getMethods(target, new StrongConcurrentSetV8<Method>(16, .8F, 1));
+        StrongConcurrentSetV8<Method> hashSet = new StrongConcurrentSetV8<Method>(16, .8F, 1);
+        getMethods(target, hashSet);
+        return hashSet;
     }
 
-    public static StrongConcurrentSetV8<Method> getMethods(Class<?> target, StrongConcurrentSetV8<Method> methods) {
+    private static void getMethods(Class<?> target, StrongConcurrentSetV8<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -33,7 +35,6 @@ public class ReflectionUtils {
         if (!target.equals(Object.class)) {
             getMethods(target.getSuperclass(), methods);
         }
-        return methods;
     }
 
     /**

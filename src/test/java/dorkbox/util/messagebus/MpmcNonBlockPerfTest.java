@@ -3,16 +3,16 @@ package dorkbox.util.messagebus;
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.util.VMSupport;
 
+import dorkbox.util.messagebus.common.simpleq.jctools.MpmcTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.Node;
-import dorkbox.util.messagebus.common.simpleq.jctools.SimpleQueue;
 
-public class SimpleQueueAltPerfTest {
+public class MpmcNonBlockPerfTest {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << 17;
 
-    private static final int concurrency = 2;
+    private static final int concurrency = 4;
 
     public static void main(final String[] args) throws Exception {
         System.out.println(VMSupport.vmDetails());
@@ -25,7 +25,7 @@ public class SimpleQueueAltPerfTest {
 
         long average = 0;
 
-        final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
+        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(QUEUE_CAPACITY);
         average = averageRun(warmupRuns, runs, queue);
 
 //        SimpleQueue.INPROGRESS_SPINS = 64;
@@ -51,7 +51,7 @@ public class SimpleQueueAltPerfTest {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    private static long averageRun(int warmUpRuns, int sumCount, SimpleQueue queue) throws Exception {
+    private static long averageRun(int warmUpRuns, int sumCount, MpmcTransferArrayQueue queue) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -67,7 +67,7 @@ public class SimpleQueueAltPerfTest {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, SimpleQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, MpmcTransferArrayQueue queue) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -116,42 +116,48 @@ public class SimpleQueueAltPerfTest {
     }
 
     public static class Producer implements Runnable {
-        private final SimpleQueue queue;
+        private final MpmcTransferArrayQueue queue;
         volatile long start;
 
-        public Producer(SimpleQueue queue) {
+        public Producer(MpmcTransferArrayQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            SimpleQueue producer = this.queue;
+            MpmcTransferArrayQueue producer = this.queue;
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
-            do {
-                producer.transfer(TEST_VALUE);
-            } while (0 != --i);
+            try {
+                do {
+                    producer.put(TEST_VALUE);
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     public static class Consumer implements Runnable {
-        private final SimpleQueue queue;
+        private final MpmcTransferArrayQueue queue;
         Object result;
         volatile long end;
 
-        public Consumer(SimpleQueue queue) {
+        public Consumer(MpmcTransferArrayQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            SimpleQueue consumer = this.queue;
+            MpmcTransferArrayQueue consumer = this.queue;
             Object result = null;
             int i = REPETITIONS;
 
             do {
-                result = consumer.take();
+                while((result = consumer.poll()) == null) {
+                   Thread.yield();
+                }
             } while (0 != --i);
 
             this.result = result;

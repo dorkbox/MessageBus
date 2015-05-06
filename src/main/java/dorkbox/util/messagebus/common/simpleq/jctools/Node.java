@@ -1,8 +1,7 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
 import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
-
-import com.lmax.disruptor.MessageType;
+import dorkbox.util.messagebus.common.simpleq.MessageType;
 
 abstract class ColdItems {
     public int type = 0;

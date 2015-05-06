@@ -1,4 +1,4 @@
-package com.lmax.disruptor;
+package dorkbox.util.messagebus.common.simpleq;
 /**
  * @author dorkbox, llc
  *         Date: 2/2/15
