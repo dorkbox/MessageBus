@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.common.simpleq.jctools;
+package dorkbox.util.messagebus.common.simpleq;
 
 import org.jctools.util.UnsafeAccess;
 

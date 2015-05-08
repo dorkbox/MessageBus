@@ -11,7 +11,7 @@ import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
-import dorkbox.util.messagebus.common.simpleq.jctools.MpmcTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.MpmcTransferArrayQueue;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -25,17 +25,13 @@ import dorkbox.util.messagebus.subscription.Subscription;
  */
 public class MultiMBassador implements IMessageBus {
 
-    // error handling is first-class functionality
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
-//    private final TransferQueue<Runnable> dispatchQueue;
     private final MpmcTransferArrayQueue dispatchQueue;
 
     private final SubscriptionManager subscriptionManager;
 
-    // all threads that are available for asynchronous message dispatching
-//    private final int numberOfThreads;
     private final Collection<Thread> threads;
 
     /**
@@ -44,6 +40,11 @@ public class MultiMBassador implements IMessageBus {
      * system. By default, this is FALSE, to support subTypes and VarArg matching.
      */
     private final boolean forceExactMatches = false;
+
+    /**
+     * Notifies the consumers that the messagebus is shutting down.
+     */
+    private volatile boolean shuttingDown;
 
 
     /**
@@ -73,9 +74,6 @@ public class MultiMBassador implements IMessageBus {
         }
         numberOfThreads = Pow2.roundToPowerOfTwo(numberOfThreads);
 
-//        this.numberOfThreads = numberOfThreads;
-
-//        this.dispatchQueue = new LinkedTransferQueue<Runnable>();
         this.dispatchQueue = new MpmcTransferArrayQueue(numberOfThreads);
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
@@ -88,12 +86,22 @@ public class MultiMBassador implements IMessageBus {
                 @Override
                 public void run() {
                     MpmcTransferArrayQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
-//                    TransferQueue<Runnable> IN_QUEUE = MultiMBassador.this.dispatchQueue;
 
-                    Object message1;
-                    while (true) {
-                        message1 = IN_QUEUE.take();
-                        publish(message1);
+                    Object message1 = null;
+                    while (!MultiMBassador.this.shuttingDown) {
+                        try {
+                            while (true) {
+                                message1 = IN_QUEUE.take();
+                                publish(message1);
+                            }
+                        } catch (InterruptedException e) {
+                            if (!MultiMBassador.this.shuttingDown) {
+                                handlePublicationError(new PublicationError()
+                                    .setMessage("Thread interupted while processing message")
+                                    .setCause(e)
+                                    .setPublishedObject(message1));
+                            }
+                        }
                     }
                 }
             };
@@ -132,12 +140,12 @@ public class MultiMBassador implements IMessageBus {
 
     @Override
     public boolean hasPendingMessages() {
-//        return this.dispatchQueue.getWaitingConsumerCount() != this.numberOfThreads;
         return this.dispatchQueue.hasPendingMessages();
     }
 
     @Override
     public void shutdown() {
+        this.shuttingDown = true;
         for (Thread t : this.threads) {
             t.interrupt();
         }
@@ -396,22 +404,14 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publishAsync(final Object message) {
         if (message != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message);
-//                }
-//            };
-
-//            try {
-//              this.dispatchQueue.transfer(runnable);
-              this.dispatchQueue.transfer(message);
-//          } catch (InterruptedException e) {
-//              handlePublicationError(new PublicationError()
-//                  .setMessage("Error while adding an asynchronous message")
-//                  .setCause(e)
-//                  .setPublishedObject(message));
-//          }
+            try {
+                this.dispatchQueue.transfer(message);
+            } catch (InterruptedException e) {
+                handlePublicationError(new PublicationError()
+                .setMessage("Error while adding an asynchronous message")
+                .setCause(e)
+                .setPublishedObject(message));
+            }
         }
     }
 

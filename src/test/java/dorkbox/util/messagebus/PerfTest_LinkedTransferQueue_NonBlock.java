@@ -1,54 +1,54 @@
-/*
- * Copyright 2012 Real Logic Ltd.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
- * obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
- */
 package dorkbox.util.messagebus;
 
 import java.util.concurrent.LinkedTransferQueue;
 
 public class PerfTest_LinkedTransferQueue_NonBlock {
-    // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
+    public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
-    public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
+    public static final int QUEUE_CAPACITY = 1 << 17;
 
     private static final int concurrency = 4;
 
     public static void main(final String[] args) throws Exception {
-        System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-        final LinkedTransferQueue queue = new LinkedTransferQueue();
+        System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
-        final long[] results = new long[20];
-        for (int i = 0; i < 20; i++) {
-            System.gc();
-            results[i] = performanceRun(i, queue);
-        }
-        // only average last 10 results for summary
-        long sum = 0;
-        for (int i = 10; i < 20; i++) {
-            sum += results[i];
-        }
-        System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
+        final int warmupRuns = 5;
+        final int runs = 5;
+
+        long average = 0;
+
+        final LinkedTransferQueue queue = new LinkedTransferQueue();
+        average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
+
+        System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    private static long performanceRun(int runNumber, LinkedTransferQueue queue) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, LinkedTransferQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+        int runs = warmUpRuns + sumCount;
+        final long[] results = new long[runs];
+        for (int i = 0; i < runs; i++) {
+            System.gc();
+            results[i] = performanceRun(i, queue, showStats, concurrency, repetitions);
+        }
+        // only average last X results for summary
+        long sum = 0;
+        for (int i = warmUpRuns; i < runs; i++) {
+            sum += results[i];
+        }
+
+        return sum/sumCount;
+    }
+
+    private static long performanceRun(int runNumber, LinkedTransferQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
         Thread[] threads = new Thread[concurrency*2];
 
         for (int i=0;i<concurrency;i++) {
-            producers[i] = new Producer(queue);
-            consumers[i] = new Consumer(queue);
+            producers[i] = new Producer(queue, repetitions);
+            consumers[i] = new Consumer(queue, repetitions);
         }
 
         for (int j=0,i=0;i<concurrency;i++,j+=2) {
@@ -81,29 +81,35 @@ public class PerfTest_LinkedTransferQueue_NonBlock {
 
 
         long duration = end - start;
-        long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
+        long ops = repetitions * 1_000_000_000L / duration;
         String qName = queue.getClass().getSimpleName();
 
-        System.out.format("%d - ops/sec=%,d - %s\n", runNumber, ops, qName);
+        if (showStats) {
+            System.out.format("%d - ops/sec=%,d - %s\n", runNumber, ops, qName);
+        }
         return ops;
     }
 
     public static class Producer implements Runnable {
         private final LinkedTransferQueue queue;
         volatile long start;
+        private int repetitions;
 
-        public Producer(LinkedTransferQueue queue) {
+        public Producer(LinkedTransferQueue queue, int repetitions) {
             this.queue = queue;
+            this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
             LinkedTransferQueue producer = this.queue;
-            int i = REPETITIONS;
+            int i = this.repetitions;
             this.start = System.nanoTime();
 
             do {
-                producer.put(TEST_VALUE);
+                while (!producer.offer(TEST_VALUE)) {
+                    Thread.yield();
+                }
             } while (0 != --i);
         }
     }
@@ -112,20 +118,22 @@ public class PerfTest_LinkedTransferQueue_NonBlock {
         private final LinkedTransferQueue queue;
         Object result;
         volatile long end;
+        private int repetitions;
 
-        public Consumer(LinkedTransferQueue queue) {
+        public Consumer(LinkedTransferQueue queue, int repetitions) {
             this.queue = queue;
+            this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
             LinkedTransferQueue consumer = this.queue;
             Object result = null;
-            int i = REPETITIONS;
+            int i = this.repetitions;
 
             do {
-                while((result = consumer.poll()) == null) {
-                   Thread.yield();
+                while (null == (result = consumer.poll())) {
+                    Thread.yield();
                 }
             } while (0 != --i);
 

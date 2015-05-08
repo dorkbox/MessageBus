@@ -17,7 +17,7 @@ package dorkbox.util.messagebus;
 
 import org.jctools.queues.MpmcArrayQueue;
 
-import dorkbox.util.messagebus.common.simpleq.jctools.Node;
+import dorkbox.util.messagebus.common.simpleq.Node;
 
 public class PerfTest_MpmcArrayQueue_Baseline_Node {
     // 15 == 32 * 1024

@@ -2,24 +2,20 @@ package dorkbox.util.messagebus;
 
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class PerfTest_LinkedBlockingQueue_NonBlock {
+public class PerfTest_LinkedBlockingQueue_Block {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
-
-    public static final int QUEUE_CAPACITY = 1 << 17;
 
     private static final int concurrency = 4;
 
     public static void main(final String[] args) throws Exception {
         System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
-        final int warmupRuns = 5;
+        final int warmupRuns = 4;
         final int runs = 5;
 
-        long average = 0;
-
-        final LinkedBlockingQueue queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
-        average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
+        final LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue<Integer>(concurrency);
+        long average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
@@ -106,11 +102,13 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
             int i = this.repetitions;
             this.start = System.nanoTime();
 
-            do {
-                while (!producer.offer(TEST_VALUE)) {
-                    Thread.yield();
-                }
-            } while (0 != --i);
+            try {
+                do {
+                    producer.put(TEST_VALUE);
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -131,11 +129,13 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
             Object result = null;
             int i = this.repetitions;
 
-            do {
-                while (null == (result = consumer.poll())) {
-                    Thread.yield();
-                }
-            } while (0 != --i);
+            try {
+                do {
+                    result = consumer.take();
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             this.result = result;
             this.end = System.nanoTime();

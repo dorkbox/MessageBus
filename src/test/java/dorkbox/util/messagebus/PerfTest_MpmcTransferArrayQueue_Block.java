@@ -1,30 +1,58 @@
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.LinkedBlockingQueue;
+import org.openjdk.jol.info.ClassLayout;
+import org.openjdk.jol.util.VMSupport;
 
-public class PerfTest_LinkedBlockingQueue_NonBlock {
+import dorkbox.util.messagebus.common.simpleq.MpmcTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.Node;
+
+public class PerfTest_MpmcTransferArrayQueue_Block {
+//    static {
+//        System.setProperty("sparse.shift", "2");
+//    }
+
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
-
-    public static final int QUEUE_CAPACITY = 1 << 17;
 
     private static final int concurrency = 4;
 
     public static void main(final String[] args) throws Exception {
+
+        System.out.println(VMSupport.vmDetails());
+        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
+
         System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
-        final int warmupRuns = 5;
+        final int warmupRuns = 4;
         final int runs = 5;
 
-        long average = 0;
+        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(concurrency);
+        long average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
-        final LinkedBlockingQueue queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
-        average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
+//        SimpleQueue.INPROGRESS_SPINS = 64;
+//        SimpleQueue.POP_SPINS = 512;
+//        SimpleQueue.PUSH_SPINS = 512;
+//        SimpleQueue.PARK_SPINS = 512;
+//
+//        for (int i = 128; i< 10000;i++) {
+//            int full = 2*i;
+//
+//            final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
+//            SimpleQueue.PARK_SPINS = full;
+//
+//
+//            long newAverage = averageRun(warmupRuns, runs, queue);
+//            if (newAverage > average) {
+//                average = newAverage;
+//                System.err.println("Best value: " + i + "  : " + newAverage);
+//            }
+//        }
+
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -40,7 +68,7 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -91,51 +119,60 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final MpmcTransferArrayQueue queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(LinkedBlockingQueue queue, int repetitions) {
+        public Producer(MpmcTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue producer = this.queue;
+            MpmcTransferArrayQueue producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
-            do {
-                while (!producer.offer(TEST_VALUE)) {
-                    Thread.yield();
-                }
-            } while (0 != --i);
+            try {
+                do {
+                    producer.transfer(TEST_VALUE);
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                // log.error(e);
+            }
         }
     }
 
     public static class Consumer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final MpmcTransferArrayQueue queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(LinkedBlockingQueue queue, int repetitions) {
+        public Consumer(MpmcTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue consumer = this.queue;
+            MpmcTransferArrayQueue consumer = this.queue;
             Object result = null;
             int i = this.repetitions;
 
-            do {
-                while (null == (result = consumer.poll())) {
-                    Thread.yield();
-                }
-            } while (0 != --i);
+            Node node = new Node();
+            try {
+                do {
+                    result = consumer.take(node);
+                } while (0 != --i);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                // log.error(e);
+            }
 
             this.result = result;
             this.end = System.nanoTime();
