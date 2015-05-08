@@ -7,26 +7,31 @@ import dorkbox.util.messagebus.common.simpleq.jctools.MpmcTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
 public class PerfTest_MpmcTransferArrayQueue {
+//    static {
+//        System.setProperty("sparse.shift", "2");
+//    }
+
+
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << 17;
 
-    private static final int concurrency = 4;
+    private static final int concurrency = 2;
 
     public static void main(final String[] args) throws Exception {
 
         System.out.println(VMSupport.vmDetails());
         System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
 
-        System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
+        System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
-        final int warmupRuns = 2;
+        final int warmupRuns = 4;
         final int runs = 5;
 
         long average = 0;
 
-        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(QUEUE_CAPACITY);
+        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(concurrency);
         average = averageRun(warmupRuns, runs, queue);
 
 //        SimpleQueue.INPROGRESS_SPINS = 64;
@@ -151,8 +156,9 @@ public class PerfTest_MpmcTransferArrayQueue {
             Object result = null;
             int i = REPETITIONS;
 
+            Node node = new Node();
             do {
-                result = consumer.take();
+                result = consumer.take(node);
             } while (0 != --i);
 
             this.result = result;

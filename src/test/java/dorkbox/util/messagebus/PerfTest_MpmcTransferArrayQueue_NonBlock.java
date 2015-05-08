@@ -11,12 +11,12 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     private static final int concurrency = 1;
 
     public static void main(final String[] args) throws Exception {
-        final int warmupRuns = 2;
+        final int warmupRuns = 5;
         final int runs = 5;
 
         long average = 0;
 
-        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(QUEUE_CAPACITY);
+        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(concurrency, QUEUE_CAPACITY);
         average = averageRun(warmupRuns, runs, queue);
 
 //        SimpleQueue.INPROGRESS_SPINS = 64;

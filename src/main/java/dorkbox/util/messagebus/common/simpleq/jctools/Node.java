@@ -2,16 +2,14 @@ package dorkbox.util.messagebus.common.simpleq.jctools;
 
 import org.jctools.util.UnsafeAccess;
 
-import dorkbox.util.messagebus.common.simpleq.MessageType;
-
 abstract class ColdItems {
     public int type = 0;
 
-    public int messageType = MessageType.ONE;
+//    public int messageType = MessageType.ONE;
     public Object item1 = null;
-    public Object item2 = null;
-    public Object item3 = null;
-    public Object[] item4 = null;
+//    public Object item2 = null;
+//    public Object item3 = null;
+//    public Object[] item4 = null;
 }
 
 abstract class Pad0 extends ColdItems {
