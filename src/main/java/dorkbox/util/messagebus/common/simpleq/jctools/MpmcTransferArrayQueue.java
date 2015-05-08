@@ -10,15 +10,18 @@ import static dorkbox.util.messagebus.common.simpleq.jctools.Node.soThread;
 import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spItem1;
 import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spThread;
 import static dorkbox.util.messagebus.common.simpleq.jctools.Node.spType;
-import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
 
 import java.util.Collection;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TransferQueue;
 
+import org.jctools.queues.MpmcArrayQueue;
+import org.jctools.util.Pow2;
+import org.jctools.util.UnsafeAccess;
 
-public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Object> implements TransferQueue<Object> {
+
+public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> implements TransferQueue<Object> {
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_CONSUMER = 1;
     private static final int TYPE_PRODUCER = 2;
@@ -79,19 +82,127 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
      */
     @Override
     public final void transfer(final Object item) {
-        producerWait(item, false, 0L);
+        producerXfer(item, false, 0L);
     }
 
     /**
      * CONSUMER
+     * <p>
+     * Remove an item from the queue. If there are no items on the queue, wait for a producer to place an item on the queue. This will
+     * as long as necessary
      */
     @Override
     public final Object take() {
-        return consumerWait(false, 0L);
+        // local load of field to avoid repeated loads after volatile reads
+        final long mask = this.mask;
+        final long[] sBuffer = this.sequenceBuffer;
+
+        long consumerIndex;
+        long producerIndex;
+        int lastType;
+
+        while (true) {
+            consumerIndex = lvConsumerIndex();
+            producerIndex = lvProducerIndex();
+
+            final Object previousElement;
+            if (consumerIndex == producerIndex) {
+                lastType = TYPE_EMPTY;
+                previousElement = null;
+            } else {
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
+                if (previousElement == null) {
+                    // the last producer hasn't finished setting the object yet
+                    busySpin(INPROGRESS_SPINS);
+                    continue;
+                }
+
+                lastType = lpType(previousElement);
+            }
+
+            switch (lastType) {
+                case TYPE_EMPTY:
+                case TYPE_CONSUMER: {
+
+//            if (lastType != TYPE_PRODUCER) {
+                // TYPE_EMPTY, TYPE_CONSUMER
+                // empty or same mode = push+park onto queue
+                long pSeqOffset = calcSequenceOffset(producerIndex, mask);
+                final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
+                final long delta = seq - producerIndex;
+
+                if (delta == 0) {
+                    // this is expected if we see this first time around
+                    if (casProducerIndex(producerIndex, producerIndex + 1)) {
+                        // Successful CAS: full barrier
+
+                        final Thread myThread = Thread.currentThread();
+                        final Object node = nodeThreadLocal.get();
+
+                        spType(node, TYPE_CONSUMER);
+                        spThread(node, myThread);
+
+
+                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                        final long offset = calcElementOffset(producerIndex, mask);
+                        spElement(offset, node);
+
+
+                        // increment sequence by 1, the value expected by consumer
+                        // (seeing this value from a producer will lead to retry 2)
+                        soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
+
+                        park(node, myThread, false, 0L);
+                        Object item1 = lvItem1(node);
+
+                        return item1;
+                    }
+                }
+
+                // whoops, inconsistent state
+                busySpin(PUSH_SPINS);
+                continue;
+            }
+//                else {
+            case TYPE_PRODUCER: {
+                // TYPE_PRODUCER
+                // complimentary mode = pop+unpark off queue
+                long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
+                final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
+                final long delta = seq - (consumerIndex + 1);
+
+                if (delta == 0) {
+                    if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
+                        // Successful CAS: full barrier
+
+                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                        final long offset = calcElementOffset(consumerIndex, mask);
+                        final Object e = lpElement(offset);
+                        spElement(offset, null);
+
+                        // Move sequence ahead by capacity, preparing it for next offer
+                        // (seeing this value from a consumer will lead to retry 2)
+                        soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
+
+                        final Object lvItem1 = lpItem1(e);
+                        unpark(e);
+
+                        return lvItem1;
+                    }
+                }
+
+                // whoops, inconsistent state
+                busySpin(POP_SPINS);
+                continue;
+            }
+            }
+        }
     }
 
+
+    // modification of super implementation, as to include a small busySpin on contention
     @Override
-    public boolean offer(Object item) {
+    public final boolean offer(Object item) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = mask + 1;
@@ -137,6 +248,9 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
         }
     }
 
+    /**
+     * Will busy spin until timeout
+     */
     @Override
     public boolean offer(Object item, long timeout, TimeUnit unit) throws InterruptedException {
         long nanos = unit.toNanos(timeout);
@@ -188,7 +302,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                     if (remaining < SPIN_THRESHOLD) {
                         busySpin(PARK_UNTIMED_SPINS);
                     } else {
-                        UNSAFE.park(false, 1L);
+                        UnsafeAccess.UNSAFE.park(false, 1L);
                     }
                 } else {
                     return false;
@@ -251,7 +365,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
 
 
 
-
+    // modification of super implementation, as to include a small busySpin on contention
     @Override
     public Object poll() {
         // local load of field to avoid repeated loads after volatile reads
@@ -274,7 +388,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(consumerIndex, mask);
-                    final Object e = lpElementNoCast(offset);
+                    final Object e = lpElement(offset);
                     spElement(offset, null);
 
                     // Move sequence ahead by capacity, preparing it for next offer
@@ -312,7 +426,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
         do {
             currConsumerIndex = lvConsumerIndex();
             // other consumers may have grabbed the element, or queue might be empty
-            e = lpElementNoCast(calcElementOffset(currConsumerIndex));
+            e = lpElement(calcElementOffset(currConsumerIndex));
             // only return null if queue is empty
         } while (e == null && currConsumerIndex != lvProducerIndex());
         return e;
@@ -356,7 +470,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                 lastType = TYPE_EMPTY;
                 previousElement = null;
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
                     busySpin(INPROGRESS_SPINS);
@@ -366,52 +480,49 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                 lastType = lpType(previousElement);
             }
 
-            switch (lastType) {
-                case TYPE_EMPTY:
-                case TYPE_PRODUCER: {
-                    // empty or same mode = push+park onto queue
-                    long pSeqOffset = calcSequenceOffset(producerIndex, mask);
-                    final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-                    final long delta = seq - producerIndex;
+            if (lastType != TYPE_CONSUMER) {
+                // TYPE_EMPTY, TYPE_PRODUCER
+                // empty or same mode = push+park onto queue
+                long pSeqOffset = calcSequenceOffset(producerIndex, mask);
+                final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
+                final long delta = seq - producerIndex;
 
-                    if (delta == 0) {
-                        return false;
-                    }
-
-                    // whoops, inconsistent state
-                    busySpin(PUSH_SPINS);
-                    continue;
+                if (delta == 0) {
+                    // don't add to queue, abort!!
+                    return false;
                 }
-                case TYPE_CONSUMER: {
-                    // complimentary mode = pop+unpark off queue
-                    long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-                    final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-                    final long delta = seq - (consumerIndex + 1);
 
-                    if (delta == 0) {
-                        if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
-                            // Successful CAS: full barrier
+                // whoops, inconsistent state
+                busySpin(PUSH_SPINS);
+            } else {
+                // TYPE_CONSUMER
+                // complimentary mode = pop+unpark off queue
+                long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
+                final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
+                final long delta = seq - (consumerIndex + 1);
 
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(consumerIndex, mask);
-                            final Object e = lpElementNoCast(offset);
-                            spElement(offset, null);
+                if (delta == 0) {
+                    if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
+                        // Successful CAS: full barrier
 
-                            // Move sequence ahead by capacity, preparing it for next offer
-                            // (seeing this value from a consumer will lead to retry 2)
-                            soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
+                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                        final long offset = calcElementOffset(consumerIndex, mask);
+                        final Object e = lpElement(offset);
+                        spElement(offset, null);
 
-                            soItem1(e, item);
-                            unpark(e);
+                        // Move sequence ahead by capacity, preparing it for next offer
+                        // (seeing this value from a consumer will lead to retry 2)
+                        soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
 
-                            return true;
-                        }
+                        soItem1(e, item);
+                        unpark(e);
+
+                        return true;
                     }
-
-                    // whoops, inconsistent state
-                    busySpin(POP_SPINS);
-                    continue;
                 }
+
+                // whoops, inconsistent state
+                busySpin(POP_SPINS);
             }
         }
     }
@@ -419,97 +530,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
     @Override
     public boolean tryTransfer(Object item, long timeout, TimeUnit unit) throws InterruptedException {
         long nanos = unit.toNanos(timeout);
-        long lastTime = System.nanoTime();
-
-        // local load of field to avoid repeated loads after volatile reads
-        final long mask = this.mask;
-        final long[] sBuffer = this.sequenceBuffer;
-
-        long consumerIndex;
-        long producerIndex;
-        int lastType;
-
-        while (true) {
-            consumerIndex = lvConsumerIndex();
-            producerIndex = lvProducerIndex();
-
-            final Object previousElement;
-            if (consumerIndex == producerIndex) {
-                lastType = TYPE_EMPTY;
-                previousElement = null;
-            } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
-                if (previousElement == null) {
-                    // the last producer hasn't finished setting the object yet
-                    busySpin(INPROGRESS_SPINS);
-                    continue;
-                }
-
-                lastType = lpType(previousElement);
-            }
-
-            switch (lastType) {
-                case TYPE_EMPTY:
-                case TYPE_PRODUCER: {
-                    // empty or same mode = push+park onto queue
-                    long pSeqOffset = calcSequenceOffset(producerIndex, mask);
-                    final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-                    final long delta = seq - producerIndex;
-
-                    if (delta == 0) {
-                        long now = System.nanoTime();
-                        long remaining = nanos -= now - lastTime;
-                        lastTime = now;
-
-                        if (remaining > 0) {
-                            if (remaining < SPIN_THRESHOLD) {
-                                busySpin(PARK_UNTIMED_SPINS);
-                            } else {
-                                UNSAFE.park(false, 1L);
-                            }
-                            // make sure to continue here (so we don't spin twice)
-                            continue;
-                        } else {
-                            return false;
-                        }
-                    }
-
-                    // whoops, inconsistent state
-                    busySpin(PUSH_SPINS);
-                    continue;
-                }
-                case TYPE_CONSUMER: {
-                    // complimentary mode = pop+unpark off queue
-                    long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-                    final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-                    final long delta = seq - (consumerIndex + 1);
-
-                    if (delta == 0) {
-                        if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
-                            // Successful CAS: full barrier
-
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(consumerIndex, mask);
-                            final Object e = lpElementNoCast(offset);
-                            spElement(offset, null);
-
-                            // Move sequence ahead by capacity, preparing it for next offer
-                            // (seeing this value from a consumer will lead to retry 2)
-                            soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
-
-                            soItem1(e, item);
-                            unpark(e);
-
-                            return true;
-                        }
-                    }
-
-                    // whoops, inconsistent state
-                    busySpin(POP_SPINS);
-                    continue;
-                }
-            }
-        }
+        return producerXfer(item, true, nanos);
     }
 
     @Override
@@ -537,7 +558,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
 
                     // on 64bit(no compressed oops) JVM this is the same as seqOffset
                     final long offset = calcElementOffset(consumerIndex, mask);
-                    final Object e = lpElementNoCast(offset);
+                    final Object e = lpElement(offset);
                     spElement(offset, null);
 
                     // Move sequence ahead by capacity, preparing it for next offer
@@ -560,7 +581,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                     if (remaining < SPIN_THRESHOLD) {
                         busySpin(PARK_UNTIMED_SPINS);
                     } else {
-                        UNSAFE.park(false, 1L);
+                        UnsafeAccess.UNSAFE.park(false, 1L);
                     }
                     // make sure to continue here (so we don't spin twice)
                     continue;
@@ -635,7 +656,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
             if (consumerIndex == producerIndex) {
                 return false;
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
                     busySpin(INPROGRESS_SPINS);
@@ -660,7 +681,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
             if (consumerIndex == producerIndex) {
                 return 0;
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
                     busySpin(INPROGRESS_SPINS);
@@ -689,7 +710,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
             if (consumerIndex == producerIndex) {
                 return true;
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
                     busySpin(INPROGRESS_SPINS);
@@ -711,17 +732,21 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
         }
     }
 
+
+    /**
+     * @return true if the park was correctly unparked. false if there was an interruption or a timed-park expired
+     */
     @SuppressWarnings("null")
-    private final void park(final Object node, final Thread myThread, final boolean timed, long nanos) {
-        long lastTime = timed ? System.nanoTime() : 0L;
+    private final boolean park(final Object node, final Thread myThread, final boolean timed, long nanos) {
+        long lastTime = System.nanoTime();
         int spins = -1; // initialized after first item and cancel checks
         ThreadLocalRandom randomYields = null; // bound if needed
 
         for (;;) {
             if (lvThread(node) == null) {
-                return;
+                return true;
             } else if (myThread.isInterrupted() || timed && nanos <= 0) {
-                return;
+                return false;
             } else if (spins < 0) {
                 if (timed) {
                     spins = PARK_TIMED_SPINS;
@@ -743,16 +768,17 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                 lastTime = now;
                 if (remaining > 0) {
                     if (remaining < SPIN_THRESHOLD) {
+                        // a park is too slow for this number, so just busy spin instead
                         busySpin(PARK_UNTIMED_SPINS);
                     } else {
-                        UNSAFE.park(false, nanos);
+                        UnsafeAccess.UNSAFE.park(false, nanos);
                     }
                 } else {
-                    return;
+                    return false;
                 }
             } else {
                 // park can return for NO REASON (must check for thread values)
-                UNSAFE.park(false, 0L);
+                UnsafeAccess.UNSAFE.park(false, 0L);
             }
         }
     }
@@ -760,10 +786,14 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
     private final void unpark(Object node) {
         final Object thread = lpThread(node);
         soThread(node, null);
-        UNSAFE.unpark(thread);
+        UnsafeAccess.UNSAFE.unpark(thread);
     }
 
-    private final void producerWait(final Object item, final boolean timed, final long nanos) {
+    /**
+     * @return true if the producer successfully transferred an item (either through waiting for a consumer that took it, or transferring
+     *               directly to an already waiting consumer). false if the thread was interrupted, or it was timed and has expired.
+     */
+    private final boolean producerXfer(final Object item, final boolean timed, final long nanos) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long[] sBuffer = this.sequenceBuffer;
@@ -781,7 +811,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                 lastType = TYPE_EMPTY;
                 previousElement = null;
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
+                previousElement = lpElement(calcElementOffset(producerIndex-1));
                 if (previousElement == null) {
                     // the last producer hasn't finished setting the object yet
                     busySpin(INPROGRESS_SPINS);
@@ -791,177 +821,70 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueueConsumerField<Ob
                 lastType = lpType(previousElement);
             }
 
-            switch (lastType) {
-                case TYPE_EMPTY:
-                case TYPE_PRODUCER: {
-                    // empty or same mode = push+park onto queue
-                    long pSeqOffset = calcSequenceOffset(producerIndex, mask);
-                    final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-                    final long delta = seq - producerIndex;
+            if (lastType != TYPE_CONSUMER) {
+                // TYPE_EMPTY, TYPE_PRODUCER
+                // empty or same mode = push+park onto queue
+                long pSeqOffset = calcSequenceOffset(producerIndex, mask);
+                final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
+                final long delta = seq - producerIndex;
 
-                    if (delta == 0) {
-                        // this is expected if we see this first time around
-                        if (casProducerIndex(producerIndex, producerIndex + 1)) {
-                            // Successful CAS: full barrier
+                if (delta == 0) {
+                    // this is expected if we see this first time around
+                    if (casProducerIndex(producerIndex, producerIndex + 1)) {
+                        // Successful CAS: full barrier
 
-                            final Thread myThread = Thread.currentThread();
-                            final Object node = nodeThreadLocal.get();
+                        final Thread myThread = Thread.currentThread();
+                        final Object node = nodeThreadLocal.get();
 
-                            spType(node, TYPE_PRODUCER);
-                            spThread(node, myThread);
-                            spItem1(node, item);
-
-
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(producerIndex, mask);
-                            spElement(offset, node);
+                        spType(node, TYPE_PRODUCER);
+                        spThread(node, myThread);
+                        spItem1(node, item);
 
 
-                            // increment sequence by 1, the value expected by consumer
-                            // (seeing this value from a producer will lead to retry 2)
-                            soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
+                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                        final long offset = calcElementOffset(producerIndex, mask);
+                        spElement(offset, node);
 
-                            park(node, myThread, timed, nanos);
-                            return;
-                        }
+
+                        // increment sequence by 1, the value expected by consumer
+                        // (seeing this value from a producer will lead to retry 2)
+                        soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
+
+                        return park(node, myThread, timed, nanos);
                     }
-
-                    // whoops, inconsistent state
-                    busySpin(PUSH_SPINS);
-                    continue;
                 }
-                case TYPE_CONSUMER: {
-                    // complimentary mode = pop+unpark off queue
-                    long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-                    final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-                    final long delta = seq - (consumerIndex + 1);
 
-                    if (delta == 0) {
-                        if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
-                            // Successful CAS: full barrier
-
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(consumerIndex, mask);
-                            final Object e = lpElementNoCast(offset);
-                            spElement(offset, null);
-
-                            // Move sequence ahead by capacity, preparing it for next offer
-                            // (seeing this value from a consumer will lead to retry 2)
-                            soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
-
-                            soItem1(e, item);
-                            unpark(e);
-
-                            return;
-                        }
-                    }
-
-                    // whoops, inconsistent state
-                    busySpin(POP_SPINS);
-                    continue;
-                }
-            }
-        }
-    }
-
-    private final Object consumerWait(final boolean timed, final long nanos) {
-        // local load of field to avoid repeated loads after volatile reads
-        final long mask = this.mask;
-        final long[] sBuffer = this.sequenceBuffer;
-
-        long consumerIndex;
-        long producerIndex;
-        int lastType;
-
-        while (true) {
-            consumerIndex = lvConsumerIndex();
-            producerIndex = lvProducerIndex();
-
-            final Object previousElement;
-            if (consumerIndex == producerIndex) {
-                lastType = TYPE_EMPTY;
-                previousElement = null;
+                // whoops, inconsistent state
+                busySpin(PUSH_SPINS);
             } else {
-                previousElement = lpElementNoCast(calcElementOffset(producerIndex-1));
-                if (previousElement == null) {
-                    // the last producer hasn't finished setting the object yet
-                    busySpin(INPROGRESS_SPINS);
-                    continue;
-                }
+                // TYPE_CONSUMER
+                // complimentary mode = pop+unpark off queue
+                long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
+                final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
+                final long delta = seq - (consumerIndex + 1);
 
-                lastType = lpType(previousElement);
-            }
+                if (delta == 0) {
+                    if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
+                        // Successful CAS: full barrier
 
-            switch (lastType) {
-                case TYPE_EMPTY:
-                case TYPE_CONSUMER: {
-                    // empty or same mode = push+park onto queue
-                    long pSeqOffset = calcSequenceOffset(producerIndex, mask);
-                    final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-                    final long delta = seq - producerIndex;
+                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
+                        final long offset = calcElementOffset(consumerIndex, mask);
+                        final Object e = lpElement(offset);
+                        spElement(offset, null);
 
-                    if (delta == 0) {
-                        // this is expected if we see this first time around
-                        if (casProducerIndex(producerIndex, producerIndex + 1)) {
-                            // Successful CAS: full barrier
+                        // Move sequence ahead by capacity, preparing it for next offer
+                        // (seeing this value from a consumer will lead to retry 2)
+                        soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
 
-                            final Thread myThread = Thread.currentThread();
-                            final Object node = nodeThreadLocal.get();
+                        soItem1(e, item);
+                        unpark(e);
 
-                            spType(node, TYPE_CONSUMER);
-                            spThread(node, myThread);
-
-
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(producerIndex, mask);
-                            spElement(offset, node);
-
-
-                            // increment sequence by 1, the value expected by consumer
-                            // (seeing this value from a producer will lead to retry 2)
-                            soSequence(sBuffer, pSeqOffset, producerIndex + 1); // StoreStore
-
-                            park(node, myThread, timed, nanos);
-                            Object item1 = lvItem1(node);
-
-                            return item1;
-                        }
+                        return true;
                     }
-
-                    // whoops, inconsistent state
-                    busySpin(PUSH_SPINS);
-                    continue;
                 }
-                case TYPE_PRODUCER: {
-                    // complimentary mode = pop+unpark off queue
-                    long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-                    final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-                    final long delta = seq - (consumerIndex + 1);
 
-                    if (delta == 0) {
-                        if (casConsumerIndex(consumerIndex, consumerIndex + 1)) {
-                            // Successful CAS: full barrier
-
-                            // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                            final long offset = calcElementOffset(consumerIndex, mask);
-                            final Object e = lpElementNoCast(offset);
-                            spElement(offset, null);
-
-                            // Move sequence ahead by capacity, preparing it for next offer
-                            // (seeing this value from a consumer will lead to retry 2)
-                            soSequence(sBuffer, cSeqOffset, consumerIndex + mask + 1); // StoreStore
-
-                            final Object lvItem1 = lpItem1(e);
-                            unpark(e);
-
-                            return lvItem1;
-                        }
-                    }
-
-                    // whoops, inconsistent state
-                    busySpin(POP_SPINS);
-                    continue;
-                }
+                // whoops, inconsistent state
+                busySpin(POP_SPINS);
             }
         }
     }

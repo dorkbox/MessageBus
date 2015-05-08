@@ -5,12 +5,13 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
+import org.jctools.util.Pow2;
+
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcTransferArrayQueue;
-import dorkbox.util.messagebus.common.simpleq.jctools.Pow2;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;

@@ -1,25 +1,16 @@
 package dorkbox.util.messagebus;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
-
 import dorkbox.util.messagebus.common.simpleq.jctools.MpmcTransferArrayQueue;
-import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
-public class MpmcNonBlockPerfTest {
-    public static final int REPETITIONS = 50 * 1000 * 100;
+public class PerfTest_MpmcTransferArrayQueue_NonBlock {
+    public static final int REPETITIONS = 50 * 1000 * 1000;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << 17;
 
-    private static final int concurrency = 4;
+    private static final int concurrency = 1;
 
     public static void main(final String[] args) throws Exception {
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
-
-        System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-
         final int warmupRuns = 2;
         final int runs = 5;
 
@@ -129,13 +120,11 @@ public class MpmcNonBlockPerfTest {
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
-            try {
-                do {
-                    producer.put(TEST_VALUE);
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            do {
+                while (!producer.offer(TEST_VALUE)) {
+                    Thread.yield();
+                }
+            } while (0 != --i);
         }
     }
 
@@ -155,8 +144,8 @@ public class MpmcNonBlockPerfTest {
             int i = REPETITIONS;
 
             do {
-                while((result = consumer.poll()) == null) {
-                   Thread.yield();
+                while (null == (result = consumer.poll())) {
+                    Thread.yield();
                 }
             } while (0 != --i);
 

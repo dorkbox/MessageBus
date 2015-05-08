@@ -1,25 +1,23 @@
 /*
  * Copyright 2012 Real Logic Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
- * obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
-
-import dorkbox.util.messagebus.common.simpleq.jctools.Node;
-
-public class LinkTransferQueueConcurrentPerfTest {
+public class PerfTest_LinkedBlockingQueue {
     // 15 == 32 * 1024
     public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
@@ -29,11 +27,8 @@ public class LinkTransferQueueConcurrentPerfTest {
     private static final int concurrency = 2;
 
     public static void main(final String[] args) throws Exception {
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
-
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-        final LinkedTransferQueue queue = new LinkedTransferQueue();
+        final LinkedBlockingQueue queue = new LinkedBlockingQueue(1 << 17);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -48,7 +43,7 @@ public class LinkTransferQueueConcurrentPerfTest {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-    private static long performanceRun(int runNumber, LinkedTransferQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, LinkedBlockingQueue queue) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -97,41 +92,43 @@ public class LinkTransferQueueConcurrentPerfTest {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedTransferQueue queue;
+        private final LinkedBlockingQueue queue;
         volatile long start;
 
-        public Producer(LinkedTransferQueue queue) {
+        public Producer(LinkedBlockingQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            LinkedTransferQueue producer = this.queue;
+            LinkedBlockingQueue producer = this.queue;
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
             try {
                 do {
-                    producer.transfer(TEST_VALUE);
+                    producer.put(TEST_VALUE);
                 } while (0 != --i);
             } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
                 e.printStackTrace();
+                // log.error(e);
             }
         }
     }
 
     public static class Consumer implements Runnable {
-        private final LinkedTransferQueue queue;
+        private final LinkedBlockingQueue queue;
         Object result;
         volatile long end;
 
-        public Consumer(LinkedTransferQueue queue) {
+        public Consumer(LinkedBlockingQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            LinkedTransferQueue consumer = this.queue;
+            LinkedBlockingQueue consumer = this.queue;
             Object result = null;
             int i = REPETITIONS;
 
@@ -140,7 +137,9 @@ public class LinkTransferQueueConcurrentPerfTest {
                     result = consumer.take();
                 } while (0 != --i);
             } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
                 e.printStackTrace();
+                // log.error(e);
             }
 
             this.result = result;

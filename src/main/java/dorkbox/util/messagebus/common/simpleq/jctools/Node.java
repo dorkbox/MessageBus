@@ -1,6 +1,7 @@
 package dorkbox.util.messagebus.common.simpleq.jctools;
 
-import static dorkbox.util.messagebus.common.simpleq.jctools.UnsafeAccess.UNSAFE;
+import org.jctools.util.UnsafeAccess;
+
 import dorkbox.util.messagebus.common.simpleq.MessageType;
 
 abstract class ColdItems {
@@ -29,9 +30,9 @@ public class Node extends HotItem1 {
 
     static {
         try {
-            TYPE = UNSAFE.objectFieldOffset(Node.class.getField("type"));
-            ITEM1 = UNSAFE.objectFieldOffset(Node.class.getField("item1"));
-            THREAD = UNSAFE.objectFieldOffset(Node.class.getField("thread"));
+            TYPE = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("type"));
+            ITEM1 = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("item1"));
+            THREAD = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("thread"));
 
             // now make sure we can access UNSAFE
             Node node = new Node();
@@ -49,45 +50,45 @@ public class Node extends HotItem1 {
     }
 
     static final void spItem1(Object node, Object item) {
-        UNSAFE.putObject(node, ITEM1, item);
+        UnsafeAccess.UNSAFE.putObject(node, ITEM1, item);
     }
 
     static final void soItem1(Object node, Object item) {
-        UNSAFE.putOrderedObject(node, ITEM1, item);
+        UnsafeAccess.UNSAFE.putOrderedObject(node, ITEM1, item);
     }
 
     static final Object lpItem1(Object node) {
-        return UNSAFE.getObject(node, ITEM1);
+        return UnsafeAccess.UNSAFE.getObject(node, ITEM1);
     }
 
     static final Object lvItem1(Object node) {
-        return UNSAFE.getObjectVolatile(node, ITEM1);
+        return UnsafeAccess.UNSAFE.getObjectVolatile(node, ITEM1);
     }
 
     //////////////
     static final void spType(Object node, int type) {
-        UNSAFE.putInt(node, TYPE, type);
+        UnsafeAccess.UNSAFE.putInt(node, TYPE, type);
     }
 
     static final int lpType(Object node) {
-        return UNSAFE.getInt(node, TYPE);
+        return UnsafeAccess.UNSAFE.getInt(node, TYPE);
     }
 
     ///////////
     static final void spThread(Object node, Object thread) {
-        UNSAFE.putObject(node, THREAD, thread);
+        UnsafeAccess.UNSAFE.putObject(node, THREAD, thread);
     }
 
     static final void soThread(Object node, Object thread) {
-        UNSAFE.putOrderedObject(node, THREAD, thread);
+        UnsafeAccess.UNSAFE.putOrderedObject(node, THREAD, thread);
     }
 
     static final Object lpThread(Object node) {
-        return UNSAFE.getObject(node, THREAD);
+        return UnsafeAccess.UNSAFE.getObject(node, THREAD);
     }
 
     static final Object lvThread(Object node) {
-        return UNSAFE.getObjectVolatile(node, THREAD);
+        return UnsafeAccess.UNSAFE.getObjectVolatile(node, THREAD);
     }
 
 

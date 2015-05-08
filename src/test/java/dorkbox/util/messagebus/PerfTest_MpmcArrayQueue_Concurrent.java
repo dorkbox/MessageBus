@@ -1,39 +1,34 @@
 /*
  * Copyright 2012 Real Logic Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
- * obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.LinkedTransferQueue;
+import org.jctools.queues.MpmcArrayQueue;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
-
-import dorkbox.util.messagebus.common.simpleq.jctools.Node;
-
-public class LinkTransferQueueConcurrentNonBlockPerfTest {
+public class PerfTest_MpmcArrayQueue_Concurrent {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
-    private static final int concurrency = 4;
+    private static final int concurrency = 1;
 
     public static void main(final String[] args) throws Exception {
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
-
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS + "  Concurrency " + concurrency);
-        final LinkedTransferQueue queue = new LinkedTransferQueue();
+        final MpmcArrayQueue queue = new MpmcArrayQueue(1 << 17);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -48,7 +43,7 @@ public class LinkTransferQueueConcurrentNonBlockPerfTest {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-    private static long performanceRun(int runNumber, LinkedTransferQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, MpmcArrayQueue queue) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -97,43 +92,45 @@ public class LinkTransferQueueConcurrentNonBlockPerfTest {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedTransferQueue queue;
+        private final MpmcArrayQueue queue;
         volatile long start;
 
-        public Producer(LinkedTransferQueue queue) {
+        public Producer(MpmcArrayQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            LinkedTransferQueue producer = this.queue;
+            MpmcArrayQueue producer = this.queue;
             int i = REPETITIONS;
             this.start = System.nanoTime();
 
             do {
-                producer.put(TEST_VALUE);
+                while (!producer.offer(TEST_VALUE)) {
+                    Thread.yield();
+                }
             } while (0 != --i);
         }
     }
 
     public static class Consumer implements Runnable {
-        private final LinkedTransferQueue queue;
+        private final MpmcArrayQueue queue;
         Object result;
         volatile long end;
 
-        public Consumer(LinkedTransferQueue queue) {
+        public Consumer(MpmcArrayQueue queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            LinkedTransferQueue consumer = this.queue;
+            MpmcArrayQueue consumer = this.queue;
             Object result = null;
             int i = REPETITIONS;
 
             do {
-                while((result = consumer.poll()) == null) {
-                   Thread.yield();
+                while (null == (result = consumer.poll())) {
+                    Thread.yield();
                 }
             } while (0 != --i);
 

@@ -15,12 +15,11 @@
  */
 package dorkbox.util.messagebus;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
+import org.jctools.queues.MpmcArrayQueue;
 
-import dorkbox.util.messagebus.common.simpleq.jctools.MpmcArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.jctools.Node;
 
-public class MpmcQueueBaselinePerfTest {
+public class PerfTest_MpmcArrayQueue_Baseline_Node {
     // 15 == 32 * 1024
     public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
@@ -28,11 +27,8 @@ public class MpmcQueueBaselinePerfTest {
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
     public static void main(final String[] args) throws Exception {
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Integer.class).toPrintable());
-
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
-        final MpmcArrayQueue queue = new MpmcArrayQueue(QUEUE_CAPACITY);
+        final MpmcArrayQueue<Node> queue = new MpmcArrayQueue<Node>(QUEUE_CAPACITY);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -47,13 +43,13 @@ public class MpmcQueueBaselinePerfTest {
         System.out.format("summary,QueuePerfTest,%s,%d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-    private static long performanceRun(int runNumber, MpmcArrayQueue queue) throws Exception {
+    private static long performanceRun(int runNumber, MpmcArrayQueue<Node> queue) throws Exception {
         Producer p = new Producer(queue);
         Thread thread = new Thread(p);
         thread.start(); // producer will timestamp start
 
-        MpmcArrayQueue consumer = queue;
-        Object result;
+        MpmcArrayQueue<Node> consumer = queue;
+        Node result;
         int i = REPETITIONS;
         int queueEmpty = 0;
         do {
@@ -69,10 +65,11 @@ public class MpmcQueueBaselinePerfTest {
         long ops = REPETITIONS * 1000L * 1000L * 1000L / duration;
         String qName = queue.getClass().getSimpleName();
         System.out.format("%d - ops/sec=%,d - %s result=%d failed.poll=%d failed.offer=%d\n", runNumber, ops,
-                qName, result, queueEmpty, p.queueFull);
+                qName, result.item1, queueEmpty, p.queueFull);
         return ops;
     }
 
+    @SuppressWarnings("rawtypes")
     public static class Producer implements Runnable {
         private final MpmcArrayQueue queue;
         int queueFull = 0;
@@ -88,8 +85,10 @@ public class MpmcQueueBaselinePerfTest {
             int i = REPETITIONS;
             int f = 0;
             long s = System.nanoTime();
+            Node node = new Node();
+            node.item1 = TEST_VALUE;
             do {
-                while (!producer.offer(TEST_VALUE)) {
+                while (!producer.offer(node)) {
                     Thread.yield();
                     f++;
                 }

@@ -15,28 +15,23 @@
  */
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.LinkedTransferQueue;
+import org.jctools.queues.MpmcArrayQueue;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
 
-import dorkbox.util.messagebus.common.simpleq.jctools.Node;
+public class PerfTest_MpmcArrayQueue_Baseline {
+    static {
+        System.setProperty("sparse.shift", "2");
+    }
 
-public class LinkTransferQueuePerfTest {
     // 15 == 32 * 1024
-    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 100;
+    public static final int REPETITIONS = Integer.getInteger("reps", 50) * 1000 * 1000;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
 
     public static void main(final String[] args) throws Exception {
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
-
-
         System.out.println("capacity:" + QUEUE_CAPACITY + " reps:" + REPETITIONS);
-
-        final LinkedTransferQueue<Integer> queue = new LinkedTransferQueue<Integer>();
+        final MpmcArrayQueue<Integer> queue = new MpmcArrayQueue<Integer>(QUEUE_CAPACITY);
 
         final long[] results = new long[20];
         for (int i = 0; i < 20; i++) {
@@ -51,18 +46,20 @@ public class LinkTransferQueuePerfTest {
         System.out.format("summary,QueuePerfTest,%s,%d\n", queue.getClass().getSimpleName(), sum / 10);
     }
 
-
-    private static long performanceRun(int runNumber, LinkedTransferQueue<Integer> queue) throws Exception {
+    private static long performanceRun(int runNumber, MpmcArrayQueue<Integer> queue) throws Exception {
         Producer p = new Producer(queue);
         Thread thread = new Thread(p);
         thread.start(); // producer will timestamp start
 
-        LinkedTransferQueue<Integer> consumer = queue;
-        Object result;
+        MpmcArrayQueue<Integer> consumer = queue;
+        Integer result;
         int i = REPETITIONS;
         int queueEmpty = 0;
         do {
-            result = consumer.take();
+            while (null == (result = consumer.poll())) {
+                queueEmpty++;
+                Thread.yield();
+            }
         } while (0 != --i);
         long end = System.nanoTime();
 
@@ -76,30 +73,26 @@ public class LinkTransferQueuePerfTest {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedTransferQueue<Integer> queue;
+        private final MpmcArrayQueue<Integer> queue;
         int queueFull = 0;
         long start;
 
-        public Producer(LinkedTransferQueue<Integer> queue) {
+        public Producer(MpmcArrayQueue<Integer> queue) {
             this.queue = queue;
         }
 
         @Override
         public void run() {
-            LinkedTransferQueue<Integer> producer = this.queue;
+            MpmcArrayQueue<Integer> producer = this.queue;
             int i = REPETITIONS;
             int f = 0;
             long s = System.nanoTime();
-
-            try {
-                do {
-                    producer.transfer(TEST_VALUE);
-                } while (0 != --i);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                // log.error(e);
-            }
+            do {
+                while (!producer.offer(TEST_VALUE)) {
+                    Thread.yield();
+                    f++;
+                }
+            } while (0 != --i);
             this.queueFull = f;
             this.start = s;
         }
