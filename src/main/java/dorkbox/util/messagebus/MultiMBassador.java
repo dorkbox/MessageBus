@@ -3,7 +3,6 @@ package dorkbox.util.messagebus;
 import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.concurrent.TimeUnit;
 
 import org.jctools.util.Pow2;
 
@@ -11,7 +10,8 @@ import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
-import dorkbox.util.messagebus.common.simpleq.MpmcTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -28,7 +28,7 @@ public class MultiMBassador implements IMessageBus {
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
-    private final MpmcTransferArrayQueue dispatchQueue;
+    private final MpmcMultiTransferArrayQueue dispatchQueue;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -74,7 +74,7 @@ public class MultiMBassador implements IMessageBus {
         }
         numberOfThreads = Pow2.roundToPowerOfTwo(numberOfThreads);
 
-        this.dispatchQueue = new MpmcTransferArrayQueue(numberOfThreads);
+        this.dispatchQueue = new MpmcMultiTransferArrayQueue(numberOfThreads);
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -85,21 +85,45 @@ public class MultiMBassador implements IMessageBus {
             Runnable runnable = new Runnable() {
                 @Override
                 public void run() {
-                    MpmcTransferArrayQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
+                    MpmcMultiTransferArrayQueue IN_QUEUE = MultiMBassador.this.dispatchQueue;
 
-                    Object message1 = null;
+                    MultiNode node = new MultiNode();
                     while (!MultiMBassador.this.shuttingDown) {
                         try {
                             while (true) {
-                                message1 = IN_QUEUE.take();
-                                publish(message1);
+                                IN_QUEUE.take(node);
+
+                                switch (node.messageType) {
+                                    case 1: publish(node.item1); continue;
+                                    case 2: publish(node.item1, node.item2); continue;
+                                    case 3: publish(node.item1, node.item2, node.item3); continue;
+                                }
                             }
                         } catch (InterruptedException e) {
                             if (!MultiMBassador.this.shuttingDown) {
-                                handlePublicationError(new PublicationError()
-                                    .setMessage("Thread interupted while processing message")
-                                    .setCause(e)
-                                    .setPublishedObject(message1));
+                                switch (node.messageType) {
+                                    case 1: {
+                                        handlePublicationError(new PublicationError()
+                                            .setMessage("Thread interupted while processing message")
+                                            .setCause(e)
+                                            .setPublishedObject(node.item1));
+                                        continue;
+                                    }
+                                    case 2: {
+                                        handlePublicationError(new PublicationError()
+                                            .setMessage("Thread interupted while processing message")
+                                            .setCause(e)
+                                            .setPublishedObject(node.item1, node.item2));
+                                        continue;
+                                    }
+                                    case 3: {
+                                        handlePublicationError(new PublicationError()
+                                            .setMessage("Thread interupted while processing message")
+                                            .setCause(e)
+                                            .setPublishedObject(node.item1, node.item2, node.item3));
+                                        continue;
+                                    }
+                                }
                             }
                         }
                     }
@@ -418,106 +442,28 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publishAsync(final Object message1, final Object message2) {
         if (message1 != null && message2 != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message1, message2);
-//                }
-//            };
-
-//            try {
-//                this.dispatchQueue.transfer(runnable);
-//            } catch (InterruptedException e) {
-//                handlePublicationError(new PublicationError()
-//                    .setMessage("Error while adding an asynchronous message")
-//                    .setCause(e)
-//                    .setPublishedObject(message1, message2));
-//            }
+            try {
+                this.dispatchQueue.transfer(message1, message2);
+            } catch (InterruptedException e) {
+                handlePublicationError(new PublicationError()
+                    .setMessage("Error while adding an asynchronous message")
+                    .setCause(e)
+                    .setPublishedObject(message1, message2));
+            }
         }
     }
 
     @Override
     public void publishAsync(final Object message1, final Object message2, final Object message3) {
         if (message1 != null || message2 != null | message3 != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message1, message2, message3);
-//                }
-//            };
-
-
-//            try {
-//                this.dispatchQueue.transfer(runnable);
-//            } catch (InterruptedException e) {
-//                handlePublicationError(new PublicationError()
-//                    .setMessage("Error while adding an asynchronous message")
-//                    .setCause(e)
-//                    .setPublishedObject(message1, message2, message3));
-//            }
-        }
-    }
-
-    @Override
-    public void publishAsync(long timeout, TimeUnit unit, final Object message) {
-        if (message != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message);
-//                }
-//            };
-
-//            try {
-//                this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-//            } catch (InterruptedException e) {
-//                handlePublicationError(new PublicationError()
-//                    .setMessage("Error while adding an asynchronous message")
-//                    .setCause(e)
-//                    .setPublishedObject(message));
-//            }
-        }
-    }
-    @Override
-    public void publishAsync(long timeout, TimeUnit unit, final Object message1, final Object message2) {
-        if (message1 != null && message2 != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message1, message2);
-//                }
-//            };
-
-//            try {
-//                this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-//            } catch (InterruptedException e) {
-//                handlePublicationError(new PublicationError()
-//                    .setMessage("Error while adding an asynchronous message")
-//                    .setCause(e)
-//                    .setPublishedObject(message1, message2));
-//            }
-        }
-    }
-
-
-    @Override
-    public void publishAsync(long timeout, TimeUnit unit, final Object message1, final Object message2, final Object message3) {
-        if (message1 != null && message2 != null && message3 != null) {
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    MultiMBassador.this.publish(message1, message2, message3);
-//                }
-//            };
-
-//            try {
-//                this.dispatchQueue.tryTransfer(runnable, timeout, unit);
-//            } catch (InterruptedException e) {
-//                handlePublicationError(new PublicationError()
-//                    .setMessage("Error while adding an asynchronous message")
-//                    .setCause(e)
-//                    .setPublishedObject(message1, message2, message3));
-//            }
+            try {
+                this.dispatchQueue.transfer(message1, message2, message3);
+            } catch (InterruptedException e) {
+                handlePublicationError(new PublicationError()
+                    .setMessage("Error while adding an asynchronous message")
+                    .setCause(e)
+                    .setPublishedObject(message1, message2, message3));
+            }
         }
     }
 }

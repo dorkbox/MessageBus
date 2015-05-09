@@ -1,43 +1,38 @@
-package dorkbox.util.messagebus.common.simpleq;
+package dorkbox.util.messagebus.common.simpleq.bakup;
 
 import org.jctools.util.UnsafeAccess;
 
-abstract class ColdItems {
+abstract class CI1 {
     public int type = 0;
-
-//    public int messageType = MessageType.ONE;
     public Object item1 = null;
-//    public Object item2 = null;
-//    public Object item3 = null;
-//    public Object[] item4 = null;
 }
 
-abstract class Pad0 extends ColdItems {
-//    volatile long y0, y1, y2, y4, y5, y6 = 7L;
-    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+abstract class P0 extends CI1 {
+    volatile long y0, y1, y2, y4, y5, y6 = 7L;
 }
 
-abstract class HotItem1 extends Pad0 {
+abstract class HI0 extends P0 {
     public Thread thread;
 }
 
-public class Node extends HotItem1 {
-    private static final long ITEM1;
-    private static final long THREAD;
+public class Node extends HI0 {
     private static final long TYPE;
+    private static final long ITEM;
+    private static final long THREAD;
 
     static {
         try {
             TYPE = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("type"));
-            ITEM1 = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("item1"));
+
+            ITEM = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("item1"));
             THREAD = UnsafeAccess.UNSAFE.objectFieldOffset(Node.class.getField("thread"));
 
             // now make sure we can access UNSAFE
             Node node = new Node();
             Object o = new Object();
-            spItem1(node, o);
-            Object lpItem1 = lpItem1(node);
-            spItem1(node, null);
+            spItem(node, o);
+            Object lpItem1 = lpItem(node);
+            spItem(node, null);
 
             if (lpItem1 != o) {
                 throw new Exception("Cannot access unsafe fields");
@@ -47,21 +42,23 @@ public class Node extends HotItem1 {
         }
     }
 
-    static final void spItem1(Object node, Object item) {
-        UnsafeAccess.UNSAFE.putObject(node, ITEM1, item);
+    static final void spItem(Object node, Object item) {
+        UnsafeAccess.UNSAFE.putObject(node, ITEM, item);
     }
 
-    static final void soItem1(Object node, Object item) {
-        UnsafeAccess.UNSAFE.putOrderedObject(node, ITEM1, item);
+    static final void soItem(Object node, Object item) {
+        UnsafeAccess.UNSAFE.putOrderedObject(node, ITEM, item);
     }
 
-    static final Object lpItem1(Object node) {
-        return UnsafeAccess.UNSAFE.getObject(node, ITEM1);
+    // only used by the single take() method. Not used by the void take(node)
+    static final Object lvItem(Object node) {
+        return UnsafeAccess.UNSAFE.getObjectVolatile(node, ITEM);
     }
 
-    static final Object lvItem1(Object node) {
-        return UnsafeAccess.UNSAFE.getObjectVolatile(node, ITEM1);
+    public static final Object lpItem(Object node) {
+        return UnsafeAccess.UNSAFE.getObject(node, ITEM);
     }
+
 
     //////////////
     static final void spType(Object node, int type) {
@@ -91,14 +88,8 @@ public class Node extends HotItem1 {
 
 
     // post-padding
-//    volatile long y0, y1, y2, y4, y5, y6 = 7L;
     volatile long z0, z1, z2, z4, z5, z6 = 7L;
 
     public Node() {
     }
-
-//    @Override
-//    public String toString() {
-//        return "[" + this.ID + "]";
-//    }
 }

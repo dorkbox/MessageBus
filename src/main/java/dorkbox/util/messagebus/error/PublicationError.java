@@ -104,11 +104,6 @@ public class PublicationError {
         return this;
     }
 
-    public PublicationError setPublishedObject(Object[] publishedObjects) {
-        this.publishedObjects = publishedObjects;
-        return this;
-    }
-
     /**
      * {@inheritDoc}
      */

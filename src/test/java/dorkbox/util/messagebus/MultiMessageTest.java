@@ -43,6 +43,16 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
 
         assertEquals(12, count.get());
+        count.set(0);
+
+
+        bus.publishAsync("s");
+        bus.publishAsync("s", "s");
+        bus.publishAsync("s", "s", "s");
+        bus.publishAsync(1, 2, "s");
+        bus.publishAsync(new Integer[] {1, 2, 3, 4, 5, 6});
+
+        assertEquals(12, count.get());
 
 
         bus.shutdown();

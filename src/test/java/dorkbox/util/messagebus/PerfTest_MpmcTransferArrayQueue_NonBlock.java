@@ -1,6 +1,6 @@
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.common.simpleq.MpmcTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 
 public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     public static final int REPETITIONS = 50 * 1000 * 100;
@@ -18,7 +18,7 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
 
         long average = 0;
 
-        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(concurrency);
+        final MpmcMultiTransferArrayQueue queue = new MpmcMultiTransferArrayQueue(concurrency);
         average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
 //        SimpleQueue.INPROGRESS_SPINS = 64;
@@ -44,7 +44,7 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -60,7 +60,7 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -111,18 +111,18 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     }
 
     public static class Producer implements Runnable {
-        private final MpmcTransferArrayQueue queue;
+        private final MpmcMultiTransferArrayQueue queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(MpmcTransferArrayQueue queue, int repetitions) {
+        public Producer(MpmcMultiTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcTransferArrayQueue producer = this.queue;
+            MpmcMultiTransferArrayQueue producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
@@ -135,19 +135,19 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     }
 
     public static class Consumer implements Runnable {
-        private final MpmcTransferArrayQueue queue;
+        private final MpmcMultiTransferArrayQueue queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(MpmcTransferArrayQueue queue, int repetitions) {
+        public Consumer(MpmcMultiTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcTransferArrayQueue consumer = this.queue;
+            MpmcMultiTransferArrayQueue consumer = this.queue;
             Object result = null;
             int i = this.repetitions;
 

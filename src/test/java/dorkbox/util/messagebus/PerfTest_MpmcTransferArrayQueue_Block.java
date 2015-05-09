@@ -1,10 +1,7 @@
 package dorkbox.util.messagebus;
 
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.util.VMSupport;
-
-import dorkbox.util.messagebus.common.simpleq.MpmcTransferArrayQueue;
-import dorkbox.util.messagebus.common.simpleq.Node;
+import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
+import dorkbox.util.messagebus.common.simpleq.MultiNode;
 
 public class PerfTest_MpmcTransferArrayQueue_Block {
 //    static {
@@ -14,19 +11,18 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
-    private static final int concurrency = 4;
+    private static final int concurrency = 2;
 
     public static void main(final String[] args) throws Exception {
-
-        System.out.println(VMSupport.vmDetails());
-        System.out.println(ClassLayout.parseClass(Node.class).toPrintable());
+//        System.out.println(VMSupport.vmDetails());
+//        System.out.println(ClassLayout.parseClass(MultiNode.class).toPrintable());
 
         System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
         final int warmupRuns = 4;
         final int runs = 5;
 
-        final MpmcTransferArrayQueue queue = new MpmcTransferArrayQueue(concurrency);
+        final MpmcMultiTransferArrayQueue queue = new MpmcMultiTransferArrayQueue(concurrency);
         long average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
 //        SimpleQueue.INPROGRESS_SPINS = 64;
@@ -52,7 +48,7 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -68,7 +64,7 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, MpmcTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -119,18 +115,18 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
     }
 
     public static class Producer implements Runnable {
-        private final MpmcTransferArrayQueue queue;
+        private final MpmcMultiTransferArrayQueue queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(MpmcTransferArrayQueue queue, int repetitions) {
+        public Producer(MpmcMultiTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcTransferArrayQueue producer = this.queue;
+            MpmcMultiTransferArrayQueue producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
@@ -147,34 +143,33 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
     }
 
     public static class Consumer implements Runnable {
-        private final MpmcTransferArrayQueue queue;
+        private final MpmcMultiTransferArrayQueue queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(MpmcTransferArrayQueue queue, int repetitions) {
+        public Consumer(MpmcMultiTransferArrayQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcTransferArrayQueue consumer = this.queue;
-            Object result = null;
+            MpmcMultiTransferArrayQueue consumer = this.queue;
             int i = this.repetitions;
 
-            Node node = new Node();
+            MultiNode node = new MultiNode();
             try {
                 do {
-                    result = consumer.take(node);
+                    consumer.take(node);
                 } while (0 != --i);
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
-                // log.error(e);
             }
 
-            this.result = result;
+            MultiNode.lvMessageType(node); // LoadLoad
+            this.result = MultiNode.lpItem1(node);
+
             this.end = System.nanoTime();
         }
     }

@@ -108,9 +108,7 @@ public class PerfTest_LinkedTransferQueue_Block {
                     producer.transfer(TEST_VALUE);
                 } while (0 != --i);
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
-                // log.error(e);
             }
         }
     }
@@ -137,9 +135,7 @@ public class PerfTest_LinkedTransferQueue_Block {
                     result = consumer.take();
                 } while (0 != --i);
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
-                // log.error(e);
             }
 
             this.result = result;

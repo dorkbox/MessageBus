@@ -1,21 +1,9 @@
-package dorkbox.util.messagebus.common.simpleq;
-
-import static dorkbox.util.messagebus.common.simpleq.Node.lpItem1;
-import static dorkbox.util.messagebus.common.simpleq.Node.lpThread;
-import static dorkbox.util.messagebus.common.simpleq.Node.lpType;
-import static dorkbox.util.messagebus.common.simpleq.Node.lvItem1;
-import static dorkbox.util.messagebus.common.simpleq.Node.lvThread;
-import static dorkbox.util.messagebus.common.simpleq.Node.soItem1;
-import static dorkbox.util.messagebus.common.simpleq.Node.soThread;
-import static dorkbox.util.messagebus.common.simpleq.Node.spItem1;
-import static dorkbox.util.messagebus.common.simpleq.Node.spThread;
-import static dorkbox.util.messagebus.common.simpleq.Node.spType;
+package dorkbox.util.messagebus.common.simpleq.bakup;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.jctools.queues.MpmcArrayQueue;
 import org.jctools.util.UnsafeAccess;
-
 
 public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
     private static final int TYPE_EMPTY = 0;
@@ -90,7 +78,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                     continue;
                 }
 
-                lastType = lpType(previousElement);
+                lastType = Node.lpType(previousElement);
             }
 
             if (lastType != TYPE_CONSUMER) {
@@ -109,9 +97,9 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                         final Thread myThread = Thread.currentThread();
                         final Object node = nodeThreadLocal.get();
 
-                        spType(node, TYPE_PRODUCER);
-                        spThread(node, myThread);
-                        spItem1(node, item);
+                        Node.spType(node, TYPE_PRODUCER);
+                        Node.spThread(node, myThread);
+                        Node.spItem(node, item);
 
 
                         // on 64bit(no compressed oops) JVM this is the same as seqOffset
@@ -152,8 +140,8 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                         // (seeing this value from a consumer will lead to retry 2)
                         soSequence(sBuffer, cSeqOffset, mask + newConsumerIndex); // StoreStore
 
-                        soItem1(e, item);
-                        unpark(e);
+                        Node.spItem(e, item);
+                        unpark(e);  // StoreStore
 
                         return;
                     } else {
@@ -168,7 +156,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
      * CONSUMER
      * <p>
      * Remove an item from the queue. If there are no items on the queue, wait for a producer to place an item on the queue. This will
-     * as long as necessary
+     * as long as necessary.
      */
     public final Object take() throws InterruptedException {
         // local load of field to avoid repeated loads after volatile reads
@@ -194,7 +182,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                     continue;
                 }
 
-                lastType = lpType(previousElement);
+                lastType = Node.lpType(previousElement);
             }
 
             if (lastType != TYPE_PRODUCER) {
@@ -213,9 +201,10 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                         final Thread myThread = Thread.currentThread();
                         final Object node = nodeThreadLocal.get();
 
-                        spType(node, TYPE_CONSUMER);
-                        spThread(node, myThread);
+                        Node.spType(node, TYPE_CONSUMER);
+                        Node.spThread(node, myThread);
 
+                        // the unpark thread sets our contents
 
                         // on 64bit(no compressed oops) JVM this is the same as seqOffset
                         final long offset = calcElementOffset(producerIndex, mask);
@@ -227,8 +216,8 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                         soSequence(sBuffer, pSeqOffset, newProducerIndex); // StoreStore
 
                         park(node, myThread);
-                        Object item1 = lvItem1(node);
 
+                        Object item1 = Node.lvItem(node);
                         return item1;
                     } else {
                         busySpin(PRODUCER_CAS_FAIL_SPINS);
@@ -256,8 +245,8 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                         // (seeing this value from a consumer will lead to retry 2)
                         soSequence(sBuffer, cSeqOffset, mask + newConsumerIndex); // StoreStore
 
-                        final Object lvItem1 = lpItem1(e);
-                        unpark(e);
+                        final Object lvItem1 = Node.lpItem(e);
+                        unpark(e); // StoreStore
 
                         return lvItem1;
                     } else {
@@ -267,113 +256,6 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
             }
         }
     }
-
-    /**
-     * CONSUMER
-     * <p>
-     * Remove an item from the queue. If there are no items on the queue, wait for a producer to place an item on the queue. This will
-     * as long as necessary.
-     * <p>
-     * This method does not depend on thread-local for node information, and so is more efficient
-     */
-    public final Object take(final Node node) throws InterruptedException {
-        // local load of field to avoid repeated loads after volatile reads
-        final long mask = this.mask;
-        final Object[] buffer = this.buffer;
-        final long[] sBuffer = this.sequenceBuffer;
-
-        long consumerIndex;
-        long producerIndex;
-        int lastType;
-
-        while (true) {
-            consumerIndex = lvConsumerIndex();
-            producerIndex = lvProducerIndex();
-
-            if (consumerIndex == producerIndex) {
-                lastType = TYPE_EMPTY;
-            } else {
-                final Object previousElement = lpElement(buffer, calcElementOffset(consumerIndex, mask));
-                if (previousElement == null) {
-                    // the last producer hasn't finished setting the object yet
-                    busySpin(INPROGRESS_SPINS);
-                    continue;
-                }
-
-                lastType = lpType(previousElement);
-            }
-
-            if (lastType != TYPE_PRODUCER) {
-                // TYPE_EMPTY, TYPE_CONSUMER
-                // empty or same mode = push+park onto queue
-                long pSeqOffset = calcSequenceOffset(producerIndex, mask);
-                final long seq = lvSequence(sBuffer, pSeqOffset); // LoadLoad
-                final long delta = seq - producerIndex;
-
-                if (delta == 0) {
-                    // this is expected if we see this first time around
-                    final long newProducerIndex = producerIndex + 1;
-                    if (casProducerIndex(producerIndex, newProducerIndex)) {
-                        // Successful CAS: full barrier
-
-                        final Thread myThread = Thread.currentThread();
-//                        final Object node = nodeThreadLocal.get();
-
-                        spType(node, TYPE_CONSUMER);
-                        spThread(node, myThread);
-
-
-                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                        final long offset = calcElementOffset(producerIndex, mask);
-                        spElement(buffer, offset, node);
-
-
-                        // increment sequence by 1, the value expected by consumer
-                        // (seeing this value from a producer will lead to retry 2)
-                        soSequence(sBuffer, pSeqOffset, newProducerIndex); // StoreStore
-
-                        park(node, myThread);
-                        Object item1 = lvItem1(node);
-
-                        return item1;
-                    } else {
-                        busySpin(PRODUCER_CAS_FAIL_SPINS);
-                    }
-                }
-            }
-            else {
-                // TYPE_PRODUCER
-                // complimentary mode = pop+unpark off queue
-                long cSeqOffset = calcSequenceOffset(consumerIndex, mask);
-                final long seq = lvSequence(sBuffer, cSeqOffset); // LoadLoad
-                final long newConsumerIndex = consumerIndex + 1;
-                final long delta = seq - newConsumerIndex;
-
-                if (delta == 0) {
-                    if (casConsumerIndex(consumerIndex, newConsumerIndex)) {
-                        // Successful CAS: full barrier
-
-                        // on 64bit(no compressed oops) JVM this is the same as seqOffset
-                        final long offset = calcElementOffset(consumerIndex, mask);
-                        final Object e = lpElement(buffer, offset);
-                        spElement(buffer, offset, null);
-
-                        // Move sequence ahead by capacity, preparing it for next offer
-                        // (seeing this value from a consumer will lead to retry 2)
-                        soSequence(sBuffer, cSeqOffset, mask + newConsumerIndex); // StoreStore
-
-                        final Object lvItem1 = lpItem1(e);
-                        unpark(e);
-
-                        return lvItem1;
-                    } else {
-                        busySpin(CONSUMER_CAS_FAIL_SPINS);
-                    }
-                }
-            }
-        }
-    }
-
 
     // modification of super implementation, as to include a small busySpin on contention
     @Override
@@ -542,7 +424,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
                     continue;
                 }
 
-                return lpType(previousElement) != TYPE_CONSUMER || consumerIndex + this.consumerCount != producerIndex;
+                return Node.lpType(previousElement) != TYPE_CONSUMER || consumerIndex + this.consumerCount != producerIndex;
             }
         }
     }
@@ -563,7 +445,7 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
         ThreadLocalRandom randomYields = null; // bound if needed
 
         for (;;) {
-            if (lvThread(node) == null) {
+            if (Node.lvThread(node) == null) {
                 return;
             } else if (myThread.isInterrupted()) {
                 throw new InterruptedException();
@@ -583,8 +465,8 @@ public final class MpmcTransferArrayQueue extends MpmcArrayQueue<Object> {
     }
 
     private final void unpark(Object node) {
-        final Object thread = lpThread(node);
-        soThread(node, null);
+        final Object thread = Node.lpThread(node);
+        Node.soThread(node, null);  // StoreStore
         UnsafeAccess.UNSAFE.unpark(thread);
     }
 }
