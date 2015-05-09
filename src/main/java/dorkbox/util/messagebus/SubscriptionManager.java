@@ -52,7 +52,7 @@ public class SubscriptionManager {
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
     private final ConcurrentMap<Class<?>, StrongConcurrentSetV8<Subscription>> subscriptionsPerMessageSingle;
-    private final HashMapTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti;
+    private final HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> subscriptionsPerMessageMulti;
 
     // all subscriptions per messageHandler type
     // this map provides fast access for subscribing and unsubscribing
@@ -67,7 +67,7 @@ public class SubscriptionManager {
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
     // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
     private final Map<Class<?>, StrongConcurrentSetV8<Subscription>> superClassSubscriptions;
-    private final HashMapTree<Class<?>, Collection<Subscription>> superClassSubscriptionsMulti;
+    private final HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> superClassSubscriptionsMulti;
 
     private final Map<Class<?>, StrongConcurrentSetV8<Subscription>> varArgSubscriptions;
     private final Map<Class<?>, StrongConcurrentSetV8<Subscription>> varArgSuperClassSubscriptions;
@@ -87,7 +87,7 @@ public class SubscriptionManager {
             this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, SubscriptionManager.LOAD_FACTOR);
 
             this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, StrongConcurrentSetV8<Subscription>>(64, SubscriptionManager.LOAD_FACTOR, 1);
-            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, Collection<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
+            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
 
             // only used during SUB/UNSUB
             this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, StrongConcurrentSetV8<Subscription>>(64, SubscriptionManager.LOAD_FACTOR, 1);
@@ -101,7 +101,7 @@ public class SubscriptionManager {
             // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
             // it's a hit on SUB/UNSUB, but improves performance of handlers
             this.superClassSubscriptions = new ConcurrentHashMapV8<Class<?>, StrongConcurrentSetV8<Subscription>>(64, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-            this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, Collection<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
+            this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
 
             // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
             // it's a hit on SUB/UNSUB, but improves performance of handlers
@@ -340,13 +340,13 @@ public class SubscriptionManager {
     }
 
     // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
+    public final StrongConcurrentSetV8<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
         return this.subscriptionsPerMessageMulti.get(messageType1, messageType2);
     }
 
 
     // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
+    public final StrongConcurrentSetV8<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2, messageType3);
     }
 
@@ -506,12 +506,12 @@ public class SubscriptionManager {
 
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
-        HashMapTree<Class<?>, Collection<Subscription>> local = this.superClassSubscriptionsMulti;
+    public StrongConcurrentSetV8<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
+        HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> local = this.superClassSubscriptionsMulti;
 
         // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, Collection<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2);
-        Collection<Subscription> subsPerType = null;
+        HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2);
+        StrongConcurrentSetV8<Subscription> subsPerType = null;
 
         // we DO NOT care about duplicate, because the answers will be the same
         if (subsPerTypeLeaf != null) {
@@ -521,12 +521,24 @@ public class SubscriptionManager {
             subsPerType = new StrongConcurrentSetV8<Subscription>(16, LOAD_FACTOR, this.STRIPE_SIZE);
 
             // whenever our subscriptions change, this map is cleared.
-            Collection<Class<?>> types1 = this.superClassesCache.get(superType1);
-            Collection<Class<?>> types2 = this.superClassesCache.get(superType2);
+            StrongConcurrentSetV8<Class<?>> types1 = this.superClassesCache.get(superType1);
+            StrongConcurrentSetV8<Class<?>> types2 = this.superClassesCache.get(superType2);
 
-            Collection<Subscription> subs;
-            HashMapTree<Class<?>, Collection<Subscription>> leaf1;
-            HashMapTree<Class<?>, Collection<Subscription>> leaf2;
+            StrongConcurrentSetV8<Subscription> subs;
+            HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf1;
+            HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf2;
+
+//            ISetEntry<Class<?>> current1;
+//            Class<?> eventSuperType1;
+//
+//            current1 = types1.head;
+//            while (current1 != null) {
+//                eventSuperType1 = current1.getValue();
+//                current1 = current1.next();
+//
+//            }
+
+
 
             Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
             Iterator<Class<?>> iterator2;
@@ -567,7 +579,7 @@ public class SubscriptionManager {
                 }
             }
 
-            Collection<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2);
+            StrongConcurrentSetV8<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2);
             if (putIfAbsent != null) {
                 // someone beat us
                 subsPerType = putIfAbsent;
@@ -579,12 +591,12 @@ public class SubscriptionManager {
 
     // must be protected by read lock
     // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
-        HashMapTree<Class<?>, Collection<Subscription>> local = this.superClassSubscriptionsMulti;
+    public StrongConcurrentSetV8<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
+        HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> local = this.superClassSubscriptionsMulti;
 
         // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, Collection<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2, superType3);
-        Collection<Subscription> subsPerType;
+        HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2, superType3);
+        StrongConcurrentSetV8<Subscription> subsPerType;
 
 
         // we DO NOT care about duplicate, because the answers will be the same
@@ -599,9 +611,9 @@ public class SubscriptionManager {
             subsPerType = new StrongConcurrentSetV8<Subscription>(16, LOAD_FACTOR, this.STRIPE_SIZE);
 
             Collection<Subscription> subs;
-            HashMapTree<Class<?>, Collection<Subscription>> leaf1;
-            HashMapTree<Class<?>, Collection<Subscription>> leaf2;
-            HashMapTree<Class<?>, Collection<Subscription>> leaf3;
+            HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf1;
+            HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf2;
+            HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf3;
 
             Iterator<Class<?>> iterator1 = new SuperClassIterator(superType1, types1);
             Iterator<Class<?>> iterator2;
@@ -658,7 +670,7 @@ public class SubscriptionManager {
                 }
             }
 
-            Collection<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2, superType3);
+            StrongConcurrentSetV8<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2, superType3);
             if (putIfAbsent != null) {
                 // someone beat us
                 subsPerType = putIfAbsent;
