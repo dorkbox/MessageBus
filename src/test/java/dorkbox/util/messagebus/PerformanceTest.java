@@ -20,8 +20,6 @@ public class PerformanceTest {
 
     public static final int CONCURRENCY_LEVEL = 2;
 
-    private static long count = 0;
-
     protected static final IPublicationErrorHandler TestFailingHandler = new IPublicationErrorHandler() {
         @Override
         public void handleError(PublicationError error) {
@@ -42,15 +40,14 @@ public class PerformanceTest {
         ConcurrentExecutor.runConcurrent(new Runnable() {
             @Override
             public void run() {
-                long num = 0;
-                while (num < Long.MAX_VALUE) {
-                    bus.publishAsync(num++);
+                Long num = Long.valueOf(7L);
+                while (true) {
+                    bus.publishAsync(num);
                 }
             }}, CONCURRENCY_LEVEL);
 
 
         bus.shutdown();
-        System.err.println("Count: " + count);
     }
 
     public PerformanceTest() {
@@ -61,7 +58,6 @@ public class PerformanceTest {
         @Handler
         public void handleSync(Long o1) {
 //            System.err.println(Long.toString(o1));
-              count++;
         }
     }
 }

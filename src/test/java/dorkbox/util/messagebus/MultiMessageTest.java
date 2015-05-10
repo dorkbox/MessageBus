@@ -42,7 +42,7 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publish(1, 2, "s");
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
 
-        assertEquals(12, count.get());
+        assertEquals(13, count.get());
         count.set(0);
 
 
@@ -52,7 +52,17 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publishAsync(1, 2, "s");
         bus.publishAsync(new Integer[] {1, 2, 3, 4, 5, 6});
 
-        assertEquals(12, count.get());
+        while (bus.hasPendingMessages()) {
+            try {
+                Thread.sleep(ConcurrentUnits);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                // log.error(e);
+            }
+        }
+
+        assertEquals(13, count.get());
 
 
         bus.shutdown();
