@@ -9,7 +9,7 @@ public class PerfTest_MpmcTransferArrayQueue {
     public static void main(final String[] args) throws Exception {
         final int repetitions = 50_000_00;
 
-        final int warmupRuns = 2;
+        final int warmupRuns = 4;
         final int runs = 3;
 
         for (int concurrency = 1; concurrency < 5; concurrency++) {

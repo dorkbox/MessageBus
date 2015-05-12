@@ -10,7 +10,7 @@ public class PerfTest_LinkedTransferQueue {
     public static void main(final String[] args) throws Exception {
         System.out.println("reps:" + REPETITIONS);
 
-        final int warmupRuns = 2;
+        final int warmupRuns = 4;
         final int runs = 3;
 
         for (int concurrency = 1; concurrency < 5; concurrency++) {

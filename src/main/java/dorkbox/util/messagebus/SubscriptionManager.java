@@ -146,7 +146,8 @@ public class SubscriptionManager {
 
 
         // no point in locking everything. We lock on the class object being subscribed, since that is as coarse as we can go.
-        // the listenerClass is GUARANTEED to be unique and the same object, per classloader. We do NOT LOCK for visibility, but for concurrency
+        // the listenerClass is GUARANTEED to be unique and the same object, per classloader. We do NOT LOCK for visibility,
+        // but for concurrency because there are race conditions here if we don't.
         synchronized(listenerClass) {
             ConcurrentMap<Class<?>, StrongConcurrentSetV8<Subscription>> subsPerListener2 = this.subscriptionsPerListener;
             StrongConcurrentSetV8<Subscription> subsPerListener = subsPerListener2.get(listenerClass);
@@ -218,7 +219,11 @@ public class SubscriptionManager {
                                 } else {
                                     subsPerType = this.subHolder.get();
                                     this.subHolder.set(new StrongConcurrentSetV8<Subscription>(16, SubscriptionManager.LOAD_FACTOR, 1));
-                                    for (Class<?> c : types) {
+
+                                    Class<?> c;
+                                    int length = types.length;
+                                    for (int i = 0; i < length; i++) {
+                                        c = types[i];
                                         getSuperClasses(c);
                                     }
                                 }
@@ -578,8 +583,6 @@ public class SubscriptionManager {
 
                 StrongConcurrentSetV8<Subscription> subs = local2.get(superClass);
                 if (subs != null && !subs.isEmpty()) {
-
-
                     current = subs.head;
                     while (current != null) {
                         sub = current.getValue();
@@ -624,6 +627,9 @@ public class SubscriptionManager {
             HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf1;
             HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf2;
 
+            ISetEntry<Subscription> current = null;
+            Subscription sub;
+
             ISetEntry<Class<?>> current1 = null;
             Class<?> eventSuperType1;
 
@@ -660,7 +666,11 @@ public class SubscriptionManager {
                         if (leaf2 != null) {
                             subs = leaf2.getValue();
                             if (subs != null) {
-                                for (Subscription sub : subs) {
+                                current = subs.head;
+                                while (current != null) {
+                                    sub = current.getValue();
+                                    current = current.next();
+
                                     if (sub.acceptsSubtypes()) {
                                         subsPerType.add(sub);
                                     }
@@ -706,6 +716,9 @@ public class SubscriptionManager {
             HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf1;
             HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf2;
             HashMapTree<Class<?>, StrongConcurrentSetV8<Subscription>> leaf3;
+
+            ISetEntry<Subscription> current = null;
+            Subscription sub;
 
             ISetEntry<Class<?>> current1 = null;
             Class<?> eventSuperType1;
@@ -761,7 +774,11 @@ public class SubscriptionManager {
                                 if (leaf3 != null) {
                                     subs = leaf3.getValue();
                                     if (subs != null) {
-                                        for (Subscription sub : subs) {
+                                        current = subs.head;
+                                        while (current != null) {
+                                            sub = current.getValue();
+                                            current = current.next();
+
                                             if (sub.acceptsSubtypes()) {
                                                 subsPerType.add(sub);
                                             }
@@ -783,6 +800,4 @@ public class SubscriptionManager {
 
         return subsPerType;
     }
-
-
 }
