@@ -1,5 +1,6 @@
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.common.thread;
 
+import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.subscription.Subscription;
 
 public class SubscriptionHolder extends ThreadLocal<StrongConcurrentSetV8<Subscription>> {

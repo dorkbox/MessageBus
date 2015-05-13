@@ -1,4 +1,6 @@
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.common.thread;
+
+import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 
 
 public class ClassHolder extends ThreadLocal<StrongConcurrentSetV8<Class<?>>> {

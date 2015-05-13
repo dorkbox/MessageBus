@@ -42,7 +42,7 @@ public class PerformanceTest {
             public void run() {
                 Long num = Long.valueOf(7L);
                 while (true) {
-                    bus.publishAsync(num);
+                    bus.publish(num);
                 }
             }}, CONCURRENCY_LEVEL);
 

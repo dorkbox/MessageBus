@@ -5,14 +5,14 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
-import dorkbox.util.messagebus.common.ClassHolder;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.ReflectionUtils;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
-import dorkbox.util.messagebus.common.SubscriptionHolder;
 import dorkbox.util.messagebus.common.VarArgPossibility;
+import dorkbox.util.messagebus.common.thread.ClassHolder;
+import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 import dorkbox.util.messagebus.listener.MessageHandler;
 import dorkbox.util.messagebus.listener.MetadataReader;
 import dorkbox.util.messagebus.subscription.Subscription;

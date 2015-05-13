@@ -7,6 +7,7 @@ import com.esotericsoftware.reflectasm.MethodAccess;
 
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
+import dorkbox.util.messagebus.common.thread.BooleanHolder;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
@@ -99,7 +100,7 @@ public class Subscription {
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
-    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message) {
+    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message) {
         StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -114,6 +115,7 @@ public class Subscription {
                 listener = current.getValue();
                 current = current.next();
 //this.count++;
+
                 try {
                     invocation.invoke(listener, handler, handleIndex, message);
                 } catch (IllegalAccessException e) {
@@ -151,15 +153,14 @@ public class Subscription {
                                     .setPublishedObject(message));
                 }
             }
-            return true;
+            booleanHolder.bool = true;
         }
-        return false;
     }
 
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
-    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2) {
+    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message1, Object message2) {
         StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -215,15 +216,14 @@ public class Subscription {
                                                             .setPublishedObject(message1, message2));
                 }
             }
-            return true;
+            booleanHolder.bool = true;
         }
-        return false;
     }
 
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
-    public boolean publishToSubscription(ErrorHandlingSupport errorHandler, Object message1, Object message2, Object message3) {
+    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message1, Object message2, Object message3) {
         StrongConcurrentSet<Object> listeners = this.listeners;
 
         if (!listeners.isEmpty()) {
@@ -281,9 +281,8 @@ public class Subscription {
                                                             .setPublishedObject(message1, message2, message3));
                 }
             }
-            return true;
+            booleanHolder.bool = true;
         }
-        return false;
     }
 
 
