@@ -1,8 +1,8 @@
-package dorkbox.util.messagebus;
+package dorkbox.util.messagebus.queuePerf;
 
-import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
-public class PerfTest_MpmcTransferArrayQueue_NonBlock {
+public class PerfTest_LinkedBlockingQueue_NonBlock {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
@@ -18,33 +18,13 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
 
         long average = 0;
 
-        final MpmcMultiTransferArrayQueue queue = new MpmcMultiTransferArrayQueue(concurrency);
+        final LinkedBlockingQueue queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
         average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
-
-//        SimpleQueue.INPROGRESS_SPINS = 64;
-//        SimpleQueue.POP_SPINS = 512;
-//        SimpleQueue.PUSH_SPINS = 512;
-//        SimpleQueue.PARK_SPINS = 512;
-//
-//        for (int i = 128; i< 10000;i++) {
-//            int full = 2*i;
-//
-//            final SimpleQueue queue = new SimpleQueue(QUEUE_CAPACITY);
-//            SimpleQueue.PARK_SPINS = full;
-//
-//
-//            long newAverage = averageRun(warmupRuns, runs, queue);
-//            if (newAverage > average) {
-//                average = newAverage;
-//                System.err.println("Best value: " + i + "  : " + newAverage);
-//            }
-//        }
-
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -60,7 +40,7 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, MpmcMultiTransferArrayQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -111,18 +91,18 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     }
 
     public static class Producer implements Runnable {
-        private final MpmcMultiTransferArrayQueue queue;
+        private final LinkedBlockingQueue queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(MpmcMultiTransferArrayQueue queue, int repetitions) {
+        public Producer(LinkedBlockingQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcMultiTransferArrayQueue producer = this.queue;
+            LinkedBlockingQueue producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
@@ -135,19 +115,19 @@ public class PerfTest_MpmcTransferArrayQueue_NonBlock {
     }
 
     public static class Consumer implements Runnable {
-        private final MpmcMultiTransferArrayQueue queue;
+        private final LinkedBlockingQueue queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(MpmcMultiTransferArrayQueue queue, int repetitions) {
+        public Consumer(LinkedBlockingQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MpmcMultiTransferArrayQueue consumer = this.queue;
+            LinkedBlockingQueue consumer = this.queue;
             Object result = null;
             int i = this.repetitions;
 

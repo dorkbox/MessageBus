@@ -1,8 +1,8 @@
-package dorkbox.util.messagebus;
+package dorkbox.util.messagebus.queuePerf;
 
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedTransferQueue;
 
-public class PerfTest_LinkedBlockingQueue_NonBlock {
+public class PerfTest_LinkedTransferQueue_NonBlock {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
@@ -18,13 +18,13 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
 
         long average = 0;
 
-        final LinkedBlockingQueue queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
+        final LinkedTransferQueue queue = new LinkedTransferQueue();
         average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, LinkedTransferQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -40,7 +40,7 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, LinkedTransferQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -91,18 +91,18 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final LinkedTransferQueue queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(LinkedBlockingQueue queue, int repetitions) {
+        public Producer(LinkedTransferQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue producer = this.queue;
+            LinkedTransferQueue producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
@@ -115,19 +115,19 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
     }
 
     public static class Consumer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final LinkedTransferQueue queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(LinkedBlockingQueue queue, int repetitions) {
+        public Consumer(LinkedTransferQueue queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue consumer = this.queue;
+            LinkedTransferQueue consumer = this.queue;
             Object result = null;
             int i = this.repetitions;
 

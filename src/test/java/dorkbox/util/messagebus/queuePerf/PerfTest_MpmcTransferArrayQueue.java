@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus;
+package dorkbox.util.messagebus.queuePerf;
 
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 

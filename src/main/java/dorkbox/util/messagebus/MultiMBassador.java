@@ -220,7 +220,7 @@ public class MultiMBassador implements IMessageBus {
 
 
             // publish to var arg, only if not already an array
-            if (manager.hasVarArgPossibility() && !manager.isArray(messageClass)) {
+            if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
                 Object[] asArray = null;
 
                 StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
