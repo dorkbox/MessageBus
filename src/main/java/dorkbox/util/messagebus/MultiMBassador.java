@@ -46,7 +46,6 @@ public class MultiMBassador implements IMessageBus {
      */
     private volatile boolean shuttingDown;
 
-
     /**
      * By default, will permit subTypes and VarArg matching, and will use half of CPUs available for dispatching async messages
      */
@@ -58,7 +57,7 @@ public class MultiMBassador implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MultiMBassador(int numberOfThreads) {
-        this(true, numberOfThreads);
+        this(false, numberOfThreads);
     }
 
     /**
@@ -216,7 +215,7 @@ public class MultiMBassador implements IMessageBus {
 
 
             // publish to var arg, only if not already an array
-            if (!manager.isArray(messageClass)) {
+            if (manager.hasVarArgPossibility() && !manager.isArray(messageClass)) {
                 Object[] asArray = null;
 
                 StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
@@ -312,62 +311,64 @@ public class MultiMBassador implements IMessageBus {
             }
 
             // publish to var arg, only if not already an array
-            if (messageClass1 == messageClass2) {
-                Object[] asArray = null;
+            if (manager.hasVarArgPossibility()) {
+                if (messageClass1 == messageClass2) {
+                    Object[] asArray = null;
 
-                StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
-                if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    asArray = (Object[]) Array.newInstance(messageClass1, 2);
-                    asArray[0] = message1;
-                    asArray[1] = message2;
-
-                    current = varargSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
-
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
-                    }
-                }
-
-                StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-                // now get array based superClasses (but only if those ALSO accept vararg)
-                if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    if (asArray == null) {
+                    StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 2);
                         asArray[0] = message1;
                         asArray[1] = message2;
+
+                        current = varargSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
+
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
 
-                    current = varargSuperSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
+                    StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+                    // now get array based superClasses (but only if those ALSO accept vararg)
+                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
+                        if (asArray == null) {
+                            asArray = (Object[]) Array.newInstance(messageClass1, 2);
+                            asArray[0] = message1;
+                            asArray[1] = message2;
+                        }
 
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
+                        current = varargSuperSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
+
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
-                }
-            } else {
-                StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
+                } else {
+                    StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
 
-                // now get array based superClasses (but only if those ALSO accept vararg)
-                if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
-                    current = varargSuperMultiSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
+                    // now get array based superClasses (but only if those ALSO accept vararg)
+                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
+                        current = varargSuperMultiSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
 
-                        // since each sub will be for the "lowest common demoninator", we have to re-create
-                        // this array from the componentType every time -- since it will be different
-                        Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
-                        Object[] asArray = (Object[]) Array.newInstance(componentType, 2);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
+                            // since each sub will be for the "lowest common demoninator", we have to re-create
+                            // this array from the componentType every time -- since it will be different
+                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
+                            Object[] asArray = (Object[]) Array.newInstance(componentType, 2);
+                            asArray[0] = message1;
+                            asArray[1] = message2;
 
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
                 }
             }
@@ -434,64 +435,66 @@ public class MultiMBassador implements IMessageBus {
             }
 
             // publish to var arg, only if not already an array, and all of the same type
-            if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
-                Object[] asArray = null;
-                StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
-                if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    asArray = (Object[]) Array.newInstance(messageClass1, 3);
-                    asArray[0] = message1;
-                    asArray[1] = message2;
-                    asArray[2] = message3;
-
-                    current = varargSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
-
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
-                    }
-                }
-
-                StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-                // now get array based superClasses (but only if those ALSO accept vararg)
-                if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    if (asArray == null) {
+            if (manager.hasVarArgPossibility()) {
+                if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
+                    Object[] asArray = null;
+                    StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 3);
                         asArray[0] = message1;
                         asArray[1] = message2;
                         asArray[2] = message3;
+
+                        current = varargSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
+
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
 
-                    current = varargSuperSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
+                    StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+                    // now get array based superClasses (but only if those ALSO accept vararg)
+                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
+                        if (asArray == null) {
+                            asArray = (Object[]) Array.newInstance(messageClass1, 3);
+                            asArray[0] = message1;
+                            asArray[1] = message2;
+                            asArray[2] = message3;
+                        }
 
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
+                        current = varargSuperSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
+
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
-                }
-            } else {
-                StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+                } else {
+                    StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
 
-                // now get array based superClasses (but only if those ALSO accept vararg)
-                if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
-                    current = varargSuperMultiSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
+                    // now get array based superClasses (but only if those ALSO accept vararg)
+                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
+                        current = varargSuperMultiSubscriptions.head;
+                        while (current != null) {
+                            sub = current.getValue();
+                            current = current.next();
 
-                        // since each sub will be for the "lowest common demoninator", we have to re-create
-                        // this array from the componentType every time -- since it will be different
-                        Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
-                        Object[] asArray = (Object[]) Array.newInstance(componentType, 3);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
-                        asArray[2] = message3;
+                            // since each sub will be for the "lowest common demoninator", we have to re-create
+                            // this array from the componentType every time -- since it will be different
+                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
+                            Object[] asArray = (Object[]) Array.newInstance(componentType, 3);
+                            asArray[0] = message1;
+                            asArray[1] = message2;
+                            asArray[2] = message3;
 
-                        // this catches all exception types
-                        subsPublished |= sub.publishToSubscription(this, asArray);
+                            // this catches all exception types
+                            subsPublished |= sub.publishToSubscription(this, asArray);
+                        }
                     }
                 }
             }
