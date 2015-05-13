@@ -401,7 +401,7 @@ public class SubscriptionManager {
             Subscription sub;
 
             StrongConcurrentSetV8<Subscription> subs = local2.get(arrayVersion);
-            if (subs != null && !subs.isEmpty()) {
+            if (subs != null) {
                 current = subs.head;
                 while (current != null) {
                     sub = current.getValue();
@@ -436,7 +436,7 @@ public class SubscriptionManager {
             StrongConcurrentSetV8<Class<?>> types = getSuperClasses(arrayVersion);
             if (types.isEmpty()) {
                 local.put(varArgType, EMPTY_SUBS);
-                return null;
+                return EMPTY_SUBS;
             }
 
             Map<Class<?>, StrongConcurrentSetV8<Subscription>> local2 = this.subscriptionsPerMessageSingle;
@@ -447,14 +447,14 @@ public class SubscriptionManager {
 
             ISetEntry<Class<?>> current1;
             Class<?> superClass;
-            current1 = types.head;
 
+            current1 = types.head;
             while (current1 != null) {
                 superClass = current1.getValue();
                 current1 = current1.next();
 
                 StrongConcurrentSetV8<Subscription> subs = local2.get(superClass);
-                if (subs != null && !subs.isEmpty()) {
+                if (subs != null) {
                     current = subs.head;
                     while (current != null) {
                         sub = current.getValue();
@@ -552,6 +552,7 @@ public class SubscriptionManager {
     }
 
 
+    // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.
     public final StrongConcurrentSetV8<Subscription> getSuperSubscriptions(Class<?> superType) {
         Map<Class<?>, StrongConcurrentSetV8<Subscription>> local = this.superClassSubscriptions;
@@ -564,7 +565,7 @@ public class SubscriptionManager {
             StrongConcurrentSetV8<Class<?>> types = getSuperClasses(superType);
             if (types.isEmpty()) {
                 local.put(superType, EMPTY_SUBS);
-                return null;
+                return EMPTY_SUBS;
             }
 
             Map<Class<?>, StrongConcurrentSetV8<Subscription>> local2 = this.subscriptionsPerMessageSingle;
@@ -582,7 +583,7 @@ public class SubscriptionManager {
                 current1 = current1.next();
 
                 StrongConcurrentSetV8<Subscription> subs = local2.get(superClass);
-                if (subs != null && !subs.isEmpty()) {
+                if (subs != null) {
                     current = subs.head;
                     while (current != null) {
                         sub = current.getValue();

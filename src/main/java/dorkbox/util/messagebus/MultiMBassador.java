@@ -93,12 +93,12 @@ public class MultiMBassador implements IMessageBus {
                         try {
                             while (true) {
                                 IN_QUEUE.take(node);
-
-                                switch (node.messageType) {
-                                    case 1: publish(node.item1); continue;
-                                    case 2: publish(node.item1, node.item2); continue;
-                                    case 3: publish(node.item1, node.item2, node.item3); continue;
-                                }
+                                publish(node.item1);
+//                                switch (node.messageType) {
+//                                    case 1: publish(node.item1); continue;
+//                                    case 2: publish(node.item1, node.item2); continue;
+//                                    case 3: publish(node.item1, node.item2, node.item3); continue;
+//                                }
                             }
                         } catch (InterruptedException e) {
                             if (!MultiMBassador.this.shuttingDown) {
@@ -189,7 +189,7 @@ public class MultiMBassador implements IMessageBus {
         Subscription sub;
 
         // Run subscriptions
-        if (subscriptions != null && !subscriptions.isEmpty()) {
+        if (subscriptions != null) {
             current = subscriptions.head;
             while (current != null) {
                 sub = current.getValue();
@@ -203,7 +203,7 @@ public class MultiMBassador implements IMessageBus {
         if (!this.forceExactMatches) {
             StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
-            if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
+            if (superSubscriptions != null) {
                 current = superSubscriptions.head;
                 while (current != null) {
                     sub = current.getValue();
@@ -286,7 +286,7 @@ public class MultiMBassador implements IMessageBus {
         Subscription sub;
 
         // Run subscriptions
-        if (subscriptions != null && !subscriptions.isEmpty()) {
+        if (subscriptions != null) {
             current = subscriptions.head;
             while (current != null) {
                 sub = current.getValue();
@@ -300,7 +300,7 @@ public class MultiMBassador implements IMessageBus {
         if (!this.forceExactMatches) {
             StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
             // now get superClasses
-            if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
+            if (superSubscriptions != null) {
                 current = superSubscriptions.head;
                 while (current != null) {
                     sub = current.getValue();
@@ -407,7 +407,7 @@ public class MultiMBassador implements IMessageBus {
         Subscription sub;
 
         // Run subscriptions
-        if (subscriptions != null && !subscriptions.isEmpty()) {
+        if (subscriptions != null) {
             current = subscriptions.head;
             while (current != null) {
                 sub = current.getValue();
@@ -422,7 +422,7 @@ public class MultiMBassador implements IMessageBus {
         if (!this.forceExactMatches) {
             StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
             // now get superClasses
-            if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
+            if (superSubscriptions != null) {
                 current = superSubscriptions.head;
                 while (current != null) {
                     sub = current.getValue();
