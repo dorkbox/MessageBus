@@ -15,7 +15,7 @@ public class SubscriptionHolder extends ThreadLocal<StrongConcurrentSetV8<Subscr
     }
 
     @Override
-    protected StrongConcurrentSetV8<Subscription> initialValue() {
+    public StrongConcurrentSetV8<Subscription> initialValue() {
         return new StrongConcurrentSetV8<Subscription>(16, this.loadFactor, this.stripeSize);
     }
 }
