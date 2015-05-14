@@ -8,6 +8,11 @@ import java.util.concurrent.locks.Lock;
 
 import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
 
+
+abstract class pad<T> extends item<T> {
+    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+}
+
 /**
  * This data structure is optimized for non-blocking reads even when write operations occur.
  * Running read iterators will not be affected by add operations since writes always insert at the head of the
@@ -17,14 +22,17 @@ import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
  * @author bennidi
  *         Date: 2/12/12
  */
-public abstract class AbstractConcurrentSet<T> implements Set<T> {
+public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> {
     private static final AtomicLong id = new AtomicLong();
     private final transient long ID = id.getAndIncrement();
 
     // Internal state
     protected final transient ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
     private final transient Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
-    public transient Entry<T> head; // reference to the first element
+
+    volatile long y0, y1, y2, y4, y5, y6 = 7L;
+    volatile long z0, z1, z2, z4, z5, z6 = 7L;
+
 
     protected AbstractConcurrentSet(Map<T, ISetEntry<T>> entries) {
         this.entries = entries;
@@ -196,45 +204,4 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
 
-    public abstract static class Entry<T> implements ISetEntry<T> {
-
-        private Entry<T> next;
-
-        private Entry<T> predecessor;
-
-        protected Entry(Entry<T> next) {
-            this.next = next;
-            next.predecessor = this;
-        }
-
-        protected Entry() {
-        }
-
-        // not thread-safe! must be synchronized in enclosing context
-        @Override
-        public void remove() {
-            if (this.predecessor != null) {
-                this.predecessor.next = this.next;
-                if (this.next != null) {
-                    this.next.predecessor = this.predecessor;
-                }
-            } else if (this.next != null) {
-                this.next.predecessor = null;
-            }
-            // can not nullify references to help GC since running iterators might not see the entire set
-            // if this element is their current element
-            //next = null;
-            //predecessor = null;
-        }
-
-        @Override
-        public Entry<T> next() {
-            return this.next;
-        }
-
-        @Override
-        public void clear() {
-            this.next = null;
-        }
-    }
 }

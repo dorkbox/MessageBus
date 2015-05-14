@@ -7,7 +7,7 @@ public class PerfTest_MBassador {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
-    private static final int concurrency = 10;
+    private static final int concurrency = 1;
 
     public static void main(final String[] args) throws Exception {
         System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);

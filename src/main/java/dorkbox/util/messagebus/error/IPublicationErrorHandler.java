@@ -24,13 +24,11 @@ public interface IPublicationErrorHandler {
      * print the stack trace if available.
      */
     static final class ConsoleLogger implements IPublicationErrorHandler {
-
         /**
          * {@inheritDoc}
          */
         @Override
         public void handleError(final PublicationError error) {
-
             // Printout the error itself
             System.out.println(error);
 

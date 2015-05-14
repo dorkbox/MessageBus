@@ -67,6 +67,11 @@ public interface IMessageBus extends PubSubSupport, ErrorHandlingSupport {
     boolean hasPendingMessages();
 
     /**
+     * Starts the bus
+     */
+    void start();
+
+    /**
      * Shutdown the bus such that it will stop delivering asynchronous messages. Executor service and
      * other internally used threads will be shutdown gracefully. After calling shutdown it is not safe
      * to further use the message bus.

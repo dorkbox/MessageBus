@@ -114,7 +114,6 @@ public class Subscription {
             while (current != null) {
                 listener = current.getValue();
                 current = current.next();
-//this.count++;
 
                 try {
                     invocation.invoke(listener, handler, handleIndex, message);

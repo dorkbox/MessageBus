@@ -27,6 +27,11 @@ import dorkbox.util.messagebus.subscription.Subscription;
  */
 public class MultiMBassador implements IMessageBus {
 
+    public static final String ERROR_HANDLER_MSG =
+                    "INFO: No error handler has been configured to handle exceptions during publication.\n" +
+                    "Publication error handlers can be added by bus.addErrorHandler()\n" +
+                    "Falling back to console logger.";
+
     // this handler will receive all errors that occur during message dispatch or message handling
     private final Collection<IPublicationErrorHandler> errorHandlers = new ArrayDeque<IPublicationErrorHandler>();
 
@@ -133,7 +138,6 @@ public class MultiMBassador implements IMessageBus {
 
             Thread runner = dispatchThreadFactory.newThread(runnable);
             this.threads.add(runner);
-            runner.start();
         }
     }
 
@@ -166,6 +170,19 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public final boolean hasPendingMessages() {
         return this.dispatchQueue.hasPendingMessages();
+    }
+
+    @Override
+    public void start() {
+        for (Thread t : this.threads) {
+            t.start();
+        }
+        synchronized (this.errorHandlers) {
+            if (this.errorHandlers.isEmpty()) {
+                this.errorHandlers.add(new IPublicationErrorHandler.ConsoleLogger());
+                System.out.println(ERROR_HANDLER_MSG);
+            }
+        }
     }
 
     @Override
