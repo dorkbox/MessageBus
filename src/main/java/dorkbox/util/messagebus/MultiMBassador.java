@@ -7,13 +7,13 @@ import java.util.Collection;
 import org.jctools.util.Pow2;
 
 import dorkbox.util.messagebus.common.DeadMessage;
-import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.common.thread.BooleanHolder;
 import dorkbox.util.messagebus.common.thread.BooleanThreadHolder;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -201,35 +201,25 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
+        ConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
 
         BooleanHolder subsPublished = this.booleanThreadLocal.get();
         subsPublished.bool = false;
 
-        ISetEntry<Subscription> current;
-        Subscription sub;
 
         // Run subscriptions
         if (subscriptions != null) {
-            current = subscriptions.head;
-            while (current != null) {
-                sub = current.getValue();
-                current = current.next();
-
+            for (Subscription sub : subscriptions) {
                 // this catches all exception types
                 sub.publishToSubscription(this, subsPublished, message);
             }
         }
 
         if (!this.forceExactMatches) {
-            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+            ConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
             if (superSubscriptions != null) {
-                current = superSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
+                for (Subscription sub : superSubscriptions) {
                     // this catches all exception types
                     sub.publishToSubscription(this, subsPublished, message);
                 }
@@ -240,34 +230,25 @@ public class MultiMBassador implements IMessageBus {
             if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
                 Object[] asArray = null;
 
-                StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
+                ConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
                     asArray[0] = message;
 
-                    current = varargSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
-
+                    for (Subscription sub : varargSubscriptions) {
                         // this catches all exception types
                         sub.publishToSubscription(this, subsPublished, asArray);
                     }
                 }
 
-                StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
+                ConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
                     if (asArray == null) {
                         asArray = (Object[]) Array.newInstance(messageClass, 1);
                         asArray[0] = message;
                     }
-
-                    current = varargSuperSubscriptions.head;
-                    while (current != null) {
-                        sub = current.getValue();
-                        current = current.next();
-
+                    for (Subscription sub : varargSuperSubscriptions) {
                         // this catches all exception types
                         sub.publishToSubscription(this, subsPublished, asArray);
                     }
@@ -277,17 +258,13 @@ public class MultiMBassador implements IMessageBus {
 
         if (!subsPublished.bool) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            ConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
 
-                current = deadSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
+                for (Subscription sub2 : deadSubscriptions) {
                     // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, deadMessage);
+                    sub2.publishToSubscription(this, subsPublished, deadMessage);
                 }
             }
         }
@@ -295,252 +272,252 @@ public class MultiMBassador implements IMessageBus {
 
     @Override
     public void publish(final Object message1, final Object message2) {
-        SubscriptionManager manager = this.subscriptionManager;
-
-        Class<?> messageClass1 = message1.getClass();
-        Class<?> messageClass2 = message2.getClass();
-
-        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
-        BooleanHolder subsPublished = this.booleanThreadLocal.get();
-        subsPublished.bool = false;
-
-        ISetEntry<Subscription> current;
-        Subscription sub;
-
-        // Run subscriptions
-        if (subscriptions != null) {
-            current = subscriptions.head;
-            while (current != null) {
-                sub = current.getValue();
-                current = current.next();
-
-                // this catches all exception types
-                sub.publishToSubscription(this, subsPublished, message1, message2);
-            }
-        }
-
-        if (!this.forceExactMatches) {
-            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
-            // now get superClasses
-            if (superSubscriptions != null) {
-                current = superSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, message1, message2);
-                }
-            }
-
-            // publish to var arg, only if not already an array
-            if (manager.hasVarArgPossibility()) {
-                if (messageClass1 == messageClass2) {
-                    Object[] asArray = null;
-
-                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
-                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                        asArray = (Object[]) Array.newInstance(messageClass1, 2);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
-
-                        current = varargSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-
-                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-                    // now get array based superClasses (but only if those ALSO accept vararg)
-                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                        if (asArray == null) {
-                            asArray = (Object[]) Array.newInstance(messageClass1, 2);
-                            asArray[0] = message1;
-                            asArray[1] = message2;
-                        }
-
-                        current = varargSuperSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-                } else {
-                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
-
-                    // now get array based superClasses (but only if those ALSO accept vararg)
-                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
-                        current = varargSuperMultiSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // since each sub will be for the "lowest common demoninator", we have to re-create
-                            // this array from the componentType every time -- since it will be different
-                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
-                            Object[] asArray = (Object[]) Array.newInstance(componentType, 2);
-                            asArray[0] = message1;
-                            asArray[1] = message2;
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-                }
-            }
-        }
-
-
-        if (!subsPublished.bool) {
-            // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
-                DeadMessage deadMessage = new DeadMessage(message1, message2);
-
-                current = deadSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, deadMessage);
-                }
-            }
-        }
+//        SubscriptionManager manager = this.subscriptionManager;
+//
+//        Class<?> messageClass1 = message1.getClass();
+//        Class<?> messageClass2 = message2.getClass();
+//
+//        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
+//        BooleanHolder subsPublished = this.booleanThreadLocal.get();
+//        subsPublished.bool = false;
+//
+//        ISetEntry<Subscription> current;
+//        Subscription sub;
+//
+//        // Run subscriptions
+//        if (subscriptions != null) {
+//            current = subscriptions.head;
+//            while (current != null) {
+//                sub = current.getValue();
+//                current = current.next();
+//
+//                // this catches all exception types
+//                sub.publishToSubscription(this, subsPublished, message1, message2);
+//            }
+//        }
+//
+//        if (!this.forceExactMatches) {
+//            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
+//            // now get superClasses
+//            if (superSubscriptions != null) {
+//                current = superSubscriptions.head;
+//                while (current != null) {
+//                    sub = current.getValue();
+//                    current = current.next();
+//
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, message1, message2);
+//                }
+//            }
+//
+//            // publish to var arg, only if not already an array
+//            if (manager.hasVarArgPossibility()) {
+//                if (messageClass1 == messageClass2) {
+//                    Object[] asArray = null;
+//
+//                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+//                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
+//                        asArray = (Object[]) Array.newInstance(messageClass1, 2);
+//                        asArray[0] = message1;
+//                        asArray[1] = message2;
+//
+//                        current = varargSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//
+//                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+//                    // now get array based superClasses (but only if those ALSO accept vararg)
+//                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
+//                        if (asArray == null) {
+//                            asArray = (Object[]) Array.newInstance(messageClass1, 2);
+//                            asArray[0] = message1;
+//                            asArray[1] = message2;
+//                        }
+//
+//                        current = varargSuperSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//                } else {
+//                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
+//
+//                    // now get array based superClasses (but only if those ALSO accept vararg)
+//                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
+//                        current = varargSuperMultiSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // since each sub will be for the "lowest common demoninator", we have to re-create
+//                            // this array from the componentType every time -- since it will be different
+//                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
+//                            Object[] asArray = (Object[]) Array.newInstance(componentType, 2);
+//                            asArray[0] = message1;
+//                            asArray[1] = message2;
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//
+//        if (!subsPublished.bool) {
+//            // Dead Event must EXACTLY MATCH (no subclasses)
+//            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+//            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
+//                DeadMessage deadMessage = new DeadMessage(message1, message2);
+//
+//                current = deadSubscriptions.head;
+//                while (current != null) {
+//                    sub = current.getValue();
+//                    current = current.next();
+//
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, deadMessage);
+//                }
+//            }
+//        }
     }
 
     @Override
     public void publish(final Object message1, final Object message2, final Object message3) {
-        SubscriptionManager manager = this.subscriptionManager;
-
-        Class<?> messageClass1 = message1.getClass();
-        Class<?> messageClass2 = message2.getClass();
-        Class<?> messageClass3 = message3.getClass();
-
-        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
-        BooleanHolder subsPublished = this.booleanThreadLocal.get();
-        subsPublished.bool = false;
-
-        ISetEntry<Subscription> current;
-        Subscription sub;
-
-        // Run subscriptions
-        if (subscriptions != null) {
-            current = subscriptions.head;
-            while (current != null) {
-                sub = current.getValue();
-                current = current.next();
-
-                // this catches all exception types
-                sub.publishToSubscription(this, subsPublished, message1, message2, message3);
-            }
-        }
-
-
-        if (!this.forceExactMatches) {
-            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
-            // now get superClasses
-            if (superSubscriptions != null) {
-                current = superSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, message1, message2, message3);
-                }
-            }
-
-            // publish to var arg, only if not already an array, and all of the same type
-            if (manager.hasVarArgPossibility()) {
-                if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
-                    Object[] asArray = null;
-                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
-                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                        asArray = (Object[]) Array.newInstance(messageClass1, 3);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
-                        asArray[2] = message3;
-
-                        current = varargSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-
-                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-                    // now get array based superClasses (but only if those ALSO accept vararg)
-                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                        if (asArray == null) {
-                            asArray = (Object[]) Array.newInstance(messageClass1, 3);
-                            asArray[0] = message1;
-                            asArray[1] = message2;
-                            asArray[2] = message3;
-                        }
-
-                        current = varargSuperSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-                } else {
-                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
-
-                    // now get array based superClasses (but only if those ALSO accept vararg)
-                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
-                        current = varargSuperMultiSubscriptions.head;
-                        while (current != null) {
-                            sub = current.getValue();
-                            current = current.next();
-
-                            // since each sub will be for the "lowest common demoninator", we have to re-create
-                            // this array from the componentType every time -- since it will be different
-                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
-                            Object[] asArray = (Object[]) Array.newInstance(componentType, 3);
-                            asArray[0] = message1;
-                            asArray[1] = message2;
-                            asArray[2] = message3;
-
-                            // this catches all exception types
-                            sub.publishToSubscription(this, subsPublished, asArray);
-                        }
-                    }
-                }
-            }
-        }
-
-
-        if (!subsPublished.bool) {
-            // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
-                DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
-
-                current = deadSubscriptions.head;
-                while (current != null) {
-                    sub = current.getValue();
-                    current = current.next();
-
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, deadMessage);
-                }
-            }
-        }
+//        SubscriptionManager manager = this.subscriptionManager;
+//
+//        Class<?> messageClass1 = message1.getClass();
+//        Class<?> messageClass2 = message2.getClass();
+//        Class<?> messageClass3 = message3.getClass();
+//
+//        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
+//        BooleanHolder subsPublished = this.booleanThreadLocal.get();
+//        subsPublished.bool = false;
+//
+//        ISetEntry<Subscription> current;
+//        Subscription sub;
+//
+//        // Run subscriptions
+//        if (subscriptions != null) {
+//            current = subscriptions.head;
+//            while (current != null) {
+//                sub = current.getValue();
+//                current = current.next();
+//
+//                // this catches all exception types
+//                sub.publishToSubscription(this, subsPublished, message1, message2, message3);
+//            }
+//        }
+//
+//
+//        if (!this.forceExactMatches) {
+//            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+//            // now get superClasses
+//            if (superSubscriptions != null) {
+//                current = superSubscriptions.head;
+//                while (current != null) {
+//                    sub = current.getValue();
+//                    current = current.next();
+//
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, message1, message2, message3);
+//                }
+//            }
+//
+//            // publish to var arg, only if not already an array, and all of the same type
+//            if (manager.hasVarArgPossibility()) {
+//                if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
+//                    Object[] asArray = null;
+//                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+//                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
+//                        asArray = (Object[]) Array.newInstance(messageClass1, 3);
+//                        asArray[0] = message1;
+//                        asArray[1] = message2;
+//                        asArray[2] = message3;
+//
+//                        current = varargSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//
+//                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+//                    // now get array based superClasses (but only if those ALSO accept vararg)
+//                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
+//                        if (asArray == null) {
+//                            asArray = (Object[]) Array.newInstance(messageClass1, 3);
+//                            asArray[0] = message1;
+//                            asArray[1] = message2;
+//                            asArray[2] = message3;
+//                        }
+//
+//                        current = varargSuperSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//                } else {
+//                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+//
+//                    // now get array based superClasses (but only if those ALSO accept vararg)
+//                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
+//                        current = varargSuperMultiSubscriptions.head;
+//                        while (current != null) {
+//                            sub = current.getValue();
+//                            current = current.next();
+//
+//                            // since each sub will be for the "lowest common demoninator", we have to re-create
+//                            // this array from the componentType every time -- since it will be different
+//                            Class<?> componentType = sub.getHandledMessageTypes()[0].getComponentType();
+//                            Object[] asArray = (Object[]) Array.newInstance(componentType, 3);
+//                            asArray[0] = message1;
+//                            asArray[1] = message2;
+//                            asArray[2] = message3;
+//
+//                            // this catches all exception types
+//                            sub.publishToSubscription(this, subsPublished, asArray);
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//
+//        if (!subsPublished.bool) {
+//            // Dead Event must EXACTLY MATCH (no subclasses)
+//            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+//            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
+//                DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
+//
+//                current = deadSubscriptions.head;
+//                while (current != null) {
+//                    sub = current.getValue();
+//                    current = current.next();
+//
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, deadMessage);
+//                }
+//            }
+//        }
     }
 
     @Override

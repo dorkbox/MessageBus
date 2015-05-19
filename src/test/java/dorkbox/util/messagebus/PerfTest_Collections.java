@@ -14,6 +14,8 @@ import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
+import dorkbox.util.messagebus.common.thread.ConcurrentLinkedQueue2;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.listener.MessageHandler;
 import dorkbox.util.messagebus.listener.MessageListener;
 import dorkbox.util.messagebus.listener.MetadataReader;
@@ -48,6 +50,9 @@ public class PerfTest_Collections {
 //        }
         System.err.println("Done");
 
+        bench(size, new ConcurrentLinkedQueue2<Subscription>());
+        bench(size, new ConcurrentSet<Subscription>(size*2, LOAD_FACTOR, 5));
+        bench(size, Collections.<Subscription>newSetFromMap(new ConcurrentHashMapV8<Subscription, Boolean>(size*2, LOAD_FACTOR, 1)));
         bench(size, new ArrayList<Subscription>(size*2));
         bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedTransferQueue<Subscription>());
@@ -55,7 +60,6 @@ public class PerfTest_Collections {
         bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedList<Subscription>());
         bench(size, new StrongConcurrentSetV8<Subscription>(size*2, LOAD_FACTOR));
-        bench(size, Collections.<Subscription>newSetFromMap(new ConcurrentHashMapV8<Subscription, Boolean>(size*2, LOAD_FACTOR, 1)));
         bench(size, new StrongConcurrentSet<Subscription>(size*2, LOAD_FACTOR));
         bench(size, new HashSet<Subscription>());
 //        bench(size, new ConcurrentSkipListSet<Subscription>()); // needs comparable
