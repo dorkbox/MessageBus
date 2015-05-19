@@ -1,5 +1,7 @@
 package dorkbox.util.messagebus.common;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
@@ -18,10 +20,10 @@ public class VarArgUtils {
     private final int stripeSize;
 
     private final SubscriptionUtils utils;
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerMessageSingle;
+    private final Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle;
 
 
-    public VarArgUtils(SubscriptionUtils utils, ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerMessageSingle,
+    public VarArgUtils(SubscriptionUtils utils, Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle,
                     float loadFactor, int stripeSize) {
 
         this.utils = utils;
@@ -63,9 +65,13 @@ public class VarArgUtils {
             // this caches our array type. This is never cleared.
             Class<?> arrayVersion = this.utils.getArrayClass(messageClass);
 
-            ConcurrentSet<Subscription> subs = this.subscriptionsPerMessageSingle.get(arrayVersion);
+            Iterator<Subscription> iterator;
+            Subscription sub;
+
+            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(arrayVersion);
             if (subs != null) {
-                for (Subscription sub : subs) {
+                for (iterator = subs.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     if (sub.acceptsVarArgs()) {
                         subsPerType.add(sub);
                     }
@@ -98,24 +104,27 @@ public class VarArgUtils {
             subHolderConcurrent.set(subHolderConcurrent.initialValue());
 
             Class<?> arrayVersion = this.utils.getArrayClass(messageClass);
-            StrongConcurrentSet<Class<?>> types = this.utils.getSuperClasses(arrayVersion, true);
+            Collection<Class<?>> types = this.utils.getSuperClasses(arrayVersion, true);
             if (types.isEmpty()) {
-                return null;
+                return subsPerType;
             }
 
-            Map<Class<?>, ConcurrentSet<Subscription>> local2 = this.subscriptionsPerMessageSingle;
+            Map<Class<?>, Collection<Subscription>> local2 = this.subscriptionsPerMessageSingle;
 
-            ISetEntry<Class<?>> current1;
+            Iterator<Class<?>> iterator;
             Class<?> superClass;
 
-            current1 = types.head;
-            while (current1 != null) {
-                superClass = current1.getValue();
-                current1 = current1.next();
+            Iterator<Subscription> subIterator;
+            Subscription sub;
 
-                ConcurrentSet<Subscription> subs = local2.get(superClass);
+
+            for (iterator = types.iterator(); iterator.hasNext();) {
+                superClass = iterator.next();
+
+                Collection<Subscription> subs = local2.get(superClass);
                 if (subs != null) {
-                    for (Subscription sub : subs) {
+                    for (subIterator = subs.iterator(); subIterator.hasNext();) {
+                        sub = subIterator.next();
                         if (sub.acceptsSubtypes() && sub.acceptsVarArgs()) {
                             subsPerType.add(sub);
                         }
@@ -159,7 +168,11 @@ public class VarArgUtils {
                 ConcurrentSet<Subscription> varargSuperSubscriptions1 = getVarArgSuperSubscriptions(messageClass1);
                 ConcurrentSet<Subscription> varargSuperSubscriptions2 = getVarArgSuperSubscriptions(messageClass2);
 
-                for (Subscription sub : varargSuperSubscriptions1) {
+                Iterator<Subscription> iterator;
+                Subscription sub;
+
+                for (iterator = varargSuperSubscriptions1.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     if (varargSuperSubscriptions2.contains(sub)) {
                         subsPerType.add(sub);
                     }
@@ -202,7 +215,11 @@ public class VarArgUtils {
                 ConcurrentSet<Subscription> varargSuperSubscriptions2 = getVarArgSuperSubscriptions(messageClass2);
                 ConcurrentSet<Subscription> varargSuperSubscriptions3 = getVarArgSuperSubscriptions(messageClass3);
 
-                for (Subscription sub : varargSuperSubscriptions1) {
+                Iterator<Subscription> iterator;
+                Subscription sub;
+
+                for (iterator = varargSuperSubscriptions1.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     if (varargSuperSubscriptions2.contains(sub) && varargSuperSubscriptions3.contains(sub)) {
                         subsPerType.add(sub);
                     }

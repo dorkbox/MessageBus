@@ -4,8 +4,10 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.Iterator;
 
 import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 
 /**
  * @author bennidi
@@ -16,13 +18,13 @@ import dorkbox.util.messagebus.annotations.Handler;
  */
 public class ReflectionUtils {
 
-    public static StrongConcurrentSetV8<Method> getMethods(Class<?> target) {
-        StrongConcurrentSetV8<Method> hashSet = new StrongConcurrentSetV8<Method>(16, .8F);
+    public static Collection<Method> getMethods(Class<?> target) {
+        Collection<Method> hashSet = new ConcurrentSet<Method>(16, .8F, 1);
         getMethods(target, hashSet);
         return hashSet;
     }
 
-    private static void getMethods(Class<?> target, StrongConcurrentSetV8<Method> methods) {
+    private static void getMethods(Class<?> target, Collection<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -66,8 +68,8 @@ public class ReflectionUtils {
      * @param from The root class to start with
      * @return A set of classes, each representing a super type of the root class
      */
-    public static StrongConcurrentSetV8<Class<?>> getSuperTypes(Class<?> from) {
-        StrongConcurrentSetV8<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F);
+    public static Collection<Class<?>> getSuperTypes(Class<?> from) {
+        Collection<Class<?>> superclasses = new ConcurrentSet<Class<?>>(8, 0.8F, 1);
 
         collectInterfaces( from, superclasses );
 
@@ -79,21 +81,19 @@ public class ReflectionUtils {
         return superclasses;
     }
 
-    public static void collectInterfaces( Class<?> from, StrongConcurrentSetV8<Class<?>> accumulator ) {
+    public static void collectInterfaces( Class<?> from, Collection<Class<?>> accumulator ) {
         for ( Class<?> intface : from.getInterfaces() ) {
             accumulator.add( intface );
             collectInterfaces( intface, accumulator );
         }
     }
 
-    //
-    public static boolean containsOverridingMethod(final StrongConcurrentSetV8<Method> allMethods, final Method methodToCheck) {
-
-        ISetEntry<Method> current = allMethods.head;
+    public static boolean containsOverridingMethod(final Collection<Method> allMethods, final Method methodToCheck) {
+        Iterator<Method> iterator;
         Method method;
-        while (current != null) {
-            method = current.getValue();
-            current = current.next();
+
+        for (iterator = allMethods.iterator(); iterator.hasNext();) {
+            method = iterator.next();
 
             if (isOverriddenBy(methodToCheck, method)) {
                 return true;
@@ -131,7 +131,7 @@ public class ReflectionUtils {
     }
 
     public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType) {
-        A annotation = getAnnotation(from, annotationType, new StrongConcurrentSetV8<AnnotatedElement>(16, .8F));
+        A annotation = getAnnotation(from, annotationType, new ConcurrentSet<AnnotatedElement>(16, .8F, 1));
         return annotation;
     }
 

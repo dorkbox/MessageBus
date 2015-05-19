@@ -1,19 +1,17 @@
 package dorkbox.util.messagebus;
 
-import java.lang.reflect.Array;
 import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Iterator;
 
 import org.jctools.util.Pow2;
 
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
-import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.common.thread.BooleanHolder;
 import dorkbox.util.messagebus.common.thread.BooleanThreadHolder;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -158,21 +156,6 @@ public class MultiMBassador implements IMessageBus {
     }
 
     @Override
-    public void subscribe(final Object listener) {
-        MultiMBassador.this.subscriptionManager.subscribe(listener);
-    }
-
-    @Override
-    public void unsubscribe(final Object listener) {
-        MultiMBassador.this.subscriptionManager.unsubscribe(listener);
-    }
-
-    @Override
-    public final boolean hasPendingMessages() {
-        return this.dispatchQueue.hasPendingMessages();
-    }
-
-    @Override
     public void start() {
         for (Thread t : this.threads) {
             t.start();
@@ -194,6 +177,21 @@ public class MultiMBassador implements IMessageBus {
         this.subscriptionManager.shutdown();
     }
 
+    @Override
+    public void subscribe(final Object listener) {
+        MultiMBassador.this.subscriptionManager.subscribe(listener);
+    }
+
+    @Override
+    public void unsubscribe(final Object listener) {
+        MultiMBassador.this.subscriptionManager.unsubscribe(listener);
+    }
+
+    @Override
+    public final boolean hasPendingMessages() {
+        return this.dispatchQueue.hasPendingMessages();
+    }
+
     private final BooleanThreadHolder booleanThreadLocal = new BooleanThreadHolder();
 
     @Override
@@ -201,70 +199,80 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-        ConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
+        Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass); // can return null
 
         BooleanHolder subsPublished = this.booleanThreadLocal.get();
         subsPublished.bool = false;
 
+        Iterator<Subscription> iterator;
+        Subscription sub;
+
 
         // Run subscriptions
         if (subscriptions != null) {
-            for (Subscription sub : subscriptions) {
+            for (iterator = subscriptions.iterator(); iterator.hasNext();) {
+                sub = iterator.next();
+
                 // this catches all exception types
                 sub.publishToSubscription(this, subsPublished, message);
             }
         }
 
         if (!this.forceExactMatches) {
-            ConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
             if (superSubscriptions != null) {
-                for (Subscription sub : superSubscriptions) {
+                for (iterator = superSubscriptions.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
+
                     // this catches all exception types
                     sub.publishToSubscription(this, subsPublished, message);
                 }
             }
 
 
-            // publish to var arg, only if not already an array
-            if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
-                Object[] asArray = null;
-
-                ConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
-                if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-                    asArray = (Object[]) Array.newInstance(messageClass, 1);
-                    asArray[0] = message;
-
-                    for (Subscription sub : varargSubscriptions) {
-                        // this catches all exception types
-                        sub.publishToSubscription(this, subsPublished, asArray);
-                    }
-                }
-
-                ConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
-                // now get array based superClasses (but only if those ALSO accept vararg)
-                if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-                    if (asArray == null) {
-                        asArray = (Object[]) Array.newInstance(messageClass, 1);
-                        asArray[0] = message;
-                    }
-                    for (Subscription sub : varargSuperSubscriptions) {
-                        // this catches all exception types
-                        sub.publishToSubscription(this, subsPublished, asArray);
-                    }
-                }
-            }
+//            // publish to var arg, only if not already an array
+//            if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
+//                Object[] asArray = null;
+//
+//                ConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
+//                if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
+//                    asArray = (Object[]) Array.newInstance(messageClass, 1);
+//                    asArray[0] = message;
+//
+//                    for (iterator = varargSubscriptions.iterator(); iterator.hasNext();) {
+//                        sub = iterator.next();
+//                        // this catches all exception types
+//                        sub.publishToSubscription(this, subsPublished, asArray);
+//                    }
+//                }
+//
+//                ConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
+//                // now get array based superClasses (but only if those ALSO accept vararg)
+//                if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
+//                    if (asArray == null) {
+//                        asArray = (Object[]) Array.newInstance(messageClass, 1);
+//                        asArray[0] = message;
+//                    }
+//                    for (iterator = varargSuperSubscriptions.iterator(); iterator.hasNext();) {
+//                        sub = iterator.next();
+//                        // this catches all exception types
+//                        sub.publishToSubscription(this, subsPublished, asArray);
+//                    }
+//                }
+//            }
         }
 
         if (!subsPublished.bool) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            ConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
 
-                for (Subscription sub2 : deadSubscriptions) {
+                for (iterator = deadSubscriptions.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     // this catches all exception types
-                    sub2.publishToSubscription(this, subsPublished, deadMessage);
+                    sub.publishToSubscription(this, subsPublished, deadMessage);
                 }
             }
         }

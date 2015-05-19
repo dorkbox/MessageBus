@@ -26,7 +26,7 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testListenerWithoutInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener1.class);
+        MessageListener listener = this.reader.getMessageListener(MessageListener1.class, 0.85F, 4);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(2, String.class)
                 .expectHandlers(2, Object.class)
@@ -45,7 +45,7 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testListenerWithInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener2.class);
+        MessageListener listener = this.reader.getMessageListener(MessageListener2.class, 0.85F, 4);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(2, String.class)
                 .expectHandlers(2, Object.class)
@@ -55,7 +55,7 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testListenerWithInheritanceOverriding() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener3.class);
+        MessageListener listener = this.reader.getMessageListener(MessageListener3.class, 0.85F, 4);
 
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(0, String.class)
@@ -198,7 +198,7 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testMultipleSignatureListenerWithoutInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MultiMessageListener1.class);
+        MessageListener listener = this.reader.getMessageListener(MultiMessageListener1.class, 0.85F, 4);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(7, String.class)
                 .expectHandlers(9, String.class, String.class)

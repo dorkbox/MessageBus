@@ -27,10 +27,11 @@ public class PerfTest_Collections {
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     private static final float LOAD_FACTOR = 0.8F;
-    private static MessageListener messageListener = new MetadataReader().getMessageListener(Listener.class);
+    private static final MessageListener messageListener = new MetadataReader().getMessageListener(Listener.class, LOAD_FACTOR, 8);
 
     public static void main(final String[] args) throws Exception {
         final int size = 16;
+
 
         System.out.println("reps:" + REPETITIONS + "  size: " + size);
 
@@ -72,8 +73,10 @@ public class PerfTest_Collections {
         final int warmupRuns = 2;
         final int runs = 3;
 
+        Collection<MessageHandler> handlers = messageListener.getHandlers();
+
         for (int i=0;i<size;i++) {
-            for (MessageHandler x : messageListener.getHandlers()) {
+            for (MessageHandler x : handlers) {
                 set.add(new Subscription(x));
             }
         }

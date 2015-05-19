@@ -94,7 +94,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
         }
 
         Node<T> pred = null;
-        for (Node<T> p = node; p != null; p = succ(p)) {
+        for (Node<T> p = this.head; p != null; p = succ(p)) {
             T item = p.item;
             if (item != null &&
                 element.equals(item) &&

@@ -1,21 +1,22 @@
 package dorkbox.util.messagebus.common.thread;
 
-import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 
 
-public class ClassHolder extends ThreadLocal<StrongConcurrentSetV8<Class<?>>> {
+public class ClassHolder extends ThreadLocal<ConcurrentSet<Class<?>>> {
 
     private final float loadFactor;
+    private final int stripeSize;
 
-    public ClassHolder(float loadFactor) {
+    public ClassHolder(float loadFactor, int stripeSize) {
         super();
 
         this.loadFactor = loadFactor;
+        this.stripeSize = stripeSize;
     }
 
     @Override
-    public StrongConcurrentSetV8<Class<?>> initialValue() {
-        return new StrongConcurrentSetV8<Class<?>>(16, this.loadFactor);
+    public ConcurrentSet<Class<?>> initialValue() {
+        return new ConcurrentSet<Class<?>>(16, this.loadFactor, this.stripeSize);
     }
 }
 

@@ -1,13 +1,12 @@
 package dorkbox.util.messagebus;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
-import dorkbox.util.messagebus.common.ISetEntry;
-import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.SubscriptionUtils;
 import dorkbox.util.messagebus.common.VarArgPossibility;
 import dorkbox.util.messagebus.common.VarArgUtils;
@@ -51,8 +50,8 @@ public class SubscriptionManager {
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerMessageSingle;
-    private final HashMapTree<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerMessageMulti;
+    private final ConcurrentMap<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle;
+    private final HashMapTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti;
 
     // all subscriptions per messageHandler type
     // this map provides fast access for subscribing and unsubscribing
@@ -60,12 +59,6 @@ public class SubscriptionManager {
     // once a collection of subscriptions is stored it does not change
     private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerListener;
 
-
-    // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
-    // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
-    // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> superClassSubscriptions;
-    private final HashMapTree<Class<?>, ConcurrentSet<Subscription>> superClassSubscriptionsMulti;
 
     private final VarArgUtils varArgUtils;
 
@@ -75,36 +68,31 @@ public class SubscriptionManager {
     private final SubscriptionHolder subHolderSingle;
     private final SubscriptionHolder subHolderConcurrent;
 
+
     SubscriptionManager(int numberOfThreads) {
         this.STRIPE_SIZE = numberOfThreads;
 
-        this.utils = new SubscriptionUtils(LOAD_FACTOR, numberOfThreads);
+        float loadFactor = SubscriptionManager.LOAD_FACTOR;
 
         // modified ONLY during SUB/UNSUB
         {
-            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, SubscriptionManager.LOAD_FACTOR);
+            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, loadFactor, this.STRIPE_SIZE);
 
-            this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(32, SubscriptionManager.LOAD_FACTOR, 1);
-            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ConcurrentSet<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
+            this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, Collection<Subscription>>(4, loadFactor, this.STRIPE_SIZE);
+            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, Collection<Subscription>>(4, loadFactor);
 
             // only used during SUB/UNSUB
-            this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(32, SubscriptionManager.LOAD_FACTOR, 1);
+            this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(4, loadFactor, this.STRIPE_SIZE);
         }
 
-        // modified by N threads
-        {
-            // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
-            // it's a hit on SUB/UNSUB, but improves performance of handlers
-            this.superClassSubscriptions = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(32, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-            this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ConcurrentSet<Subscription>>(4, SubscriptionManager.LOAD_FACTOR);
+        this.utils = new SubscriptionUtils(this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, loadFactor, numberOfThreads);
 
-            // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
-            // it's a hit on SUB/UNSUB, but improves performance of handlers
-            this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-        }
+        // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
+        // it's a hit on SUB/UNSUB, but improves performance of handlers
+        this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, this.STRIPE_SIZE);
 
-        this.subHolderSingle = new SubscriptionHolder(SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-        this.subHolderConcurrent = new SubscriptionHolder(SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
+        this.subHolderSingle = new SubscriptionHolder(loadFactor, this.STRIPE_SIZE);
+        this.subHolderConcurrent = new SubscriptionHolder(loadFactor, this.STRIPE_SIZE);
     }
 
     public void shutdown() {
@@ -146,7 +134,7 @@ public class SubscriptionManager {
             ConcurrentSet<Subscription> subsPerListener = subsPerListener2.get(listenerClass);
             if (subsPerListener == null) {
                 // a listener is subscribed for the first time
-                StrongConcurrentSet<MessageHandler> messageHandlers = SubscriptionManager.metadataReader.getMessageListener(listenerClass).getHandlers();
+                Collection<MessageHandler> messageHandlers = SubscriptionManager.metadataReader.getMessageListener(listenerClass, LOAD_FACTOR, this.STRIPE_SIZE).getHandlers();
                 int handlersSize = messageHandlers.size();
 
                 if (handlersSize == 0) {
@@ -157,15 +145,15 @@ public class SubscriptionManager {
                     VarArgPossibility varArgPossibility = this.varArgPossibility;
 
                     subsPerListener = new ConcurrentSet<Subscription>(16, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-                    ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
+                    ConcurrentMap<Class<?>, Collection<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
 
-                    ISetEntry<MessageHandler> current = messageHandlers.head;
+                    Iterator<MessageHandler> iterator;
                     MessageHandler messageHandler;
-                    while (current != null) {
-                        messageHandler = current.getValue();
-                        current = current.next();
+                    Collection<Subscription> subsPerType = null;
 
-                        ConcurrentSet<Subscription> subsPerType = null;
+                    for (iterator = messageHandlers.iterator(); iterator.hasNext();) {
+                        messageHandler = iterator.next();
+
 
                         // now add this subscription to each of the handled types
                         Class<?>[] types = messageHandler.getHandledMessages();
@@ -176,12 +164,13 @@ public class SubscriptionManager {
                                 SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
                                 subsPerType = subHolderConcurrent.get();
 
-                                ConcurrentSet<Subscription> putIfAbsent = subsPerMessageSingle.putIfAbsent(types[0], subsPerType);
+                                Collection<Subscription> putIfAbsent = subsPerMessageSingle.putIfAbsent(types[0], subsPerType);
                                 if (putIfAbsent != null) {
                                     subsPerType = putIfAbsent;
                                 } else {
                                     subHolderConcurrent.set(subHolderConcurrent.initialValue());
                                     boolean isArray = this.utils.isArray(types[0]);
+                                    // cache the super classes
                                     this.utils.getSuperClasses(types[0], isArray);
                                     if (isArray) {
                                         varArgPossibility.set(true);
@@ -194,11 +183,12 @@ public class SubscriptionManager {
                                 SubscriptionHolder subHolderSingle = this.subHolderSingle;
                                 subsPerType = subHolderSingle.get();
 
-                                ConcurrentSet<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1]);
+                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1]);
                                 if (putIfAbsent != null) {
                                     subsPerType = putIfAbsent;
                                 } else {
                                     subHolderSingle.set(subHolderSingle.initialValue());
+                                    // cache the super classes
                                     this.utils.getSuperClasses(types[0]);
                                     this.utils.getSuperClasses(types[1]);
                                 }
@@ -209,11 +199,12 @@ public class SubscriptionManager {
                                 SubscriptionHolder subHolderSingle = this.subHolderSingle;
                                 subsPerType = subHolderSingle.get();
 
-                                ConcurrentSet<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1], types[2]);
+                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1], types[2]);
                                 if (putIfAbsent != null) {
                                     subsPerType = putIfAbsent;
                                 } else {
                                     subHolderSingle.set(subHolderSingle.initialValue());
+                                    // cache the super classes
                                     this.utils.getSuperClasses(types[0]);
                                     this.utils.getSuperClasses(types[1]);
                                     this.utils.getSuperClasses(types[2]);
@@ -225,7 +216,7 @@ public class SubscriptionManager {
                                 SubscriptionHolder subHolderSingle = this.subHolderSingle;
                                 subsPerType = subHolderSingle.get();
 
-                                ConcurrentSet<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types);
+                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types);
                                 if (putIfAbsent != null) {
                                     subsPerType = putIfAbsent;
                                 } else {
@@ -253,8 +244,11 @@ public class SubscriptionManager {
                     subsPerListener2.put(listenerClass, subsPerListener);
                 }
             } else {
-                // subscriptions already exist and must only be updated
-                for (Subscription sub : subsPerListener) {
+                Iterator<Subscription> iterator;
+                Subscription sub;
+
+                for (iterator = subsPerListener.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     sub.subscribe(listener);
                 }
             }
@@ -276,9 +270,13 @@ public class SubscriptionManager {
         clearConcurrentCollections();
 
         synchronized(listenerClass) {
-            ConcurrentSet<Subscription> subscriptions = this.subscriptionsPerListener.get(listenerClass);
+            Collection<Subscription> subscriptions = this.subscriptionsPerListener.get(listenerClass);
             if (subscriptions != null) {
-                for (Subscription sub : subscriptions) {
+                Iterator<Subscription> iterator;
+                Subscription sub;
+
+                for (iterator = subscriptions.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     sub.unsubscribe(listener);
                 }
             }
@@ -286,23 +284,23 @@ public class SubscriptionManager {
     }
 
     private void clearConcurrentCollections() {
-        this.superClassSubscriptions.clear();
+        this.utils.clear();
         this.varArgUtils.clear();
     }
 
     // CAN RETURN NULL
-    public final ConcurrentSet<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
         return this.subscriptionsPerMessageSingle.get(messageType);
     }
 
     // CAN RETURN NULL
-    public final ConcurrentSet<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
         return this.subscriptionsPerMessageMulti.get(messageType1, messageType2);
     }
 
 
     // CAN RETURN NULL
-    public final ConcurrentSet<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
+    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2, Class<?> messageType3) {
         return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2, messageType3);
     }
 
@@ -321,263 +319,40 @@ public class SubscriptionManager {
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass) {
+    public Collection<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass) {
         return this.varArgUtils.getVarArgSuperSubscriptions(messageClass);
     }
 
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass1, Class<?> messageClass2) {
+    public Collection<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass1, Class<?> messageClass2) {
         return this.varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2);
     }
 
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+    public Collection<Subscription> getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
         return this.varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
     }
 
 
     // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.
-    public final ConcurrentSet<Subscription> getSuperSubscriptions(Class<?> superType) {
-        // whenever our subscriptions change, this map is cleared.
-        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> local = this.superClassSubscriptions;
-
-        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.get();
-
-        // cache our subscriptions for super classes, so that their access can be fast!
-        ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(superType, subsPerType);
-        if (putIfAbsent == null) {
-            // we are the first one in the map
-            subHolderConcurrent.set(subHolderConcurrent.initialValue());
-
-            StrongConcurrentSet<Class<?>> types = this.utils.getSuperClasses(superType);
-            if (types.isEmpty()) {
-                return subsPerType;
-            }
-
-            Map<Class<?>, ConcurrentSet<Subscription>> local2 = this.subscriptionsPerMessageSingle;
-
-            ISetEntry<Class<?>> current1 = null;
-            Class<?> superClass;
-
-            current1 = types.head;
-            while (current1 != null) {
-                superClass = current1.getValue();
-                current1 = current1.next();
-
-                ConcurrentSet<Subscription> subs = local2.get(superClass);
-                if (subs != null) {
-                    for (Subscription sub : subs) {
-                        if (sub.acceptsSubtypes()) {
-                            subsPerType.add(sub);
-                        }
-                    }
-                }
-            }
-            return subsPerType;
-        } else {
-            // someone beat us
-            return putIfAbsent;
-        }
-
+    public final Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
+        return this.utils.getSuperSubscriptions(superType);
     }
 
     // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.
-    public ConcurrentSet<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
-        HashMapTree<Class<?>, ConcurrentSet<Subscription>> local = this.superClassSubscriptionsMulti;
-
-        // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, ConcurrentSet<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2);
-        ConcurrentSet<Subscription> subsPerType = null;
-
-        // we DO NOT care about duplicate, because the answers will be the same
-        if (subsPerTypeLeaf != null) {
-            // if the leaf exists, then the value exists.
-            subsPerType = subsPerTypeLeaf.getValue();
-        } else {
-            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-            subsPerType = subHolderSingle.get();
-
-            // cache our subscriptions for super classes, so that their access can be fast!
-            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2);
-            if (putIfAbsent == null) {
-                // we are the first one in the map
-                subHolderSingle.set(subHolderSingle.initialValue());
-
-                // whenever our subscriptions change, this map is cleared.
-                StrongConcurrentSet<Class<?>> types1 = this.utils.getSuperClasses(superType1);
-                StrongConcurrentSet<Class<?>> types2 = this.utils.getSuperClasses(superType2);
-
-                ConcurrentSet<Subscription> subs;
-                HashMapTree<Class<?>, ConcurrentSet<Subscription>> leaf1;
-                HashMapTree<Class<?>, ConcurrentSet<Subscription>> leaf2;
-
-                ISetEntry<Class<?>> current1 = null;
-                Class<?> eventSuperType1;
-
-                ISetEntry<Class<?>> current2 = null;
-                Class<?> eventSuperType2;
-
-                if (types1 != null) {
-                    current1 = types1.head;
-                }
-                while (current1 != null) {
-                    eventSuperType1 = current1.getValue();
-                    current1 = current1.next();
-
-                    boolean type1Matches = eventSuperType1 == superType1;
-                    if (type1Matches) {
-                        continue;
-                    }
-
-                    leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
-                    if (leaf1 != null) {
-                        if (types2 != null) {
-                            current2 = types2.head;
-                        }
-                        while (current2 != null) {
-                            eventSuperType2 = current2.getValue();
-                            current2 = current2.next();
-
-                            if (type1Matches && eventSuperType2 == superType2) {
-                                continue;
-                            }
-
-                            leaf2 = leaf1.getLeaf(eventSuperType2);
-
-                            if (leaf2 != null) {
-                                subs = leaf2.getValue();
-                                if (subs != null) {
-                                    for (Subscription sub : subs) {
-                                        if (sub.acceptsSubtypes()) {
-                                            subsPerType.add(sub);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // someone beat us
-                subsPerType = putIfAbsent;
-            }
-        }
-
-        return subsPerType;
+    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
+        return this.utils.getSuperSubscriptions(superType1, superType2);
     }
 
     // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.
-    public ConcurrentSet<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
-        HashMapTree<Class<?>, ConcurrentSet<Subscription>> local = this.superClassSubscriptionsMulti;
-
-        // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, ConcurrentSet<Subscription>> subsPerTypeLeaf = local.getLeaf(superType1, superType2, superType3);
-        ConcurrentSet<Subscription> subsPerType;
-
-
-        // we DO NOT care about duplicate, because the answers will be the same
-        if (subsPerTypeLeaf != null) {
-            // if the leaf exists, then the value exists.
-            subsPerType = subsPerTypeLeaf.getValue();
-        } else {
-            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-            subsPerType = subHolderSingle.get();
-
-            // cache our subscriptions for super classes, so that their access can be fast!
-            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2, superType3);
-            if (putIfAbsent == null) {
-                // we are the first one in the map
-                subHolderSingle.set(subHolderSingle.initialValue());
-
-                StrongConcurrentSet<Class<?>> types1 = this.utils.getSuperClasses(superType1);
-                StrongConcurrentSet<Class<?>> types2 = this.utils.getSuperClasses(superType2);
-                StrongConcurrentSet<Class<?>> types3 = this.utils.getSuperClasses(superType3);
-
-                ConcurrentSet<Subscription> subs;
-                HashMapTree<Class<?>, ConcurrentSet<Subscription>> leaf1;
-                HashMapTree<Class<?>, ConcurrentSet<Subscription>> leaf2;
-                HashMapTree<Class<?>, ConcurrentSet<Subscription>> leaf3;
-
-                ISetEntry<Class<?>> current1 = null;
-                Class<?> eventSuperType1;
-
-                ISetEntry<Class<?>> current2 = null;
-                Class<?> eventSuperType2;
-
-                ISetEntry<Class<?>> current3 = null;
-                Class<?> eventSuperType3;
-
-                if (types1 != null) {
-                    current1 = types1.head;
-                }
-                while (current1 != null) {
-                    eventSuperType1 = current1.getValue();
-                    current1 = current1.next();
-
-                    boolean type1Matches = eventSuperType1 == superType1;
-                    if (type1Matches) {
-                        continue;
-                    }
-
-                    leaf1 = this.subscriptionsPerMessageMulti.getLeaf(eventSuperType1);
-                    if (leaf1 != null) {
-                        if (types2 != null) {
-                            current2 = types2.head;
-                        }
-                        while (current2 != null) {
-                            eventSuperType2 = current2.getValue();
-                            current2 = current2.next();
-
-                            boolean type12Matches = type1Matches && eventSuperType2 == superType2;
-                            if (type12Matches) {
-                                continue;
-                            }
-
-                            leaf2 = leaf1.getLeaf(eventSuperType2);
-
-                            if (leaf2 != null) {
-                                if (types3 != null) {
-                                    current3 = types3.head;
-                                }
-                                while (current3 != null) {
-                                    eventSuperType3 = current3.getValue();
-                                    current3 = current3.next();
-
-                                    if (type12Matches && eventSuperType3 == superType3) {
-                                        continue;
-                                    }
-
-                                    leaf3 = leaf2.getLeaf(eventSuperType3);
-
-                                    if (leaf3 != null) {
-                                        subs = leaf3.getValue();
-                                        if (subs != null) {
-                                            for (Subscription sub : subs) {
-                                                if (sub.acceptsSubtypes()) {
-                                                    subsPerType.add(sub);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // someone beat us
-                subsPerType = putIfAbsent;
-            }
-        }
-
-        return subsPerType;
+    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
+        return this.utils.getSuperSubscriptions(superType1, superType2, superType3);
     }
 }

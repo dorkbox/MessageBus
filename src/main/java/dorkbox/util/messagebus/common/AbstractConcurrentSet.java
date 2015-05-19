@@ -4,9 +4,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
 
-import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
+import dorkbox.util.messagebus.common.thread.StampedLock;
 
 
 abstract class pad<T> extends item<T> {
@@ -27,7 +26,7 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
     private final transient long ID = id.getAndIncrement();
 
     // Internal state
-    protected final transient ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
+    protected final StampedLock lock = new StampedLock();
     private final transient Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
 
     volatile long y0, y1, y2, y4, y5, y6 = 7L;
@@ -47,25 +46,38 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
         }
         boolean changed = false;
 
-        Lock writeLock = this.lock.writeLock();
-        writeLock.lock();
+        long stamp = this.lock.readLock();
+        if (this.entries.containsKey(element)) {
+            this.lock.unlockRead(stamp);
+            return false;
+        }
+
+        long newStamp = 0L;
+        while ((newStamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
+            this.lock.unlockRead(stamp);
+            stamp = this.lock.writeLock();
+        }
+        stamp = newStamp;
+
+
         changed = insert(element);
-        writeLock.unlock();
+        this.lock.unlock(stamp);
 
         return changed;
     }
 
     @Override
     public boolean contains(Object element) {
-        Lock readLock = this.lock.readLock();
-        ISetEntry<T> entry;
-        try {
-            readLock.lock();
-            entry = this.entries.get(element);
+        long stamp = this.lock.tryOptimisticRead();
 
-        } finally {
-            readLock.unlock();
+        ISetEntry<T> entry = this.entries.get(element);
+
+        if (!this.lock.validate(stamp)) {
+            stamp = this.lock.readLock();
+            entry = this.entries.get(element);
+            this.lock.unlockRead(stamp);
         }
+
         return entry != null && entry.getValue() != null;
     }
 
@@ -90,18 +102,21 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
 
     @Override
     public boolean addAll(Collection<? extends T> elements) {
+        StampedLock lock = this.lock;
+
         boolean changed = false;
-        Lock writeLock = this.lock.writeLock();
+        long stamp = lock.writeLock();
+
         try {
-            writeLock.lock();
             for (T element : elements) {
                 if (element != null) {
                     changed |= insert(element);
                 }
             }
         } finally {
-            writeLock.unlock();
+            lock.unlockWrite(stamp);
         }
+
         return changed;
     }
 
@@ -110,33 +125,35 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
      */
     @Override
     public boolean remove(Object element) {
+        StampedLock lock = this.lock;
+        long stamp = lock.tryOptimisticRead();
 
-        Lock updateLock = this.lock.updateLock();
-        try {
-            updateLock.lock();
-            ISetEntry<T> entry = this.entries.get(element);
+        ISetEntry<T> entry = this.entries.get(element);
 
-            if (entry != null && entry.getValue() != null) {
-                Lock writeLock = this.lock.writeLock();
-                try {
-                    writeLock.lock();
-                    if (entry != this.head) {
-                        entry.remove();
-                    } else {
-                        // if it was second, now it's first
-                        this.head = this.head.next();
-                        //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
-                    }
-                    this.entries.remove(element);
-                    return true;
-                } finally {
-                    writeLock.unlock();
+        if (!lock.validate(stamp)) {
+            stamp = lock.readLock();
+            entry = this.entries.get(element);
+            lock.unlockRead(stamp);
+        }
+
+        if (entry == null || entry.getValue() == null) {
+            return false; // fast exit
+        } else {
+            stamp = lock.writeLock();
+
+            try {
+                if (entry != this.head) {
+                    entry.remove();
+                } else {
+                    // if it was second, now it's first
+                    this.head = this.head.next();
+                    //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
                 }
-            } else {
-                return false; // fast exit
+                this.entries.remove(element);
+                return true;
+            } finally {
+                lock.unlockWrite(stamp);
             }
-        } finally {
-            updateLock.unlock();
         }
     }
 
@@ -146,7 +163,7 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
     }
 
     @Override
-    public <T> T[] toArray(T[] a) {
+    public <T2> T2[] toArray(T2[] a) {
         return this.entries.entrySet().toArray(a);
     }
 
@@ -167,14 +184,12 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
 
     @Override
     public void clear() {
-        Lock writeLock = this.lock.writeLock();
-        try {
-            writeLock.lock();
-                this.head = null;
-                this.entries.clear();
-        } finally {
-            writeLock.unlock();
-        }
+        StampedLock lock = this.lock;
+
+        long stamp = lock.writeLock();
+        this.head = null;
+        this.entries.clear();
+        lock.unlockWrite(stamp);
     }
 
     @Override
@@ -196,6 +211,7 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
         if (getClass() != obj.getClass()) {
             return false;
         }
+        @SuppressWarnings("rawtypes")
         AbstractConcurrentSet other = (AbstractConcurrentSet) obj;
         if (this.ID != other.ID) {
             return false;

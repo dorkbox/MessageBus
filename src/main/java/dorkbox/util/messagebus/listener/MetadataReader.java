@@ -1,11 +1,12 @@
 package dorkbox.util.messagebus.listener;
 
 import java.lang.reflect.Method;
+import java.util.Collection;
+import java.util.Iterator;
 
 import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.ReflectionUtils;
-import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 
 /**
  * The meta data reader is responsible for parsing and validating message handler configurations.
@@ -19,35 +20,31 @@ public class MetadataReader {
 
     // get all listeners defined by the given class (includes
     // listeners defined in super classes)
-    public MessageListener getMessageListener(Class<?> target) {
+    public MessageListener getMessageListener(Class<?> target, float loadFactor, int stripeSize) {
 
         // get all handlers (this will include all (inherited) methods directly annotated using @Handler)
-        StrongConcurrentSetV8<Method> allHandlers = ReflectionUtils.getMethods(target);
+        Collection<Method> allHandlers = ReflectionUtils.getMethods(target);
 
         // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-        StrongConcurrentSetV8<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F);
-
-
-        ISetEntry<Method> current = allHandlers.head;
+        Collection<Method> bottomMostHandlers = new ConcurrentSet<Method>(allHandlers.size(), loadFactor, stripeSize);
+        Iterator<Method> iterator;
         Method handler;
-        while (current != null) {
-            handler = current.getValue();
-            current = current.next();
+
+        for (iterator = allHandlers.iterator(); iterator.hasNext();) {
+            handler  = iterator.next();
 
             if (!ReflectionUtils.containsOverridingMethod(allHandlers, handler)) {
                 bottomMostHandlers.add(handler);
             }
         }
 
-        MessageListener listenerMetadata = new MessageListener(target, bottomMostHandlers.size());
+        MessageListener listenerMetadata = new MessageListener(target, bottomMostHandlers.size(), loadFactor, stripeSize);
 
         // for each handler there will be no overriding method that specifies @Handler annotation
         // but an overriding method does inherit the listener configuration of the overwritten method
 
-        current = bottomMostHandlers.head;
-        while (current != null) {
-            handler = current.getValue();
-            current = current.next();
+        for (iterator = bottomMostHandlers.iterator(); iterator.hasNext();) {
+            handler = iterator.next();
 
             Handler handlerConfig = ReflectionUtils.getAnnotation(handler, Handler.class);
             if (handlerConfig == null || !handlerConfig.enabled()) {
