@@ -22,7 +22,7 @@ public class MessageListener {
     private Class<?> listenerDefinition;
 
     public MessageListener(Class<?> listenerDefinition, int size) {
-        this.handlers = new StrongConcurrentSetV8<MessageHandler>(size, 0.8F, 1);
+        this.handlers = new StrongConcurrentSetV8<MessageHandler>(size, 0.8F);
         this.listenerDefinition = listenerDefinition;
     }
 

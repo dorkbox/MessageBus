@@ -9,7 +9,7 @@ import org.jctools.util.Pow2;
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.ISetEntry;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
-import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
+import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.common.thread.BooleanHolder;
@@ -201,7 +201,7 @@ public class MultiMBassador implements IMessageBus {
         SubscriptionManager manager = this.subscriptionManager;
 
         Class<?> messageClass = message.getClass();
-        StrongConcurrentSetV8<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
+        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass);
 
         BooleanHolder subsPublished = this.booleanThreadLocal.get();
         subsPublished.bool = false;
@@ -222,7 +222,7 @@ public class MultiMBassador implements IMessageBus {
         }
 
         if (!this.forceExactMatches) {
-            StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
             // now get superClasses
             if (superSubscriptions != null) {
                 current = superSubscriptions.head;
@@ -240,7 +240,7 @@ public class MultiMBassador implements IMessageBus {
             if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
                 Object[] asArray = null;
 
-                StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
+                StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
                 if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
                     asArray[0] = message;
@@ -255,7 +255,7 @@ public class MultiMBassador implements IMessageBus {
                     }
                 }
 
-                StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
+                StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
                 // now get array based superClasses (but only if those ALSO accept vararg)
                 if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
                     if (asArray == null) {
@@ -277,7 +277,7 @@ public class MultiMBassador implements IMessageBus {
 
         if (!subsPublished.bool) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSetV8<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message);
 
@@ -300,7 +300,7 @@ public class MultiMBassador implements IMessageBus {
         Class<?> messageClass1 = message1.getClass();
         Class<?> messageClass2 = message2.getClass();
 
-        StrongConcurrentSetV8<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
+        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
         BooleanHolder subsPublished = this.booleanThreadLocal.get();
         subsPublished.bool = false;
 
@@ -320,7 +320,7 @@ public class MultiMBassador implements IMessageBus {
         }
 
         if (!this.forceExactMatches) {
-            StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
+            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
             // now get superClasses
             if (superSubscriptions != null) {
                 current = superSubscriptions.head;
@@ -338,7 +338,7 @@ public class MultiMBassador implements IMessageBus {
                 if (messageClass1 == messageClass2) {
                     Object[] asArray = null;
 
-                    StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
                     if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 2);
                         asArray[0] = message1;
@@ -354,7 +354,7 @@ public class MultiMBassador implements IMessageBus {
                         }
                     }
 
-                    StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
                     // now get array based superClasses (but only if those ALSO accept vararg)
                     if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
                         if (asArray == null) {
@@ -373,7 +373,7 @@ public class MultiMBassador implements IMessageBus {
                         }
                     }
                 } else {
-                    StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
+                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
 
                     // now get array based superClasses (but only if those ALSO accept vararg)
                     if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
@@ -400,7 +400,7 @@ public class MultiMBassador implements IMessageBus {
 
         if (!subsPublished.bool) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSetV8<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message1, message2);
 
@@ -424,7 +424,7 @@ public class MultiMBassador implements IMessageBus {
         Class<?> messageClass2 = message2.getClass();
         Class<?> messageClass3 = message3.getClass();
 
-        StrongConcurrentSetV8<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
+        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
         BooleanHolder subsPublished = this.booleanThreadLocal.get();
         subsPublished.bool = false;
 
@@ -445,7 +445,7 @@ public class MultiMBassador implements IMessageBus {
 
 
         if (!this.forceExactMatches) {
-            StrongConcurrentSetV8<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
             // now get superClasses
             if (superSubscriptions != null) {
                 current = superSubscriptions.head;
@@ -462,7 +462,7 @@ public class MultiMBassador implements IMessageBus {
             if (manager.hasVarArgPossibility()) {
                 if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
                     Object[] asArray = null;
-                    StrongConcurrentSetV8<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
+                    StrongConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass1);
                     if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
                         asArray = (Object[]) Array.newInstance(messageClass1, 3);
                         asArray[0] = message1;
@@ -479,7 +479,7 @@ public class MultiMBassador implements IMessageBus {
                         }
                     }
 
-                    StrongConcurrentSetV8<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
+                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
                     // now get array based superClasses (but only if those ALSO accept vararg)
                     if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
                         if (asArray == null) {
@@ -499,7 +499,7 @@ public class MultiMBassador implements IMessageBus {
                         }
                     }
                 } else {
-                    StrongConcurrentSetV8<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
 
                     // now get array based superClasses (but only if those ALSO accept vararg)
                     if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
@@ -527,7 +527,7 @@ public class MultiMBassador implements IMessageBus {
 
         if (!subsPublished.bool) {
             // Dead Event must EXACTLY MATCH (no subclasses)
-            StrongConcurrentSetV8<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+            StrongConcurrentSet<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
             if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
                 DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
 

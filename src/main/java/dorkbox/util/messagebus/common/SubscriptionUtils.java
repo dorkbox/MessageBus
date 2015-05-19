@@ -11,7 +11,7 @@ public class SubscriptionUtils {
     private final Map<Class<?>, Class<?>> arrayVersionCache;
     private final Map<Class<?>, Boolean> isArrayCache;
 
-    private final ConcurrentMap<Class<?>, StrongConcurrentSetV8<Class<?>>> superClassesCache;
+    private final ConcurrentMap<Class<?>, StrongConcurrentSet<Class<?>>> superClassesCache;
     private final ClassHolder classHolderSingle;
 
 
@@ -19,8 +19,8 @@ public class SubscriptionUtils {
         this.arrayVersionCache = new ConcurrentHashMapV8<Class<?>, Class<?>>(64, loadFactor, stripeSize);
         this.isArrayCache = new ConcurrentHashMapV8<Class<?>, Boolean>(64, loadFactor, stripeSize);
 
-        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, StrongConcurrentSetV8<Class<?>>>(64, loadFactor, stripeSize);
-        this.classHolderSingle = new ClassHolder(loadFactor, stripeSize);
+        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, StrongConcurrentSet<Class<?>>>(64, loadFactor, stripeSize);
+        this.classHolderSingle = new ClassHolder(loadFactor);
     }
 
     /**
@@ -28,24 +28,24 @@ public class SubscriptionUtils {
      * never returns null
      * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
      */
-    public StrongConcurrentSetV8<Class<?>> getSuperClasses(Class<?> clazz) {
+    public StrongConcurrentSet<Class<?>> getSuperClasses(Class<?> clazz) {
         return getSuperClasses(clazz, isArray(clazz));
     }
 
-    public final StrongConcurrentSetV8<Class<?>> getSuperClasses(Class<?> clazz, boolean isArray) {
+    public final StrongConcurrentSet<Class<?>> getSuperClasses(Class<?> clazz, boolean isArray) {
         // this is never reset, since it never needs to be.
-        ConcurrentMap<Class<?>, StrongConcurrentSetV8<Class<?>>> local = this.superClassesCache;
+        ConcurrentMap<Class<?>, StrongConcurrentSet<Class<?>>> local = this.superClassesCache;
 
         ClassHolder classHolderSingle = this.classHolderSingle;
-        StrongConcurrentSetV8<Class<?>> classes = classHolderSingle.get();
+        StrongConcurrentSet<Class<?>> classes = classHolderSingle.get();
 
-        StrongConcurrentSetV8<Class<?>> putIfAbsent = local.putIfAbsent(clazz, classes);
+        StrongConcurrentSet<Class<?>> putIfAbsent = local.putIfAbsent(clazz, classes);
         if (putIfAbsent == null) {
             // we are the first one in the map
             classHolderSingle.set(classHolderSingle.initialValue());
 
             // it doesn't matter if concurrent access stomps on values, since they are always the same.
-            StrongConcurrentSetV8<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
+            StrongConcurrentSet<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
 
             ISetEntry<Class<?>> current = superTypes.head;
             Class<?> c;

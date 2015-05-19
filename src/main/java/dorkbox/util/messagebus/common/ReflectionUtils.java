@@ -17,7 +17,7 @@ import dorkbox.util.messagebus.annotations.Handler;
 public class ReflectionUtils {
 
     public static StrongConcurrentSetV8<Method> getMethods(Class<?> target) {
-        StrongConcurrentSetV8<Method> hashSet = new StrongConcurrentSetV8<Method>(16, .8F, 1);
+        StrongConcurrentSetV8<Method> hashSet = new StrongConcurrentSetV8<Method>(16, .8F);
         getMethods(target, hashSet);
         return hashSet;
     }
@@ -67,7 +67,7 @@ public class ReflectionUtils {
      * @return A set of classes, each representing a super type of the root class
      */
     public static StrongConcurrentSetV8<Class<?>> getSuperTypes(Class<?> from) {
-        StrongConcurrentSetV8<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F, 1);
+        StrongConcurrentSetV8<Class<?>> superclasses = new StrongConcurrentSetV8<Class<?>>(8, 0.8F);
 
         collectInterfaces( from, superclasses );
 
@@ -131,7 +131,7 @@ public class ReflectionUtils {
     }
 
     public static <A extends Annotation> A getAnnotation( AnnotatedElement from, Class<A> annotationType) {
-        A annotation = getAnnotation(from, annotationType, new StrongConcurrentSetV8<AnnotatedElement>(16, .8F, 1));
+        A annotation = getAnnotation(from, annotationType, new StrongConcurrentSetV8<AnnotatedElement>(16, .8F));
         return annotation;
     }
 

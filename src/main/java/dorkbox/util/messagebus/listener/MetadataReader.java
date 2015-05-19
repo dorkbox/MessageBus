@@ -25,7 +25,7 @@ public class MetadataReader {
         StrongConcurrentSetV8<Method> allHandlers = ReflectionUtils.getMethods(target);
 
         // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-        StrongConcurrentSetV8<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F, 1);
+        StrongConcurrentSetV8<Method> bottomMostHandlers = new StrongConcurrentSetV8<Method>(allHandlers.size(), 0.8F);
 
 
         ISetEntry<Method> current = allHandlers.head;
