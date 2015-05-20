@@ -30,7 +30,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
 
     public ConcurrentSet(int size, float loadFactor, int stripeSize) {
         super();
-        this.entries = new ConcurrentHashMapV8<T, Node<T>>(size, loadFactor, stripeSize);
+        this.entries = new ConcurrentHashMapV8<T, Node<T>>(size, loadFactor, 32);
     }
 
     @Override
@@ -39,6 +39,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
             return false;
         }
 
+        // had to modify the super implementation so we get Node<T> back
         Node<T> alreadyPresent = this.entries.putIfAbsent(element, this.IN_PROGRESS_MARKER);
         if (alreadyPresent == null) {
             // this doesn't already exist
@@ -76,7 +77,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
 
     @Override
     public boolean isEmpty() {
-        return this.entries.isEmpty();
+        return super.isEmpty();
     }
 
     /**
@@ -219,12 +220,12 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
 
     @Override
     public Object[] toArray() {
-        return this.entries.entrySet().toArray();
+        return this.entries.keySet().toArray();
     }
 
     @Override
     public <T> T[] toArray(T[] a) {
-        return this.entries.entrySet().toArray(a);
+        return this.entries.keySet().toArray(a);
     }
 
     @Override

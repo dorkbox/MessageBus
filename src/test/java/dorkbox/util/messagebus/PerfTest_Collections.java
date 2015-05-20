@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedTransferQueue;
@@ -51,17 +52,16 @@ public class PerfTest_Collections {
 //        }
         System.err.println("Done");
 
-        bench(size, new ConcurrentLinkedQueue2<Subscription>());
-        bench(size, new ConcurrentSet<Subscription>(size*2, LOAD_FACTOR, 5));
-        bench(size, Collections.<Subscription>newSetFromMap(new ConcurrentHashMapV8<Subscription, Boolean>(size*2, LOAD_FACTOR, 1)));
         bench(size, new ArrayList<Subscription>(size*2));
+        bench(size, new ConcurrentSet<Subscription>(size*2, LOAD_FACTOR, 5));
+        bench(size, new ConcurrentLinkedQueue2<Subscription>());
         bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedTransferQueue<Subscription>());
         bench(size, new ArrayDeque<Subscription>(size*2));
-        bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedList<Subscription>());
         bench(size, new StrongConcurrentSetV8<Subscription>(size*2, LOAD_FACTOR));
         bench(size, new StrongConcurrentSet<Subscription>(size*2, LOAD_FACTOR));
+        bench(size, Collections.<Subscription>newSetFromMap(new ConcurrentHashMapV8<Subscription, Boolean>(size*2, LOAD_FACTOR, 1)));
         bench(size, new HashSet<Subscription>());
 //        bench(size, new ConcurrentSkipListSet<Subscription>()); // needs comparable
     }
@@ -81,9 +81,13 @@ public class PerfTest_Collections {
             }
         }
 
-        for (int i=2;i<6;i++) {
-            long average = averageRun(warmupRuns, runs, set, false, i, REPETITIONS);
-            if (showOutput) {
+        if (!showOutput) {
+            for (int i=2;i<6;i++) {
+                averageRun(warmupRuns, runs, set, false, i, REPETITIONS);
+            }
+        } else {
+            for (int i=1;i<10;i++) {
+                long average = averageRun(warmupRuns, runs, set, false, i, REPETITIONS);
                 System.out.format("summary,IteratorPerfTest,%s - %,d  (%d)\n", set.getClass().getSimpleName(), average, i);
             }
         }
@@ -174,12 +178,16 @@ public class PerfTest_Collections {
             int i = this.repetitions;
             this.start = System.nanoTime();
 
+            Iterator<Subscription> iterator;
+            Subscription sub;
+
 //            Entry<Subscription> current;
 //            Subscription sub;
             int count = 0;
 
             do {
-                for (Subscription sub : set) {
+                for (iterator = set.iterator(); iterator.hasNext();) {
+                    sub = iterator.next();
                     //                    if (sub.acceptsSubtypes()) {
 //                        count--;
 //                    } else {

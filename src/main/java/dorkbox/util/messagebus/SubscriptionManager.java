@@ -142,10 +142,12 @@ public class SubscriptionManager {
                     this.nonListeners.put(listenerClass, Boolean.TRUE);
                     return;
                 } else {
-                    VarArgPossibility varArgPossibility = this.varArgPossibility;
-
                     subsPerListener = new ConcurrentSet<Subscription>(16, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
+
+                    VarArgPossibility varArgPossibility = this.varArgPossibility;
                     ConcurrentMap<Class<?>, Collection<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
+                    HashMapTree<Class<?>, Collection<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
+
 
                     Iterator<MessageHandler> iterator;
                     MessageHandler messageHandler;
@@ -154,84 +156,9 @@ public class SubscriptionManager {
                     for (iterator = messageHandlers.iterator(); iterator.hasNext();) {
                         messageHandler = iterator.next();
 
-
                         // now add this subscription to each of the handled types
-                        Class<?>[] types = messageHandler.getHandledMessages();
-                        int size = types.length;
-
-                        switch (size) {
-                            case 1: {
-                                SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-                                subsPerType = subHolderConcurrent.get();
-
-                                Collection<Subscription> putIfAbsent = subsPerMessageSingle.putIfAbsent(types[0], subsPerType);
-                                if (putIfAbsent != null) {
-                                    subsPerType = putIfAbsent;
-                                } else {
-                                    subHolderConcurrent.set(subHolderConcurrent.initialValue());
-                                    boolean isArray = this.utils.isArray(types[0]);
-                                    // cache the super classes
-                                    this.utils.getSuperClasses(types[0], isArray);
-                                    if (isArray) {
-                                        varArgPossibility.set(true);
-                                    }
-                                }
-                                break;
-                            }
-                            case 2: {
-                                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                                subsPerType = subHolderSingle.get();
-
-                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1]);
-                                if (putIfAbsent != null) {
-                                    subsPerType = putIfAbsent;
-                                } else {
-                                    subHolderSingle.set(subHolderSingle.initialValue());
-                                    // cache the super classes
-                                    this.utils.getSuperClasses(types[0]);
-                                    this.utils.getSuperClasses(types[1]);
-                                }
-                                break;
-                            }
-                            case 3: {
-                                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                                subsPerType = subHolderSingle.get();
-
-                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1], types[2]);
-                                if (putIfAbsent != null) {
-                                    subsPerType = putIfAbsent;
-                                } else {
-                                    subHolderSingle.set(subHolderSingle.initialValue());
-                                    // cache the super classes
-                                    this.utils.getSuperClasses(types[0]);
-                                    this.utils.getSuperClasses(types[1]);
-                                    this.utils.getSuperClasses(types[2]);
-                                }
-                                break;
-                            }
-                            default: {
-                                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                                subsPerType = subHolderSingle.get();
-
-                                Collection<Subscription> putIfAbsent = this.subscriptionsPerMessageMulti.putIfAbsent(subsPerType, types);
-                                if (putIfAbsent != null) {
-                                    subsPerType = putIfAbsent;
-                                } else {
-                                    subHolderSingle.set(subHolderSingle.initialValue());
-
-                                    Class<?> c;
-                                    int length = types.length;
-                                    for (int i = 0; i < length; i++) {
-                                        c = types[i];
-                                        this.utils.getSuperClasses(c);
-                                    }
-                                }
-                                break;
-                            }
-                        }
+                        // this can safely be called concurrently
+                        subsPerType = getSubsPerType(messageHandler, subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
 
                         // create the subscription
                         Subscription subscription = new Subscription(messageHandler);
@@ -250,6 +177,101 @@ public class SubscriptionManager {
                 for (iterator = subsPerListener.iterator(); iterator.hasNext();) {
                     sub = iterator.next();
                     sub.subscribe(listener);
+                }
+            }
+        }
+    }
+
+    private final Collection<Subscription> getSubsPerType(MessageHandler messageHandler,
+                                                          ConcurrentMap<Class<?>, Collection<Subscription>> subsPerMessageSingle,
+                                                          HashMapTree<Class<?>, Collection<Subscription>> subsPerMessageMulti,
+                                                          VarArgPossibility varArgPossibility) {
+
+        Class<?>[] types = messageHandler.getHandledMessages();
+        int size = types.length;
+
+        ConcurrentSet<Subscription> subsPerType;
+
+        SubscriptionUtils utils = this.utils;
+        switch (size) {
+            case 1: {
+                SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
+                subsPerType = subHolderConcurrent.get();
+
+                Collection<Subscription> putIfAbsent = subsPerMessageSingle.putIfAbsent(types[0], subsPerType);
+                if (putIfAbsent != null) {
+                    return putIfAbsent;
+                } else {
+                    subHolderConcurrent.set(subHolderConcurrent.initialValue());
+                    boolean isArray = utils.isArray(types[0]);
+                    if (isArray) {
+                        varArgPossibility.set(true);
+                    }
+
+                    // cache the super classes
+                    utils.getSuperClasses(types[0], isArray);
+
+                    return subsPerType;
+                }
+            }
+            case 2: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+                subsPerType = subHolderSingle.get();
+
+                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1]);
+                if (putIfAbsent != null) {
+                    return putIfAbsent;
+                } else {
+                    subHolderSingle.set(subHolderSingle.initialValue());
+
+                    // cache the super classes
+                    utils.getSuperClasses(types[0]);
+                    utils.getSuperClasses(types[1]);
+
+                    return subsPerType;
+                }
+            }
+            case 3: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+                subsPerType = subHolderSingle.get();
+
+                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types[0], types[1], types[2]);
+                if (putIfAbsent != null) {
+                    return putIfAbsent;
+                } else {
+                    subHolderSingle.set(subHolderSingle.initialValue());
+
+                    // cache the super classes
+                    utils.getSuperClasses(types[0]);
+                    utils.getSuperClasses(types[1]);
+                    utils.getSuperClasses(types[2]);
+
+                    return subsPerType;
+                }
+            }
+            default: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+                subsPerType = subHolderSingle.get();
+
+                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
+                if (putIfAbsent != null) {
+                    return putIfAbsent;
+                } else {
+                    subHolderSingle.set(subHolderSingle.initialValue());
+
+                    Class<?> c;
+                    int length = types.length;
+                    for (int i = 0; i < length; i++) {
+                        c = types[i];
+
+                        // cache the super classes
+                        utils.getSuperClasses(c);
+                    }
+
+                    return subsPerType;
                 }
             }
         }
@@ -277,6 +299,7 @@ public class SubscriptionManager {
 
                 for (iterator = subscriptions.iterator(); iterator.hasNext();) {
                     sub = iterator.next();
+
                     sub.unsubscribe(listener);
                 }
             }

@@ -6,7 +6,6 @@ import java.util.Iterator;
 
 import org.jctools.util.Pow2;
 
-import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
@@ -208,6 +207,7 @@ public class MultiMBassador implements IMessageBus {
         Subscription sub;
 
 
+
         // Run subscriptions
         if (subscriptions != null) {
             for (iterator = subscriptions.iterator(); iterator.hasNext();) {
@@ -218,17 +218,17 @@ public class MultiMBassador implements IMessageBus {
             }
         }
 
-        if (!this.forceExactMatches) {
-            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
-            // now get superClasses
-            if (superSubscriptions != null) {
-                for (iterator = superSubscriptions.iterator(); iterator.hasNext();) {
-                    sub = iterator.next();
-
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, message);
-                }
-            }
+//        if (!this.forceExactMatches) {
+//            Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+//            // now get superClasses
+//            if (superSubscriptions != null) {
+//                for (iterator = superSubscriptions.iterator(); iterator.hasNext();) {
+//                    sub = iterator.next();
+//
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, message);
+//                }
+//            }
 
 
 //            // publish to var arg, only if not already an array
@@ -261,21 +261,21 @@ public class MultiMBassador implements IMessageBus {
 //                    }
 //                }
 //            }
-        }
-
-        if (!subsPublished.bool) {
-            // Dead Event must EXACTLY MATCH (no subclasses)
-            Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
-                DeadMessage deadMessage = new DeadMessage(message);
-
-                for (iterator = deadSubscriptions.iterator(); iterator.hasNext();) {
-                    sub = iterator.next();
-                    // this catches all exception types
-                    sub.publishToSubscription(this, subsPublished, deadMessage);
-                }
-            }
-        }
+//        }
+//
+//        if (!subsPublished.bool) {
+//            // Dead Event must EXACTLY MATCH (no subclasses)
+//            Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+//            if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
+//                DeadMessage deadMessage = new DeadMessage(message);
+//
+//                for (iterator = deadSubscriptions.iterator(); iterator.hasNext();) {
+//                    sub = iterator.next();
+//                    // this catches all exception types
+//                    sub.publishToSubscription(this, subsPublished, deadMessage);
+//                }
+//            }
+//        }
     }
 
     @Override
