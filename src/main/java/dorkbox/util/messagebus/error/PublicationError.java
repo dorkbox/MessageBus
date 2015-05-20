@@ -19,8 +19,6 @@ public class PublicationError {
     // Internal state
     private Throwable cause;
     private String message;
-    private String methodName;
-    private Object listener;
     private Object[] publishedObjects;
 
 
@@ -55,24 +53,6 @@ public class PublicationError {
 
     public PublicationError setMessage(String message) {
         this.message = message;
-        return this;
-    }
-
-    public String getMethodName() {
-        return this.methodName;
-    }
-
-    public PublicationError setMethodName(String methodName) {
-        this.methodName = methodName;
-        return this;
-    }
-
-    public Object getListener() {
-        return this.listener;
-    }
-
-    public PublicationError setListener(Object listener) {
-        this.listener = listener;
         return this;
     }
 
@@ -115,10 +95,6 @@ public class PublicationError {
                 "\tcause=" + this.cause +
                 newLine +
                 "\tmessage='" + this.message + '\'' +
-                newLine +
-                "\tmethod=" + this.methodName +
-                newLine +
-                "\tlistener=" + this.listener +
                 newLine +
                 "\tpublishedObject=" + Arrays.deepToString(this.publishedObjects) +
                 '}';

@@ -52,13 +52,11 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
             return false;
         }
 
-        long newStamp = 0L;
-        while ((newStamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
-            this.lock.unlockRead(stamp);
+        long origStamp = stamp;
+        if ((stamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
+            this.lock.unlockRead(origStamp);
             stamp = this.lock.writeLock();
         }
-        stamp = newStamp;
-
 
         changed = insert(element);
         this.lock.unlock(stamp);

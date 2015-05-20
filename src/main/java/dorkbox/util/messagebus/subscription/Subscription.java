@@ -1,12 +1,12 @@
 package dorkbox.util.messagebus.subscription;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.esotericsoftware.reflectasm.MethodAccess;
+import org.omg.CORBA.BooleanHolder;
 
-import dorkbox.util.messagebus.common.thread.BooleanHolder;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
+import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
@@ -30,18 +30,20 @@ import dorkbox.util.messagebus.listener.MessageHandler;
  */
 public class Subscription {
     private static AtomicInteger ID_COUNTER = new AtomicInteger();
-    private final int ID = ID_COUNTER.getAndIncrement();
+    public final int ID = ID_COUNTER.getAndIncrement();
 
 
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
     private final MessageHandler handlerMetadata;
 
     private final IHandlerInvocation invocation;
-    private final ConcurrentSet<Object> listeners;
+    private final Collection<Object> listeners;
 
     public Subscription(MessageHandler handler) {
         this.handlerMetadata = handler;
-        this.listeners = new ConcurrentSet<Object>();
+//        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F);
+        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
+//        this.listeners = new ConcurrentLinkedQueue2();
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
@@ -99,52 +101,20 @@ public class Subscription {
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message) {
-        ConcurrentSet<Object> listeners = this.listeners;
+    public void publish(Object message) throws Throwable {
+//        MethodAccess handler = this.handlerMetadata.getHandler();
+//        int handleIndex = this.handlerMetadata.getMethodIndex();
+//        IHandlerInvocation invocation = this.invocation;
 
-        if (!listeners.isEmpty()) {
-            MethodAccess handler = this.handlerMetadata.getHandler();
-            int handleIndex = this.handlerMetadata.getMethodIndex();
-            IHandlerInvocation invocation = this.invocation;
+        Iterator<Object> iterator;
+        Object listener;
 
-            Iterator<Object> iterator;
-            Object listener;
+        for (iterator = this.listeners.iterator(); iterator.hasNext();) {
+            listener = iterator.next();
 
-            for (iterator = listeners.iterator(); iterator.hasNext();) {
-                listener = iterator.next();
+            this.c++;
 
-                this.c++;
-
-//                try {
-//                    invocation.invoke(listener, handler, handleIndex, message);
-//                } catch (IllegalAccessException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                    .setMessage("Error during invocation of message handler. " +
-//                                                "The class or method is not accessible")
-//                                    .setCause(e)
-//                                    .setMethodName(handler.getMethodNames()[handleIndex])
-//                                    .setListener(listener)
-//                                    .setPublishedObject(message));
-//                } catch (IllegalArgumentException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                    .setMessage("Error during invocation of message handler. " +
-//                                                "Wrong arguments passed to method. Was: " + message.getClass()
-//                                                + "Expected: " + handler.getParameterTypes()[0])
-//                                    .setCause(e)
-//                                    .setMethodName(handler.getMethodNames()[handleIndex])
-//                                    .setListener(listener)
-//                                    .setPublishedObject(message));
-//                } catch (Throwable e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                    .setMessage("Error during invocation of message handler. " +
-//                                                "The Message handler implementation threw an exception")
-//                                    .setCause(e)
-//                                    .setMethodName(handler.getMethodNames()[handleIndex])
-//                                    .setListener(listener)
-//                                    .setPublishedObject(message));
-//                }
-            }
-            booleanHolder.bool = true;
+//            invocation.invoke(listener, handler, handleIndex, message);
         }
     }
 
