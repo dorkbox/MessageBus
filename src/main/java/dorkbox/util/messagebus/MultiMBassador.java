@@ -2,7 +2,6 @@ package dorkbox.util.messagebus;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.Iterator;
 
 import org.jctools.util.Pow2;
 
@@ -193,29 +192,46 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object message) {
         try {
+            boolean subsPublished = false;
             SubscriptionManager manager = this.subscriptionManager;
             Class<?> messageClass = message.getClass();
-            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass); // can return null
 
-            boolean subsPublished = false;
-
-            Iterator<Subscription> iterator;
+            Subscription[] subscriptions;
             Subscription sub;
 
+            subscriptions = manager.getSubscriptionsByMessageType(messageClass); // can return null
 
             // Run subscriptions
-            if (subscriptions != null && !subscriptions.isEmpty()) {
-                for (iterator = subscriptions.iterator(); iterator.hasNext();) {
-                    sub = iterator.next();
+            if (subscriptions != null) {
+                int length = subscriptions.length;
+                if (length > 0) {
+                    for (int i=0;i<length;i++) {
+                        sub = subscriptions[i];
 
-                    sub.publish(message);
+                        sub.publish(message);
+                    }
+
+                    subsPublished = true;
                 }
-                subsPublished = true;
             }
 
-//            if (!this.forceExactMatches) {
-//                Collection<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass);
+
+            if (!this.forceExactMatches) {
+//                Subscription[] superSubscriptions = manager.getSuperSubscriptions(messageClass); // NOT return null
 //                // now get superClasses
+//                int length = superSubscriptions.length;
+//
+//                if (length > 0) {
+//                    for (int i=0;i<length;i++) {
+//                        sub = superSubscriptions[i];
+//
+//                        sub.publish(message);
+//                    }
+//
+//                    subsPublished = true;
+//                }
+
+
 //                if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
 //                    for (iterator = superSubscriptions.iterator(); iterator.hasNext();) {
 //                        sub = iterator.next();
@@ -257,19 +273,21 @@ public class MultiMBassador implements IMessageBus {
 //                        }
 //                    }
 //                }
-//            }
+            }
 
             if (!subsPublished) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                Collection<Subscription> deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-                if (deadSubscriptions != null && !deadSubscriptions.isEmpty())  {
-                    DeadMessage deadMessage = new DeadMessage(message);
+                Subscription[] deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
+                if (deadSubscriptions != null)  {
+                    int length = deadSubscriptions.length;
+                    if (length > 0) {
+                        DeadMessage deadMessage = new DeadMessage(message);
 
-                    for (iterator = deadSubscriptions.iterator(); iterator.hasNext();) {
-                        sub = iterator.next();
+                        for (int i=0;i<length;i++) {
+                            sub = deadSubscriptions[i];
 
-                        // this catches all exception types
-                        sub.publish(deadMessage);
+                            sub.publish(deadMessage);
+                        }
                     }
                 }
             }

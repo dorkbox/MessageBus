@@ -13,4 +13,9 @@ public class StrongConcurrentSetV8<T> extends StrongConcurrentSet<T> {
         // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
         super(new ConcurrentHashMapV8<T, ISetEntry<T>>(size, loadFactor, 1));
     }
+
+    public StrongConcurrentSetV8(int size, float loadFactor, int stripeSize) {
+        // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
+        super(new ConcurrentHashMapV8<T, ISetEntry<T>>(size, loadFactor, stripeSize));
+    }
 }

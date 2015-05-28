@@ -1,22 +1,18 @@
 package dorkbox.util.messagebus.common.thread;
 
+import java.util.ArrayList;
+
 import dorkbox.util.messagebus.subscription.Subscription;
 
-public class SubscriptionHolder extends ThreadLocal<ConcurrentSet<Subscription>> {
+public class SubscriptionHolder extends ThreadLocal<ArrayList<Subscription>> {
 
-    private final float loadFactor;
-    private final int stripeSize;
-
-    public SubscriptionHolder(float loadFactor, int stripeSize) {
+    public SubscriptionHolder() {
         super();
-
-        this.loadFactor = loadFactor;
-        this.stripeSize = stripeSize;
     }
 
     @Override
-    public ConcurrentSet<Subscription> initialValue() {
-        return new ConcurrentSet<Subscription>(16, this.loadFactor, this.stripeSize);
+    public ArrayList<Subscription> initialValue() {
+        return new ArrayList<Subscription>();
     }
 }
 

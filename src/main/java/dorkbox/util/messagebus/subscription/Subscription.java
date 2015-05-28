@@ -6,7 +6,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.omg.CORBA.BooleanHolder;
 
-import dorkbox.util.messagebus.common.StrongConcurrentSet;
+import com.esotericsoftware.reflectasm.MethodAccess;
+
+import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
@@ -41,9 +43,9 @@ public class Subscription {
 
     public Subscription(MessageHandler handler) {
         this.handlerMetadata = handler;
-//        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F);
-        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
-//        this.listeners = new ConcurrentLinkedQueue2();
+        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F, 16);
+//        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
+//        this.listeners = new ConcurrentLinkedQueue2<Object>();
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
@@ -101,10 +103,10 @@ public class Subscription {
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
-    public void publish(Object message) throws Throwable {
-//        MethodAccess handler = this.handlerMetadata.getHandler();
-//        int handleIndex = this.handlerMetadata.getMethodIndex();
-//        IHandlerInvocation invocation = this.invocation;
+    public final void publish(final Object message) throws Throwable {
+        MethodAccess handler = this.handlerMetadata.getHandler();
+        int handleIndex = this.handlerMetadata.getMethodIndex();
+        IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;
         Object listener;
@@ -112,9 +114,9 @@ public class Subscription {
         for (iterator = this.listeners.iterator(); iterator.hasNext();) {
             listener = iterator.next();
 
-            this.c++;
+//            this.c++;
 
-//            invocation.invoke(listener, handler, handleIndex, message);
+            invocation.invoke(listener, handler, handleIndex, message);
         }
     }
 

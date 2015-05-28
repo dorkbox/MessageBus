@@ -2,7 +2,6 @@ package dorkbox.util.messagebus;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
@@ -37,6 +36,8 @@ import dorkbox.util.messagebus.subscription.Subscription;
  *         Date: 2/2/15
  */
 public class SubscriptionManager {
+    private static final Subscription[] EMPTY = new Subscription[0];
+
     private static final float LOAD_FACTOR = 0.8F;
 
     // the metadata reader that is used to inspect objects passed to the subscribe method
@@ -53,8 +54,8 @@ public class SubscriptionManager {
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final Map<Class<?>, Collection<Subscription>> subscriptionsPerMessageSingle;
-    private final HashMapTree<Class<?>, Collection<Subscription>> subscriptionsPerMessageMulti;
+    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
+    private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
     // all subscriptions per messageHandler type
     // this map provides fast access for subscribing and unsubscribing
@@ -70,6 +71,7 @@ public class SubscriptionManager {
 
 
     private final StampedLock lock = new StampedLock();
+//    private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     private final SubscriptionHolder subHolderSingle;
     private final SubscriptionHolder subHolderConcurrent;
@@ -84,8 +86,8 @@ public class SubscriptionManager {
         {
             this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, loadFactor, this.STRIPE_SIZE);
 
-            this.subscriptionsPerMessageSingle = new HashMap<Class<?>, Collection<Subscription>>(64);
-            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, Collection<Subscription>>(4, loadFactor);
+            this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(64, LOAD_FACTOR, 1);
+            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
 
             // only used during SUB/UNSUB
             this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(4, loadFactor, this.STRIPE_SIZE);
@@ -97,8 +99,8 @@ public class SubscriptionManager {
         // it's a hit on SUB/UNSUB, but improves performance of handlers
         this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, this.STRIPE_SIZE);
 
-        this.subHolderSingle = new SubscriptionHolder(loadFactor, this.STRIPE_SIZE);
-        this.subHolderConcurrent = new SubscriptionHolder(loadFactor, this.STRIPE_SIZE);
+        this.subHolderSingle = new SubscriptionHolder();
+        this.subHolderConcurrent = new SubscriptionHolder();
     }
 
     public void shutdown() {
@@ -138,7 +140,10 @@ public class SubscriptionManager {
         // no point in locking everything. We lock on the class object being subscribed, since that is as coarse as we can go.
         // the listenerClass is GUARANTEED to be unique and the same object, per classloader. We do NOT LOCK for visibility,
         // but for concurrency because there are race conditions here if we don't.
-        long stamp = this.lock.writeLock();
+        StampedLock lock = this.lock;
+        long stamp = lock.writeLock();
+//        Lock writeLock = this.lock.writeLock();
+//        writeLock.lock();
 
         subsPerListener = subsPerListener2.get(listenerClass);
 
@@ -153,15 +158,16 @@ public class SubscriptionManager {
             }
 
             this.lock.unlockWrite(stamp);
+//            writeLock.unlock();
             return;
         }
 
         // subsPerListener == null, so we now enter an exclusive write lock and double check.
-//        long origStamp = stamp;
-//        if ((stamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
-//            this.lock.unlockRead(origStamp);
-//            stamp = this.lock.writeLock();
-//        }
+        long origStamp = stamp;
+        if ((stamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
+            this.lock.unlockRead(origStamp);
+            stamp = this.lock.writeLock();
+        }
 
         subsPerListener = subsPerListener2.get(listenerClass);
 
@@ -176,6 +182,7 @@ public class SubscriptionManager {
             }
 
             this.lock.unlockWrite(stamp);
+//            writeLock.unlock();
             return;
         }
 
@@ -188,13 +195,14 @@ public class SubscriptionManager {
             // remember the class as non listening class if no handlers are found
             this.nonListeners.put(listenerClass, Boolean.TRUE);
             this.lock.unlockWrite(stamp);
+//            writeLock.unlock();
             return;
         } else {
             subsPerListener = new ConcurrentSet<Subscription>(16, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
 
             VarArgPossibility varArgPossibility = this.varArgPossibility;
-            Map<Class<?>, Collection<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
-            HashMapTree<Class<?>, Collection<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
+            Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
+            HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
 
 
             Iterator<MessageHandler> iterator;
@@ -218,33 +226,31 @@ public class SubscriptionManager {
 
             subsPerListener2.put(listenerClass, subsPerListener);
 
+
             this.lock.unlockWrite(stamp);
+//            writeLock.unlock();
         }
     }
 
     // inside a write lock
     private final Collection<Subscription> getSubsForPublication(MessageHandler messageHandler,
-                                                          Map<Class<?>, Collection<Subscription>> subsPerMessageSingle,
-                                                          HashMapTree<Class<?>, Collection<Subscription>> subsPerMessageMulti,
+                                                          Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
+                                                          HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
                                                           VarArgPossibility varArgPossibility) {
 
         Class<?>[] types = messageHandler.getHandledMessages();
         int size = types.length;
 
-        ConcurrentSet<Subscription> subsPerType;
+//        ConcurrentSet<Subscription> subsPerType;
 
         SubscriptionUtils utils = this.utils;
         Class<?> type0 = types[0];
 
         switch (size) {
             case 1: {
-                Collection<Subscription> subs = subsPerMessageSingle.get(type0);
+                ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
                 if (subs == null) {
-//                    subs = new ConcurrentSet<>(16, LOAD_FACTOR, this.STRIPE_SIZE);
-                    subs = new ArrayList<>(16);
-//                    subs = new ConcurrentLinkedQueue2<Subscription>();
-//                    subs = new LinkedList<Subscription>();
-
+                    subs = new ArrayList<>(8);
 
                     boolean isArray = utils.isArray(type0);
                     if (isArray) {
@@ -252,7 +258,7 @@ public class SubscriptionManager {
                     }
 
                     // cache the super classes
-                    utils.getSuperClasses(type0, isArray);
+                    utils.cacheSuperClasses(type0, isArray);
 
                     subsPerMessageSingle.put(type0, subs);
                 }
@@ -261,63 +267,64 @@ public class SubscriptionManager {
             }
             case 2: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                subsPerType = subHolderSingle.get();
-
-                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1]);
-                if (putIfAbsent != null) {
-                    return putIfAbsent;
-                } else {
-                    subHolderSingle.set(subHolderSingle.initialValue());
-
-                    // cache the super classes
-                    utils.getSuperClasses(type0);
-                    utils.getSuperClasses(types[1]);
-
-                    return subsPerType;
-                }
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.get();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1]);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    // cache the super classes
+//                    utils.cacheSuperClasses(type0);
+//                    utils.cacheSuperClasses(types[1]);
+//
+//                    return subsPerType;
+//                }
             }
             case 3: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                subsPerType = subHolderSingle.get();
-
-                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1], types[2]);
-                if (putIfAbsent != null) {
-                    return putIfAbsent;
-                } else {
-                    subHolderSingle.set(subHolderSingle.initialValue());
-
-                    // cache the super classes
-                    utils.getSuperClasses(type0);
-                    utils.getSuperClasses(types[1]);
-                    utils.getSuperClasses(types[2]);
-
-                    return subsPerType;
-                }
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.get();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1], types[2]);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    // cache the super classes
+//                    utils.cacheSuperClasses(type0);
+//                    utils.cacheSuperClasses(types[1]);
+//                    utils.cacheSuperClasses(types[2]);
+//
+//                    return subsPerType;
+//                }
             }
             default: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-                subsPerType = subHolderSingle.get();
-
-                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
-                if (putIfAbsent != null) {
-                    return putIfAbsent;
-                } else {
-                    subHolderSingle.set(subHolderSingle.initialValue());
-
-                    Class<?> c;
-                    int length = types.length;
-                    for (int i = 0; i < length; i++) {
-                        c = types[i];
-
-                        // cache the super classes
-                        utils.getSuperClasses(c);
-                    }
-
-                    return subsPerType;
-                }
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.get();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    Class<?> c;
+//                    int length = types.length;
+//                    for (int i = 0; i < length; i++) {
+//                        c = types[i];
+//
+//                        // cache the super classes
+//                        utils.cacheSuperClasses(c);
+//                    }
+//
+//                    return subsPerType;
+//                }
+                return null;
             }
         }
     }
@@ -334,9 +341,11 @@ public class SubscriptionManager {
         }
 
         // these are concurrent collections
-        clearConcurrentCollections();
+//        clearConcurrentCollections();
 
         long stamp = this.lock.writeLock();
+//        Lock writeLock = this.lock.writeLock();
+//        writeLock.lock();
 
         Collection<Subscription> subscriptions = this.subscriptionsPerListener.get(listenerClass);
         if (subscriptions != null) {
@@ -351,6 +360,7 @@ public class SubscriptionManager {
         }
 
         this.lock.unlockWrite(stamp);
+//        writeLock.unlock();
     }
 
     private void clearConcurrentCollections() {
@@ -359,39 +369,55 @@ public class SubscriptionManager {
     }
 
     // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType) {
+    public final Subscription[] getSubscriptionsByMessageType(Class<?> messageType) {
         Collection<Subscription> collection;
-        Collection<Subscription> subscriptions = null;
+        Subscription[] subscriptions = null;
 
-        long stamp = this.lock.tryOptimisticRead(); // non blocking
+        long stamp = this.lock.readLock();
+//        Lock writeLock = this.lock.readLock();
+//        writeLock.lock();
 
-        collection = this.subscriptionsPerMessageSingle.get(messageType);
-        if (collection != null) {
-//            subscriptions = new ArrayDeque<>(collection);
-            subscriptions = new ArrayList<>(collection);
-//            subscriptions = new LinkedList<>();
-//            subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-
-//            subscriptions.addAll(collection);
-        }
-
-        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
-            stamp = this.lock.readLock();
-            try {
-                collection = this.subscriptionsPerMessageSingle.get(messageType);
-                if (collection != null) {
-//                    subscriptions = new ArrayDeque<>(collection);
-                    subscriptions = new ArrayList<>(collection);
-//                    subscriptions = new LinkedList<>();
-//                    subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-
-//                    subscriptions.addAll(collection);
-                }
-            }
-            finally {
-                this.lock.unlockRead(stamp);
+        try {
+            collection = this.subscriptionsPerMessageSingle.get(messageType);
+            if (collection != null) {
+                subscriptions = collection.toArray(EMPTY);
             }
         }
+        finally {
+            this.lock.unlockRead(stamp);
+//            writeLock.unlock();
+        }
+
+
+//        long stamp = this.lock.tryOptimisticRead(); // non blocking
+//
+//        collection = this.subscriptionsPerMessageSingle.get(messageType);
+//        if (collection != null) {
+////            subscriptions = new ArrayDeque<>(collection);
+//            subscriptions = new ArrayList<>(collection);
+////            subscriptions = new LinkedList<>();
+////            subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
+//
+////            subscriptions.addAll(collection);
+//        }
+//
+//        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
+//            stamp = this.lock.readLock();
+//            try {
+//                collection = this.subscriptionsPerMessageSingle.get(messageType);
+//                if (collection != null) {
+////                    subscriptions = new ArrayDeque<>(collection);
+//                    subscriptions = new ArrayList<>(collection);
+////                    subscriptions = new LinkedList<>();
+////                    subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
+//
+////                    subscriptions.addAll(collection);
+//                }
+//            }
+//            finally {
+//                this.lock.unlockRead(stamp);
+//            }
+//        }
 
         return subscriptions;
     }
@@ -459,7 +485,7 @@ public class SubscriptionManager {
 
     // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.
-    public final Collection<Subscription> getSuperSubscriptions(Class<?> superType) {
+    public final Subscription[] getSuperSubscriptions(Class<?> superType) {
         return this.utils.getSuperSubscriptions(superType);
     }
 

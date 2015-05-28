@@ -58,6 +58,7 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
             stamp = this.lock.writeLock();
         }
 
+
         changed = insert(element);
         this.lock.unlock(stamp);
 

@@ -1,6 +1,7 @@
 package dorkbox.util.messagebus.common;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -44,13 +45,13 @@ public class SubscriptionValidator extends AssertSupport{
 
             // we split subs + superSubs into TWO calls.
             Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
-            Collection<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageType);
+            Subscription[] subscriptions = manager.getSubscriptionsByMessageType(messageType);
             if (subscriptions != null) {
-                collection.addAll(subscriptions);
+                collection.addAll(Arrays.asList(subscriptions));
             }
-            Collection<Subscription> superSubs = manager.getSuperSubscriptions(messageType);
+            Subscription[] superSubs = manager.getSuperSubscriptions(messageType);
             if (superSubs != null) {
-                collection.addAll(superSubs);
+                collection.addAll(Arrays.asList(superSubs));
             }
 
             assertEquals(validationEntries.size(), collection.size());
