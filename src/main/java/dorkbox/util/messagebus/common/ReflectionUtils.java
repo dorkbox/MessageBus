@@ -3,8 +3,8 @@ package dorkbox.util.messagebus.common;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
@@ -18,13 +18,14 @@ import dorkbox.util.messagebus.common.thread.ConcurrentSet;
  */
 public class ReflectionUtils {
 
-    public static Collection<Method> getMethods(Class<?> target) {
-        Collection<Method> hashSet = new ConcurrentSet<Method>(16, .8F, 1);
-        getMethods(target, hashSet);
-        return hashSet;
+    public static Method[] getMethods(Class<?> target) {
+        ArrayList<Method> methods = new ArrayList<Method>();
+
+        getMethods(target, methods);
+        return methods.toArray(new Method[methods.size()]);
     }
 
-    private static void getMethods(Class<?> target, Collection<Method> methods) {
+    private static void getMethods(Class<?> target, ArrayList<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -34,6 +35,7 @@ public class ReflectionUtils {
         } catch (Exception ignored) {
         }
 
+        // recursively go until root
         if (!target.equals(Object.class)) {
             getMethods(target.getSuperclass(), methods);
         }
@@ -68,8 +70,8 @@ public class ReflectionUtils {
      * @param from The root class to start with
      * @return A set of classes, each representing a super type of the root class
      */
-    public static Collection<Class<?>> getSuperTypes(Class<?> from) {
-        Collection<Class<?>> superclasses = new ConcurrentSet<Class<?>>(8, 0.8F, 1);
+    public static ArrayList<Class<?>> getSuperTypes(Class<?> from) {
+        ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
 
         collectInterfaces( from, superclasses );
 
@@ -78,6 +80,7 @@ public class ReflectionUtils {
             from = from.getSuperclass();
             collectInterfaces( from, superclasses );
         }
+
         return superclasses;
     }
 
@@ -88,20 +91,20 @@ public class ReflectionUtils {
         }
     }
 
-    public static boolean containsOverridingMethod(final Collection<Method> allMethods, final Method methodToCheck) {
-        Iterator<Method> iterator;
+    public static final boolean containsOverridingMethod(final Method[] allMethods, final Method methodToCheck) {
+        final int length = allMethods.length;
         Method method;
 
-        for (iterator = allMethods.iterator(); iterator.hasNext();) {
-            method = iterator.next();
+        for (int i=0;i<length;i++) {
+            method = allMethods[i];
 
             if (isOverriddenBy(methodToCheck, method)) {
                 return true;
             }
         }
+
         return false;
     }
-
 
 
     /**
@@ -136,7 +139,7 @@ public class ReflectionUtils {
     }
 
     //
-    private static boolean isOverriddenBy( Method superclassMethod, Method subclassMethod ) {
+    private static boolean isOverriddenBy(final Method superclassMethod, final Method subclassMethod ) {
         // if the declaring classes are the same or the subclass method is not defined in the subclass
         // hierarchy of the given superclass method or the method names are not the same then
         // subclassMethod does not override superclassMethod
@@ -146,8 +149,8 @@ public class ReflectionUtils {
             return false;
         }
 
-        Class<?>[] superClassMethodParameters = superclassMethod.getParameterTypes();
-        Class<?>[] subClassMethodParameters = subclassMethod.getParameterTypes();
+        final Class<?>[] superClassMethodParameters = superclassMethod.getParameterTypes();
+        final Class<?>[] subClassMethodParameters = subclassMethod.getParameterTypes();
 
         // method must specify the same number of parameters
         //the parameters must occur in the exact same order

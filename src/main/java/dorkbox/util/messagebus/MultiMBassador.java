@@ -199,24 +199,25 @@ public class MultiMBassador implements IMessageBus {
             Subscription[] subscriptions;
             Subscription sub;
 
-            subscriptions = manager.getSubscriptionsByMessageType(messageClass); // can return null
+            if (this.forceExactMatches) {
+                subscriptions = manager.getSubscriptionsForcedExact(messageClass);
+            } else {
+                subscriptions = manager.getSubscriptions(messageClass);
+            }
 
             // Run subscriptions
-            if (subscriptions != null) {
-                int length = subscriptions.length;
-                if (length > 0) {
-                    for (int i=0;i<length;i++) {
-                        sub = subscriptions[i];
+            int length = subscriptions.length;
+            if (length > 0) {
+                for (int i=0;i<length;i++) {
+                    sub = subscriptions[i];
 
-                        sub.publish(message);
-                    }
-
-                    subsPublished = true;
+                    sub.publish(message);
                 }
+                subsPublished = true;
             }
 
 
-            if (!this.forceExactMatches) {
+//            if (!this.forceExactMatches) {
 //                Subscription[] superSubscriptions = manager.getSuperSubscriptions(messageClass); // NOT return null
 //                // now get superClasses
 //                int length = superSubscriptions.length;
@@ -273,21 +274,19 @@ public class MultiMBassador implements IMessageBus {
 //                        }
 //                    }
 //                }
-            }
+//            }
 
             if (!subsPublished) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                Subscription[] deadSubscriptions = manager.getSubscriptionsByMessageType(DeadMessage.class);
-                if (deadSubscriptions != null)  {
-                    int length = deadSubscriptions.length;
-                    if (length > 0) {
-                        DeadMessage deadMessage = new DeadMessage(message);
+                Subscription[] deadSubscriptions = manager.getSubscriptionsForcedExact(DeadMessage.class);
+                length = deadSubscriptions.length;
+                if (length > 0) {
+                    DeadMessage deadMessage = new DeadMessage(message);
 
-                        for (int i=0;i<length;i++) {
-                            sub = deadSubscriptions[i];
+                    for (int i=0;i<length;i++) {
+                        sub = deadSubscriptions[i];
 
-                            sub.publish(deadMessage);
-                        }
+                        sub.publish(deadMessage);
                     }
                 }
             }

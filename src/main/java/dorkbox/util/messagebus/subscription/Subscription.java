@@ -82,14 +82,6 @@ public class Subscription {
         return this.listeners.remove(existingListener);
     }
 
-    /**
-     * Check whether this subscription manages a message handler of the given message listener class
-     */
-    // only in unit test
-    public boolean belongsTo(Class<?> listener){
-        return this.handlerMetadata.isFromListener(listener);
-    }
-
     // only used in unit-test
     public int size() {
         return this.listeners.size();

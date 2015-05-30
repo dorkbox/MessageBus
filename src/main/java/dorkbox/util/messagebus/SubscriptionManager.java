@@ -2,9 +2,11 @@ package dorkbox.util.messagebus;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
@@ -12,8 +14,6 @@ import dorkbox.util.messagebus.common.SubscriptionUtils;
 import dorkbox.util.messagebus.common.VarArgPossibility;
 import dorkbox.util.messagebus.common.VarArgUtils;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
-import dorkbox.util.messagebus.common.thread.StampedLock;
-import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 import dorkbox.util.messagebus.listener.MessageHandler;
 import dorkbox.util.messagebus.listener.MetadataReader;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -61,7 +61,7 @@ public class SubscriptionManager {
     // this map provides fast access for subscribing and unsubscribing
     // write access is synchronized and happens very infrequently
     // once a collection of subscriptions is stored it does not change
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subscriptionsPerListener;
+    private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
 
     private final VarArgUtils varArgUtils;
@@ -70,12 +70,8 @@ public class SubscriptionManager {
     private final int STRIPE_SIZE;
 
 
-    private final StampedLock lock = new StampedLock();
-//    private final ReadWriteLock lock = new ReentrantReadWriteLock();
-
-    private final SubscriptionHolder subHolderSingle;
-    private final SubscriptionHolder subHolderConcurrent;
-
+//    private final StampedLock lock = new StampedLock();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     SubscriptionManager(int numberOfThreads) {
         this.STRIPE_SIZE = numberOfThreads;
@@ -90,7 +86,7 @@ public class SubscriptionManager {
             this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
 
             // only used during SUB/UNSUB
-            this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(4, loadFactor, this.STRIPE_SIZE);
+            this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, Subscription[]>();
         }
 
         this.utils = new SubscriptionUtils(this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, loadFactor, numberOfThreads);
@@ -98,9 +94,6 @@ public class SubscriptionManager {
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
         this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, this.STRIPE_SIZE);
-
-        this.subHolderSingle = new SubscriptionHolder();
-        this.subHolderConcurrent = new SubscriptionHolder();
     }
 
     public void shutdown() {
@@ -133,124 +126,92 @@ public class SubscriptionManager {
         // these are concurrent collections
         clearConcurrentCollections();
 
+        Subscription[] subscriptions = getListenerSubs(listenerClass);
 
-        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> subsPerListener2 = this.subscriptionsPerListener;
-        ConcurrentSet<Subscription> subsPerListener;
+        // the subscriptions from the map were null, so create them
+        if (subscriptions == null) {
+            // now write lock for the least expensive part. This is a deferred "double checked lock", but is necessary because
+            // of the huge number of reads compared to writes.
+            Lock writeLock = this.lock.writeLock();
+            writeLock.lock();
 
-        // no point in locking everything. We lock on the class object being subscribed, since that is as coarse as we can go.
-        // the listenerClass is GUARANTEED to be unique and the same object, per classloader. We do NOT LOCK for visibility,
-        // but for concurrency because there are race conditions here if we don't.
-        StampedLock lock = this.lock;
-        long stamp = lock.writeLock();
-//        Lock writeLock = this.lock.writeLock();
-//        writeLock.lock();
+            ConcurrentMap<Class<?>, Subscription[]> subsPerListener2 = this.subscriptionsPerListener;
+            subscriptions = subsPerListener2.get(listenerClass);
 
-        subsPerListener = subsPerListener2.get(listenerClass);
+            // it was still null, so we actually have to create the rest of the subs
+            if (subscriptions == null) {
+                MessageHandler[] messageHandlers = MessageHandler.get(listenerClass);
+                int handlersSize = messageHandlers.length;
 
-        if (subsPerListener != null) {
-            // subscriptions already exist and must only be updated
-            Iterator<Subscription> iterator;
-            Subscription sub;
+                // remember the class as non listening class if no handlers are found
+                if (handlersSize == 0) {
+                    this.nonListeners.put(listenerClass, Boolean.TRUE);
+                    writeLock.unlock();
+                    return;
+                }
 
-            for (iterator = subsPerListener.iterator(); iterator.hasNext();) {
-                sub = iterator.next();
-                sub.subscribe(listener);
-            }
+                ArrayList<Subscription> subsPerListener = new ArrayList<Subscription>();
+                Collection<Subscription> subsForPublication = null;
 
-            this.lock.unlockWrite(stamp);
-//            writeLock.unlock();
-            return;
-        }
+                VarArgPossibility varArgPossibility = this.varArgPossibility;
+                Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
+                HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
 
-        // subsPerListener == null, so we now enter an exclusive write lock and double check.
-        long origStamp = stamp;
-        if ((stamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
-            this.lock.unlockRead(origStamp);
-            stamp = this.lock.writeLock();
-        }
-
-        subsPerListener = subsPerListener2.get(listenerClass);
-
-        if (subsPerListener != null) {
-            // subscriptions already exist and must only be updated
-            Iterator<Subscription> iterator;
-            Subscription sub;
-
-            for (iterator = subsPerListener.iterator(); iterator.hasNext();) {
-                sub = iterator.next();
-                sub.subscribe(listener);
-            }
-
-            this.lock.unlockWrite(stamp);
-//            writeLock.unlock();
-            return;
-        }
-
-        // subsPerListener == null, which means we really do have to create it.
-        // a listener is subscribed for the first time
-        Collection<MessageHandler> messageHandlers = SubscriptionManager.metadataReader.getMessageListener(listenerClass, LOAD_FACTOR, this.STRIPE_SIZE).getHandlers();
-        int handlersSize = messageHandlers.size();
-
-        if (handlersSize == 0) {
-            // remember the class as non listening class if no handlers are found
-            this.nonListeners.put(listenerClass, Boolean.TRUE);
-            this.lock.unlockWrite(stamp);
-//            writeLock.unlock();
-            return;
-        } else {
-            subsPerListener = new ConcurrentSet<Subscription>(16, SubscriptionManager.LOAD_FACTOR, this.STRIPE_SIZE);
-
-            VarArgPossibility varArgPossibility = this.varArgPossibility;
-            Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
-            HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
-
-
-            Iterator<MessageHandler> iterator;
-            MessageHandler messageHandler;
-            Collection<Subscription> subsForPublication = null;
-
-            for (iterator = messageHandlers.iterator(); iterator.hasNext();) {
-                messageHandler = iterator.next();
-
-                // now add this subscription to each of the handled types
-                // this can safely be called concurrently
-                subsForPublication = getSubsForPublication(messageHandler, subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
 
                 // create the subscription
-                Subscription subscription = new Subscription(messageHandler);
-                subscription.subscribe(listener);
+                MessageHandler messageHandler;
 
-                subsPerListener.add(subscription); // activates this sub for sub/unsub
-                subsForPublication.add(subscription);  // activates this sub for publication
+                for (int i=0;i<handlersSize;i++) {
+                    messageHandler = messageHandlers[i];
+
+                    // create the subscription
+                    Subscription subscription = new Subscription(messageHandler);
+                    subscription.subscribe(listener);
+
+                    // now add this subscription to each of the handled types
+                    subsForPublication = getSubsForPublication(messageHandler.getHandledMessages(), subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
+
+                    subsPerListener.add(subscription); // activates this sub for sub/unsub
+                    subsForPublication.add(subscription);  // activates this sub for publication
+                }
+
+                subsPerListener2.put(listenerClass, subsPerListener.toArray(new Subscription[subsPerListener.size()]));
+                writeLock.unlock();
+
+                return;
+            } else {
+                writeLock.unlock();
             }
+        }
 
-            subsPerListener2.put(listenerClass, subsPerListener);
+        // subscriptions already exist and must only be updated
+        // only get here if our single-check was OK, or our double-check was OK
+        Subscription subscription;
 
-
-            this.lock.unlockWrite(stamp);
-//            writeLock.unlock();
+        for (int i=0;i<subscriptions.length;i++) {
+            subscription = subscriptions[i];
+            subscription.subscribe(listener);
         }
     }
 
     // inside a write lock
-    private final Collection<Subscription> getSubsForPublication(MessageHandler messageHandler,
-                                                          Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                                                          HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                                                          VarArgPossibility varArgPossibility) {
+    private final Collection<Subscription> getSubsForPublication(final Class<?>[] messageHandlerTypes,
+                    final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
+                    final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
+                    final VarArgPossibility varArgPossibility) {
 
-        Class<?>[] types = messageHandler.getHandledMessages();
-        int size = types.length;
+        final int size = messageHandlerTypes.length;
 
 //        ConcurrentSet<Subscription> subsPerType;
 
         SubscriptionUtils utils = this.utils;
-        Class<?> type0 = types[0];
+        Class<?> type0 = messageHandlerTypes[0];
 
         switch (size) {
             case 1: {
                 ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
                 if (subs == null) {
-                    subs = new ArrayList<>(8);
+                    subs = new ArrayList<Subscription>(8);
 
                     boolean isArray = utils.isArray(type0);
                     if (isArray) {
@@ -341,26 +302,17 @@ public class SubscriptionManager {
         }
 
         // these are concurrent collections
-//        clearConcurrentCollections();
+        clearConcurrentCollections();
 
-        long stamp = this.lock.writeLock();
-//        Lock writeLock = this.lock.writeLock();
-//        writeLock.lock();
-
-        Collection<Subscription> subscriptions = this.subscriptionsPerListener.get(listenerClass);
+        Subscription[] subscriptions = getListenerSubs(listenerClass);
         if (subscriptions != null) {
-            Iterator<Subscription> iterator;
-            Subscription sub;
+            Subscription subscription;
 
-            for (iterator = subscriptions.iterator(); iterator.hasNext();) {
-                sub = iterator.next();
-
-                sub.unsubscribe(listener);
+            for (int i=0;i<subscriptions.length;i++) {
+                subscription = subscriptions[i];
+                subscription.unsubscribe(listener);
             }
         }
-
-        this.lock.unlockWrite(stamp);
-//        writeLock.unlock();
     }
 
     private void clearConcurrentCollections() {
@@ -368,59 +320,121 @@ public class SubscriptionManager {
         this.varArgUtils.clear();
     }
 
-    // CAN RETURN NULL
-    public final Subscription[] getSubscriptionsByMessageType(Class<?> messageType) {
-        Collection<Subscription> collection;
-        Subscription[] subscriptions = null;
+    private final Subscription[] getListenerSubs(Class<?> listenerClass) {
+        Subscription[] subscriptions;
 
-        long stamp = this.lock.readLock();
-//        Lock writeLock = this.lock.readLock();
-//        writeLock.lock();
-
-        try {
-            collection = this.subscriptionsPerMessageSingle.get(messageType);
-            if (collection != null) {
-                subscriptions = collection.toArray(EMPTY);
-            }
-        }
-        finally {
-            this.lock.unlockRead(stamp);
-//            writeLock.unlock();
-        }
-
-
-//        long stamp = this.lock.tryOptimisticRead(); // non blocking
-//
-//        collection = this.subscriptionsPerMessageSingle.get(messageType);
-//        if (collection != null) {
-////            subscriptions = new ArrayDeque<>(collection);
-//            subscriptions = new ArrayList<>(collection);
-////            subscriptions = new LinkedList<>();
-////            subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-//
-////            subscriptions.addAll(collection);
-//        }
-//
-//        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
-//            stamp = this.lock.readLock();
-//            try {
-//                collection = this.subscriptionsPerMessageSingle.get(messageType);
-//                if (collection != null) {
-////                    subscriptions = new ArrayDeque<>(collection);
-//                    subscriptions = new ArrayList<>(collection);
-////                    subscriptions = new LinkedList<>();
-////                    subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-//
-////                    subscriptions.addAll(collection);
-//                }
-//            }
-//            finally {
-//                this.lock.unlockRead(stamp);
-//            }
-//        }
+        Lock readLock = this.lock.readLock();
+        readLock.lock();
+        subscriptions = this.subscriptionsPerListener.get(listenerClass);
+        readLock.unlock();
 
         return subscriptions;
     }
+
+
+    // retrieves all of the appropriate subscriptions for the message type
+    public final Subscription[] getSubscriptionsForcedExact(final Class<?> messageClass) {
+        ArrayList<Subscription> collection;
+        Subscription[] subscriptions;
+
+        Lock readLock = this.lock.readLock();
+        readLock.lock();
+
+        collection = this.subscriptionsPerMessageSingle.get(messageClass);
+
+        if (collection != null) {
+            subscriptions = collection.toArray(new Subscription[collection.size()]);
+        } else {
+            subscriptions = EMPTY;
+        }
+
+        readLock.unlock();
+        return subscriptions;
+    }
+
+    // never return null
+    public final Subscription[] getSubscriptions(final Class<?> messageClass) {
+        ArrayList<Subscription> collection;
+        Subscription[] subscriptions = null;
+
+        Lock readLock = this.lock.readLock();
+        readLock.lock();
+
+
+        collection = this.subscriptionsPerMessageSingle.get(messageClass);
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            // now get superClasses
+            ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass); // NOT return null
+            collection.addAll(superSubscriptions);
+        } else {
+
+            // now get superClasses
+            collection = this.utils.getSuperSubscriptions(messageClass); // NOT return null
+        }
+
+        subscriptions = collection.toArray(new Subscription[collection.size()]);
+        readLock.unlock();
+
+        return subscriptions;
+    }
+
+
+    // CAN RETURN NULL
+//    public final Subscription[] getSubscriptionsByMessageType(final Class<?> messageType) {
+//        Collection<Subscription> collection;
+//        Subscription[] subscriptions = null;
+//
+////        long stamp = this.lock.readLock();
+//        Lock readLock = this.lock.readLock();
+//        readLock.lock();
+//
+//        try {
+//            collection = this.subscriptionsPerMessageSingle.get(messageType);
+//            if (collection != null) {
+//                subscriptions = collection.toArray(EMPTY);
+//            }
+//        }
+//        finally {
+////            this.lock.unlockRead(stamp);
+//            readLock.unlock();
+//        }
+//
+//
+////        long stamp = this.lock.tryOptimisticRead(); // non blocking
+////
+////        collection = this.subscriptionsPerMessageSingle.get(messageType);
+////        if (collection != null) {
+//////            subscriptions = new ArrayDeque<>(collection);
+////            subscriptions = new ArrayList<>(collection);
+//////            subscriptions = new LinkedList<>();
+//////            subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
+////
+//////            subscriptions.addAll(collection);
+////        }
+////
+////        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
+////            stamp = this.lock.readLock();
+////            try {
+////                collection = this.subscriptionsPerMessageSingle.get(messageType);
+////                if (collection != null) {
+//////                    subscriptions = new ArrayDeque<>(collection);
+////                    subscriptions = new ArrayList<>(collection);
+//////                    subscriptions = new LinkedList<>();
+//////                    subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
+////
+//////                    subscriptions.addAll(collection);
+////                }
+////            }
+////            finally {
+////                this.lock.unlockRead(stamp);
+////            }
+////        }
+//
+//        return subscriptions;
+//    }
 
 //    public static final Comparator<Subscription> SubscriptionByPriorityDesc = new Comparator<Subscription>() {
 //        @Override
@@ -483,11 +497,11 @@ public class SubscriptionManager {
     }
 
 
-    // CAN NOT RETURN NULL
-    // ALSO checks to see if the superClass accepts subtypes.
-    public final Subscription[] getSuperSubscriptions(Class<?> superType) {
-        return this.utils.getSuperSubscriptions(superType);
-    }
+//    // CAN NOT RETURN NULL
+//    // ALSO checks to see if the superClass accepts subtypes.
+//    public final Subscription[] getSuperSubscriptions(Class<?> superType) {
+//        return this.utils.getSuperSubscriptions(superType);
+//    }
 
     // CAN NOT RETURN NULL
     // ALSO checks to see if the superClass accepts subtypes.

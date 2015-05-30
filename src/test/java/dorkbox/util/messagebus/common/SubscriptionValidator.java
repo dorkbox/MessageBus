@@ -1,15 +1,9 @@
 package dorkbox.util.messagebus.common;
 
-import java.util.ArrayDeque;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
 import dorkbox.util.messagebus.SubscriptionManager;
 import dorkbox.util.messagebus.subscription.Subscription;
+
+import java.util.*;
 
 /**
 *
@@ -45,13 +39,9 @@ public class SubscriptionValidator extends AssertSupport{
 
             // we split subs + superSubs into TWO calls.
             Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
-            Subscription[] subscriptions = manager.getSubscriptionsByMessageType(messageType);
+            Subscription[] subscriptions = manager.getSubscriptions(messageType);
             if (subscriptions != null) {
                 collection.addAll(Arrays.asList(subscriptions));
-            }
-            Subscription[] superSubs = manager.getSuperSubscriptions(messageType);
-            if (superSubs != null) {
-                collection.addAll(Arrays.asList(superSubs));
             }
 
             assertEquals(validationEntries.size(), collection.size());
@@ -70,6 +60,27 @@ public class SubscriptionValidator extends AssertSupport{
                 assertEquals(this.subscribedListener.getNumberOfListeners(validationValidationEntry.subscriber), matchingSub.size());
             }
         }
+    }
+
+
+    /**
+     * Check whether this subscription manages a message handler of the given message listener class
+     */
+    // only in unit test
+    public boolean belongsTo(Class<?> listener){
+        return this.handlerMetadata.isFromListener(listener);
+
+
+        // only in unit test
+        public boolean isFromListener(Class<?> listener){
+            return this.listenerConfig.isFromListener(listener);
+        }
+
+    }
+
+    // only in unit test
+    public boolean isFromListener(Class<?> listener) {
+        return this.listenerDefinition.equals(listener);
     }
 
 

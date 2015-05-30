@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 
 import dorkbox.util.messagebus.common.thread.ClassHolder;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
@@ -22,13 +21,13 @@ public class SubscriptionUtils {
     private final Map<Class<?>, Class<?>> arrayVersionCache;
     private final Map<Class<?>, Boolean> isArrayCache;
 
-    private final ConcurrentMap<Class<?>, ArrayList<Class<?>>> superClassesCache;
+    private final Map<Class<?>, Class<?>[]> superClassesCache;
     private final ClassHolder classHolderSingle;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
     // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
-    private final ConcurrentMap<Class<?>, ArrayList<Subscription>> superClassSubscriptions;
+    private final Map<Class<?>, ArrayList<Subscription>> superClassSubscriptions;
     private final HashMapTree<Class<?>, ConcurrentSet<Subscription>> superClassSubscriptionsMulti;
 
     private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
@@ -49,7 +48,7 @@ public class SubscriptionUtils {
         this.arrayVersionCache = new ConcurrentHashMapV8<Class<?>, Class<?>>(32, loadFactor, stripeSize);
         this.isArrayCache = new ConcurrentHashMapV8<Class<?>, Boolean>(32, loadFactor, stripeSize);
 
-        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, ArrayList<Class<?>>>(32, loadFactor, 1);
+        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, Class<?>[]>(32, loadFactor, 1);
         this.classHolderSingle = new ClassHolder(loadFactor, stripeSize);
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
@@ -66,23 +65,23 @@ public class SubscriptionUtils {
     }
 
     /**
-     * race conditions will result in duplicate answers, which we don't care if happens
      * never returns null
      * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
+     *
+     * if parameter clazz is of type array, then the super classes are of array type as well
+     *
+     * protected by read lock by caller
      */
-    public final Class<?>[] getSuperClasses_NL(Class<?> clazz, boolean isArray) {
+    public final Class<?>[] getSuperClasses_NL(final Class<?> clazz, final boolean isArray) {
         // this is never reset, since it never needs to be.
-        ConcurrentMap<Class<?>, ArrayList<Class<?>>> local = this.superClassesCache;
-        Class<?>[] classes;
+        final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
+        Class<?>[] classes = local.get(clazz);
 
-        ArrayList<Class<?>> arrayList = local.get(clazz);
-
-        if (arrayList != null) {
-            classes = arrayList.toArray(SUPER_CLASS_EMPTY);
-        } else {
+        if (classes == null) {
             // get all super types of class
-            Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
-            arrayList = new ArrayList<Class<?>>(superTypes.size());
+            final Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
+            ArrayList<Class<?>> newList = new ArrayList<Class<?>>(superTypes.size());
+
             Iterator<Class<?>> iterator;
             Class<?> c;
 
@@ -94,102 +93,101 @@ public class SubscriptionUtils {
                 }
 
                 if (c != clazz) {
-                    arrayList.add(c);
+                    newList.add(c);
                 }
             }
 
-            local.put(clazz, arrayList);
-            classes = arrayList.toArray(SUPER_CLASS_EMPTY);
+            classes = newList.toArray(new Class<?>[newList.size()]);
+            local.put(clazz, classes);
         }
 
         return classes;
     }
 
     // called inside sub/unsub write lock
-    public void cacheSuperClasses(Class<?> clazz) {
-        // TODO Auto-generated method stub
-
+    public final void cacheSuperClasses(final Class<?> clazz) {
+        getSuperClasses_NL(clazz, isArray(clazz));
     }
 
     // called inside sub/unsub write lock
-    public void cacheSuperClasses(Class<?> clazz, boolean isArray) {
-        // TODO Auto-generated method stub
-
+    public final void cacheSuperClasses(final Class<?> clazz, final boolean isArray) {
+        getSuperClasses_NL(clazz, isArray);
     }
 
-    public final Class<?>[] getSuperClasses(Class<?> clazz, boolean isArray) {
-        // this is never reset, since it never needs to be.
-        ConcurrentMap<Class<?>, ArrayList<Class<?>>> local = this.superClassesCache;
-        Class<?>[] classes;
-
-        StampedLock lock = this.superClassLock;
-        long stamp = lock.tryOptimisticRead();
-
-        if (stamp > 0) {
-            ArrayList<Class<?>> arrayList = local.get(clazz);
-            if (arrayList != null) {
-                classes = arrayList.toArray(SUPER_CLASS_EMPTY);
-
-                if (lock.validate(stamp)) {
-                    return classes;
-                } else {
-                    stamp = lock.readLock();
-
-                    arrayList = local.get(clazz);
-                    if (arrayList != null) {
-                        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
-                        lock.unlockRead(stamp);
-                        return classes;
-                    }
-                }
-            }
-        }
-
-        // unable to get a valid subscription. Have to acquire a write lock
-        long origStamp = stamp;
-        if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
-            lock.unlockRead(origStamp);
-            stamp = lock.writeLock();
-        }
-
-
-        // get all super types of class
-        Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
-        ArrayList<Class<?>> arrayList = new ArrayList<Class<?>>(superTypes.size());
-        Iterator<Class<?>> iterator;
-        Class<?> c;
-
-        for (iterator = superTypes.iterator(); iterator.hasNext();) {
-            c = iterator.next();
-
-            if (isArray) {
-                c = getArrayClass(c);
-            }
-
-            if (c != clazz) {
-                arrayList.add(c);
-            }
-        }
-
-        local.put(clazz, arrayList);
-        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
-
-        lock.unlockWrite(stamp);
-
-        return classes;
-    }
+//    public final Class<?>[] getSuperClasses(Class<?> clazz, boolean isArray) {
+//        // this is never reset, since it never needs to be.
+//        Map<Class<?>, ArrayList<Class<?>>> local = this.superClassesCache;
+//        Class<?>[] classes;
+//
+//        StampedLock lock = this.superClassLock;
+//        long stamp = lock.tryOptimisticRead();
+//
+//        if (stamp > 0) {
+//            ArrayList<Class<?>> arrayList = local.get(clazz);
+//            if (arrayList != null) {
+//                classes = arrayList.toArray(SUPER_CLASS_EMPTY);
+//
+//                if (lock.validate(stamp)) {
+//                    return classes;
+//                } else {
+//                    stamp = lock.readLock();
+//
+//                    arrayList = local.get(clazz);
+//                    if (arrayList != null) {
+//                        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
+//                        lock.unlockRead(stamp);
+//                        return classes;
+//                    }
+//                }
+//            }
+//        }
+//
+//        // unable to get a valid subscription. Have to acquire a write lock
+//        long origStamp = stamp;
+//        if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
+//            lock.unlockRead(origStamp);
+//            stamp = lock.writeLock();
+//        }
+//
+//
+//        // get all super types of class
+//        Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
+//        ArrayList<Class<?>> arrayList = new ArrayList<Class<?>>(superTypes.size());
+//        Iterator<Class<?>> iterator;
+//        Class<?> c;
+//
+//        for (iterator = superTypes.iterator(); iterator.hasNext();) {
+//            c = iterator.next();
+//
+//            if (isArray) {
+//                c = getArrayClass(c);
+//            }
+//
+//            if (c != clazz) {
+//                arrayList.add(c);
+//            }
+//        }
+//
+//        local.put(clazz, arrayList);
+//        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
+//
+//        lock.unlockWrite(stamp);
+//
+//        return classes;
+//    }
 
     /**
      * race conditions will result in duplicate answers, which we don't care if happens
      * never returns null
      * never reset
      */
-    public final Class<?> getArrayClass(Class<?> c) {
-        Map<Class<?>, Class<?>> arrayVersionCache = this.arrayVersionCache;
+    public final Class<?> getArrayClass(final Class<?> c) {
+        final Map<Class<?>, Class<?>> arrayVersionCache = this.arrayVersionCache;
         Class<?> clazz = arrayVersionCache.get(c);
+
         if (clazz == null) {
             // messy, but the ONLY way to do it. Array super types are also arrays
-            Object[] newInstance = (Object[]) Array.newInstance(c, 1);
+            final Object[] newInstance = (Object[]) Array.newInstance(c, 1);
             clazz = newInstance.getClass();
             arrayVersionCache.put(c, clazz);
         }
@@ -202,10 +200,10 @@ public class SubscriptionUtils {
      * @return true if the class c is an array type
      */
     @SuppressWarnings("boxing")
-    public final boolean isArray(Class<?> c) {
-        Map<Class<?>, Boolean> isArrayCache = this.isArrayCache;
+    public final boolean isArray(final Class<?> c) {
+        final Map<Class<?>, Boolean> isArrayCache = this.isArrayCache;
 
-        Boolean isArray = isArrayCache.get(c);
+        final Boolean isArray = isArrayCache.get(c);
         if (isArray == null) {
             boolean b = c.isArray();
             isArrayCache.put(c, b);
@@ -223,108 +221,56 @@ public class SubscriptionUtils {
 
 
     private static Subscription[] EMPTY = new Subscription[0];
+    private static Class<?>[] EMPTY2 = new Class<?>[0];
 
     private StampedLock superSubLock = new StampedLock();
 
     /**
-     * Returns an array copy of the super subscriptions for the specified type.
+     * Returns an array COPY of the super subscriptions for the specified type.
      *
      * This ALSO checks to see if the superClass accepts subtypes.
      *
+     * protected by read lock by caller
+     *
      * @return CAN NOT RETURN NULL
      */
-    public final Subscription[] getSuperSubscriptions(Class<?> superType) {
+    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> superType) {
         // whenever our subscriptions change, this map is cleared.
-        ConcurrentMap<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
-        Subscription[] subscriptions;
-//
-//        StampedLock lock = this.superSubLock;
-//        long stamp = lock.tryOptimisticRead();
-//
-//        if (stamp > 0) {
-//            ArrayList<Subscription> arrayList = local.get(superType);
-//            if (arrayList != null) {
-//                subscriptions = arrayList.toArray(EMPTY);
-//
-//                if (lock.validate(stamp)) {
-//                    return subscriptions;
-//                } else {
-//                    stamp = lock.readLock();
-//
-//                    arrayList = local.get(superType);
-//                    if (arrayList != null) {
-//                        subscriptions = arrayList.toArray(EMPTY);
-//                        lock.unlockRead(stamp);
-//                        return subscriptions;
-//                    }
-//
-//                    // unable to get a valid subscription. Have to acquire a write lock
-//                    long origStamp = stamp;
-//                    if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
-//                        lock.unlock(origStamp);
-//                        stamp = lock.writeLock();
-//                    }
-//                }
-//            } else {
-//                // unable to get a valid subscription. Have to acquire a write lock
-//                if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
-//                    stamp = lock.writeLock();
-//                }
-//            }
-//        } else {
-//            // unable to get a valid subscription. Have to acquire a write lock
-//            if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
-//                stamp = lock.writeLock();
-//            }
-//        }
+        final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
-        ArrayList<Subscription> arrayList = local.get(superType);
-        if (arrayList != null) {
-            subscriptions = arrayList.toArray(EMPTY);
+        ArrayList<Subscription> superSubscriptions = local.get(superType);
+        if (superSubscriptions == null) {
+            final Class<?>[] superClasses = getSuperClasses_NL(superType, isArray(superType));  // never returns null, cached response
+            final int length = superClasses.length;
 
-//            lock.unlockWrite(stamp);
-            return subscriptions;
-        }
+            // types was not empty, so get subscriptions for each type and collate them
+            final Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
+            Class<?> superClass;
 
-        // array was null, return EMPTY collection
-        Class<?>[] types = getSuperClasses_NL(superType, isArray(superType));
-        int length = types.length;
-        if (length == 0) {
-            local.put(superType, new ArrayList<Subscription>(0));
-//            lock.unlockWrite(stamp);
-            return EMPTY;
-        }
+            ArrayList<Subscription> subs;
+            Subscription sub;
 
-        // types was not empty, so get subscriptions for each type and collate them
-        Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
-        Class<?> superClass;
+            superSubscriptions = new ArrayList<Subscription>(length);
 
-        ArrayList<Subscription> subs;
-        Subscription sub;
-        arrayList = new ArrayList<Subscription>(16);
+            for (int i=0;i<length;i++) {
+                superClass = superClasses[i];
+                subs = local2.get(superClass);
 
+                if (subs != null) {
+                    for (int j=0;j<subs.size();j++) {
+                        sub = subs.get(j);
 
-        for (int i=0;i<length;i++) {
-            superClass = types[i];
-            subs = local2.get(superClass);
-
-            if (subs != null) {
-                for (int j=0;j<subs.size();j++) {
-                    sub = subs.get(j);
-
-                    if (sub.acceptsSubtypes()) {
-                        arrayList.add(sub);
+                        if (sub.acceptsSubtypes()) {
+                            superSubscriptions.add(sub);
+                        }
                     }
                 }
             }
+
+            local.put(superType, superSubscriptions);
         }
 
-        local.put(superType, arrayList);
-
-        subscriptions = arrayList.toArray(EMPTY);
-
-//        lock.unlockWrite(stamp);
-        return subscriptions;
+        return superSubscriptions;
     }
 
     // CAN NOT RETURN NULL
