@@ -1,5 +1,9 @@
 package dorkbox.util.messagebus;
 
+import dorkbox.util.messagebus.common.*;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
+import dorkbox.util.messagebus.subscription.Subscription;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -7,16 +11,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
-import dorkbox.util.messagebus.common.HashMapTree;
-import dorkbox.util.messagebus.common.SubscriptionUtils;
-import dorkbox.util.messagebus.common.VarArgPossibility;
-import dorkbox.util.messagebus.common.VarArgUtils;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
-import dorkbox.util.messagebus.listener.MessageHandler;
-import dorkbox.util.messagebus.listener.MetadataReader;
-import dorkbox.util.messagebus.subscription.Subscription;
 
 /**
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
@@ -40,10 +34,7 @@ public class SubscriptionManager {
 
     private static final float LOAD_FACTOR = 0.8F;
 
-    // the metadata reader that is used to inspect objects passed to the subscribe method
-    private static final MetadataReader metadataReader = new MetadataReader();
-
-    final SubscriptionUtils utils;
+    private final SubscriptionUtils utils;
 
     // remember already processed classes that do not contain any message handlers
     private final Map<Class<?>, Boolean> nonListeners;
@@ -66,21 +57,16 @@ public class SubscriptionManager {
 
     private final VarArgUtils varArgUtils;
 
-    // stripe size of maps for concurrency
-    private final int STRIPE_SIZE;
-
 
 //    private final StampedLock lock = new StampedLock();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     SubscriptionManager(int numberOfThreads) {
-        this.STRIPE_SIZE = numberOfThreads;
-
         float loadFactor = SubscriptionManager.LOAD_FACTOR;
 
         // modified ONLY during SUB/UNSUB
         {
-            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, loadFactor, this.STRIPE_SIZE);
+            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, loadFactor, numberOfThreads);
 
             this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(64, LOAD_FACTOR, 1);
             this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
@@ -93,7 +79,7 @@ public class SubscriptionManager {
 
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, this.STRIPE_SIZE);
+        this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, numberOfThreads);
     }
 
     public void shutdown() {
@@ -150,13 +136,13 @@ public class SubscriptionManager {
                     return;
                 }
 
-                ArrayList<Subscription> subsPerListener = new ArrayList<Subscription>();
-                Collection<Subscription> subsForPublication = null;
 
                 VarArgPossibility varArgPossibility = this.varArgPossibility;
                 Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
                 HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
 
+                ArrayList<Subscription> subsPerListener = new ArrayList<Subscription>(handlersSize);
+                Collection<Subscription> subsForPublication = null;
 
                 // create the subscription
                 MessageHandler messageHandler;
@@ -168,10 +154,10 @@ public class SubscriptionManager {
                     Subscription subscription = new Subscription(messageHandler);
                     subscription.subscribe(listener);
 
+                    subsPerListener.add(subscription); // activates this sub for sub/unsub
+
                     // now add this subscription to each of the handled types
                     subsForPublication = getSubsForPublication(messageHandler.getHandledMessages(), subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
-
-                    subsPerListener.add(subscription); // activates this sub for sub/unsub
                     subsForPublication.add(subscription);  // activates this sub for publication
                 }
 
@@ -195,7 +181,8 @@ public class SubscriptionManager {
     }
 
     // inside a write lock
-    private final Collection<Subscription> getSubsForPublication(final Class<?>[] messageHandlerTypes,
+    // also puts it into the correct map if it's not already there
+    private Collection<Subscription> getSubsForPublication(final Class<?>[] messageHandlerTypes,
                     final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
                     final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
                     final VarArgPossibility varArgPossibility) {
@@ -211,7 +198,7 @@ public class SubscriptionManager {
             case 1: {
                 ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
                 if (subs == null) {
-                    subs = new ArrayList<Subscription>(8);
+                    subs = new ArrayList<Subscription>();
 
                     boolean isArray = utils.isArray(type0);
                     if (isArray) {
@@ -219,6 +206,8 @@ public class SubscriptionManager {
                     }
 
                     // cache the super classes
+//                    todo: makes it's own read/write lock. it's 2x as expensive when running inside the writelock for subscribe, VS on it's own
+//                    maybe even use StampedLock
                     utils.cacheSuperClasses(type0, isArray);
 
                     subsPerMessageSingle.put(type0, subs);

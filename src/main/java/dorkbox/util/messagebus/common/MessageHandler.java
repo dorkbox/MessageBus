@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.listener;
+package dorkbox.util.messagebus.common;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -8,7 +8,6 @@ import com.esotericsoftware.reflectasm.MethodAccess;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.annotations.Synchronized;
-import dorkbox.util.messagebus.common.ReflectionUtils;
 
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains

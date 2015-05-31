@@ -13,13 +13,11 @@ import java.util.concurrent.LinkedTransferQueue;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
+import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.common.thread.ConcurrentLinkedQueue2;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
-import dorkbox.util.messagebus.listener.MessageHandler;
-import dorkbox.util.messagebus.listener.MessageListener;
-import dorkbox.util.messagebus.listener.MetadataReader;
 import dorkbox.util.messagebus.subscription.Subscription;
 
 
@@ -28,7 +26,9 @@ public class PerfTest_Collections {
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     private static final float LOAD_FACTOR = 0.8F;
-    private static final MessageListener messageListener = new MetadataReader().getMessageListener(Listener.class, LOAD_FACTOR, 8);
+
+
+    private static final MessageHandler[] allHandlers = MessageHandler.get(Listener.class);
 
     public static void main(final String[] args) throws Exception {
         final int size = 16;
@@ -73,10 +73,8 @@ public class PerfTest_Collections {
         final int warmupRuns = 2;
         final int runs = 3;
 
-        Collection<MessageHandler> handlers = messageListener.getHandlers();
-
         for (int i=0;i<size;i++) {
-            for (MessageHandler x : handlers) {
+            for (MessageHandler x : allHandlers) {
                 set.add(new Subscription(x));
             }
         }

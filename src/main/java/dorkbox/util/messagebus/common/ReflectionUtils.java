@@ -70,7 +70,7 @@ public class ReflectionUtils {
      * @param from The root class to start with
      * @return A set of classes, each representing a super type of the root class
      */
-    public static ArrayList<Class<?>> getSuperTypes(Class<?> from) {
+    public static Class<?>[] getSuperTypes(Class<?> from) {
         ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
 
         collectInterfaces( from, superclasses );
@@ -81,7 +81,7 @@ public class ReflectionUtils {
             collectInterfaces( from, superclasses );
         }
 
-        return superclasses;
+        return superclasses.toArray(new Class<?>[superclasses.size()]);
     }
 
     public static void collectInterfaces( Class<?> from, Collection<Class<?>> accumulator ) {

@@ -11,9 +11,7 @@ import org.junit.Test;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.AssertSupport;
-import dorkbox.util.messagebus.listener.MessageHandler;
-import dorkbox.util.messagebus.listener.MessageListener;
-import dorkbox.util.messagebus.listener.MetadataReader;
+import dorkbox.util.messagebus.common.MessageHandler;
 
 /**
  *
@@ -22,16 +20,14 @@ import dorkbox.util.messagebus.listener.MetadataReader;
  */
 public class MetadataReaderTest extends AssertSupport {
 
-    private MetadataReader reader = new MetadataReader();
-
     @Test
     public void testListenerWithoutInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener1.class, 0.85F, 4);
+        MessageHandler[] allHandlers = MessageHandler.get(MessageListener1.class);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(2, String.class)
                 .expectHandlers(2, Object.class)
                 .expectHandlers(1, BufferedReader.class);
-        validator.check(listener);
+        validator.check(allHandlers);
     }
 
     /*
@@ -45,23 +41,22 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testListenerWithInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener2.class, 0.85F, 4);
+        MessageHandler[] allHandlers = MessageHandler.get(MessageListener2.class);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(2, String.class)
                 .expectHandlers(2, Object.class)
                 .expectHandlers(1, BufferedReader.class);
-        validator.check(listener);
+        validator.check(allHandlers);
     }
 
     @Test
     public void testListenerWithInheritanceOverriding() {
-        MessageListener listener = this.reader.getMessageListener(MessageListener3.class, 0.85F, 4);
-
+        MessageHandler[] allHandlers = MessageHandler.get(MessageListener3.class);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(0, String.class)
                 .expectHandlers(2, Object.class)
                 .expectHandlers(0, BufferedReader.class);
-        validator.check(listener);
+        validator.check(allHandlers);
     }
 
     public static class NClasses {
@@ -119,10 +114,10 @@ public class MetadataReaderTest extends AssertSupport {
             return this;
         }
 
-        public void check(MessageListener listener){
+        public void check(MessageHandler[] allHandlers){
             for (Map.Entry<NClasses, Integer> expectedHandler: this.handlers.entrySet()) {
                 NClasses key = expectedHandler.getKey();
-                List<MessageHandler> handlers2 = getHandlers(listener, key.messageTypes);
+                List<MessageHandler> handlers2 = pruneHandlers(allHandlers, key.messageTypes);
 
                 if (expectedHandler.getValue() > 0){
                     assertTrue(!handlers2.isEmpty());
@@ -135,9 +130,10 @@ public class MetadataReaderTest extends AssertSupport {
         }
 
         // for testing
-        public List<MessageHandler> getHandlers(MessageListener listener, Class<?>... messageTypes) {
+        public List<MessageHandler> pruneHandlers(MessageHandler[] allHandlers, Class<?>... messageTypes) {
             List<MessageHandler> matching = new LinkedList<MessageHandler>();
-            for (MessageHandler handler : listener.getHandlers()) {
+
+            for (MessageHandler handler : allHandlers) {
                 if (handlesMessage(handler, messageTypes)) {
                     matching.add(handler);
                 }
@@ -198,7 +194,7 @@ public class MetadataReaderTest extends AssertSupport {
 
     @Test
     public void testMultipleSignatureListenerWithoutInheritance() {
-        MessageListener listener = this.reader.getMessageListener(MultiMessageListener1.class, 0.85F, 4);
+        MessageHandler[] allHandlers = MessageHandler.get(MultiMessageListener1.class);
         ListenerValidator validator = new ListenerValidator()
                 .expectHandlers(7, String.class)
                 .expectHandlers(9, String.class, String.class)
@@ -211,7 +207,7 @@ public class MetadataReaderTest extends AssertSupport {
                 .expectHandlers(2, String.class, Object.class)
                 .expectHandlers(2, String.class, Object[].class)
                 ;
-        validator.check(listener);
+        validator.check(allHandlers);
     }
 
     @SuppressWarnings("unused")

@@ -3,8 +3,9 @@ package dorkbox.util.messagebus.common;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import dorkbox.util.messagebus.common.thread.ClassHolder;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
@@ -48,7 +49,7 @@ public class SubscriptionUtils {
         this.arrayVersionCache = new ConcurrentHashMapV8<Class<?>, Class<?>>(32, loadFactor, stripeSize);
         this.isArrayCache = new ConcurrentHashMapV8<Class<?>, Boolean>(32, loadFactor, stripeSize);
 
-        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, Class<?>[]>(32, loadFactor, 1);
+        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, Class<?>[]>(32, loadFactor, 8);
         this.classHolderSingle = new ClassHolder(loadFactor, stripeSize);
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
@@ -64,38 +65,50 @@ public class SubscriptionUtils {
         this.superClassSubscriptions.clear();
     }
 
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
     /**
      * never returns null
      * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
      *
      * if parameter clazz is of type array, then the super classes are of array type as well
      *
-     * protected by read lock by caller
+     * protected by read lock by caller. The cache version is called first, by write lock
      */
     public final Class<?>[] getSuperClasses_NL(final Class<?> clazz, final boolean isArray) {
         // this is never reset, since it never needs to be.
         final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
+
         Class<?>[] classes = local.get(clazz);
 
         if (classes == null) {
             // get all super types of class
-            final Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
-            ArrayList<Class<?>> newList = new ArrayList<Class<?>>(superTypes.size());
+            final Class<?>[] superTypes = ReflectionUtils.getSuperTypes(clazz);
+            int length = superTypes.length;
 
-            Iterator<Class<?>> iterator;
+            ArrayList<Class<?>> newList = new ArrayList<Class<?>>(length);
+
             Class<?> c;
+            if (isArray) {
+                for (int i=0;i<length;i++) {
+                    c = superTypes[i];
 
-            for (iterator = superTypes.iterator(); iterator.hasNext();) {
-                c = iterator.next();
-
-                if (isArray) {
                     c = getArrayClass(c);
-                }
 
-                if (c != clazz) {
-                    newList.add(c);
+                    if (c != clazz) {
+                        newList.add(c);
+                    }
+                }
+            } else {
+                for (int i=0;i<length;i++) {
+                    c = superTypes[i];
+
+                    if (c != clazz) {
+                        newList.add(c);
+                    }
                 }
             }
+
 
             classes = newList.toArray(new Class<?>[newList.size()]);
             local.put(clazz, classes);
@@ -199,17 +212,17 @@ public class SubscriptionUtils {
      * Cache the values of JNI method, isArray(c)
      * @return true if the class c is an array type
      */
-    @SuppressWarnings("boxing")
+//    @SuppressWarnings("boxing")
     public final boolean isArray(final Class<?> c) {
-        final Map<Class<?>, Boolean> isArrayCache = this.isArrayCache;
-
-        final Boolean isArray = isArrayCache.get(c);
-        if (isArray == null) {
+//        final Map<Class<?>, Boolean> isArrayCache = this.isArrayCache;
+//
+//        final Boolean isArray = isArrayCache.get(c);
+//        if (isArray == null) {
             boolean b = c.isArray();
-            isArrayCache.put(c, b);
+//            isArrayCache.put(c, b);
             return b;
-        }
-        return isArray;
+//        }
+//        return isArray;
     }
 
 

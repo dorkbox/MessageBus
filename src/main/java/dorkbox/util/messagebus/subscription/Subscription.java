@@ -8,12 +8,12 @@ import org.omg.CORBA.BooleanHolder;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
 
+import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.listener.MessageHandler;
 
 /**
  * A subscription is a thread-safe container that manages exactly one message handler of all registered

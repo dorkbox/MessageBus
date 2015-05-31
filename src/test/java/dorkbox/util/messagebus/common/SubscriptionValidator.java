@@ -1,9 +1,15 @@
 package dorkbox.util.messagebus.common;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
 import dorkbox.util.messagebus.SubscriptionManager;
 import dorkbox.util.messagebus.subscription.Subscription;
-
-import java.util.*;
 
 /**
 *
@@ -51,7 +57,7 @@ public class SubscriptionValidator extends AssertSupport{
                 Subscription matchingSub = null;
                 // one of the subscriptions must belong to the subscriber type
                 for(Subscription sub : collection){
-                    if(sub.belongsTo(validationValidationEntry.subscriber)){
+                    if(belongsTo(sub, validationValidationEntry.subscriber)){
                         matchingSub = sub;
                         break;
                     }
@@ -67,21 +73,23 @@ public class SubscriptionValidator extends AssertSupport{
      * Check whether this subscription manages a message handler of the given message listener class
      */
     // only in unit test
-    public boolean belongsTo(Class<?> listener){
-        return this.handlerMetadata.isFromListener(listener);
+    public boolean belongsTo(Subscription subscription, Class<?> listener) {
 
 
-        // only in unit test
-        public boolean isFromListener(Class<?> listener){
-            return this.listenerConfig.isFromListener(listener);
-        }
-
+//        return this.handlerMetadata.isFromListener(listener);
+//
+//
+//        // only in unit test
+//        public boolean isFromListener(Class<?> listener){
+//            return this.listenerConfig.isFromListener(listener);
+//        }
+        return false;
     }
 
     // only in unit test
-    public boolean isFromListener(Class<?> listener) {
-        return this.listenerDefinition.equals(listener);
-    }
+//    public boolean isFromListener(Class<?> listener) {
+//        return this.listenerDefinition.equals(listener);
+//    }
 
 
     private Collection<ValidationEntry> getEntries(Class<?> messageType){
