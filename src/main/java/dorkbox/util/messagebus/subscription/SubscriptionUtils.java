@@ -1,33 +1,24 @@
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.subscription;
 
-import java.lang.reflect.Array;
+import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
+import dorkbox.util.messagebus.common.HashMapTree;
+import dorkbox.util.messagebus.common.SuperClassUtils;
+import dorkbox.util.messagebus.common.thread.ClassHolder;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
+import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import dorkbox.util.messagebus.common.thread.ClassHolder;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
-import dorkbox.util.messagebus.common.thread.StampedLock;
-import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
-import dorkbox.util.messagebus.subscription.Subscription;
 
 public class SubscriptionUtils {
-    private static final Class<?>[] SUPER_CLASS_EMPTY = new Class<?>[0];
+    private final SuperClassUtils superClass;
 
-    private StampedLock superClassLock = new StampedLock();
-
-
-    private final Map<Class<?>, Class<?>> arrayVersionCache;
-    private final Map<Class<?>, Boolean> isArrayCache;
-
-    private final Map<Class<?>, Class<?>[]> superClassesCache;
     private final ClassHolder classHolderSingle;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
-    // it's faster to create a new one for SUB/UNSUB than it is to clear() on the original one
+    // it's faster to create a new one for SUB/UNSUB than it is to shutdown() on the original one
     private final Map<Class<?>, ArrayList<Subscription>> superClassSubscriptions;
     private final HashMapTree<Class<?>, ConcurrentSet<Subscription>> superClassSubscriptionsMulti;
 
@@ -40,16 +31,15 @@ public class SubscriptionUtils {
 
 
     public SubscriptionUtils(Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
-                             HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti,
-                             float loadFactor, int stripeSize) {
+                             HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti, float loadFactor,
+                             int stripeSize) {
+
+        this.superClass = new SuperClassUtils(loadFactor, 1);
 
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
         this.subscriptionsPerMessageMulti = subscriptionsPerMessageMulti;
 
-        this.arrayVersionCache = new ConcurrentHashMapV8<Class<?>, Class<?>>(32, loadFactor, stripeSize);
-        this.isArrayCache = new ConcurrentHashMapV8<Class<?>, Boolean>(32, loadFactor, stripeSize);
 
-        this.superClassesCache = new ConcurrentHashMapV8<Class<?>, Class<?>[]>(32, loadFactor, 8);
         this.classHolderSingle = new ClassHolder(loadFactor, stripeSize);
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
@@ -65,66 +55,15 @@ public class SubscriptionUtils {
         this.superClassSubscriptions.clear();
     }
 
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();
-
-    /**
-     * never returns null
-     * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
-     *
-     * if parameter clazz is of type array, then the super classes are of array type as well
-     *
-     * protected by read lock by caller. The cache version is called first, by write lock
-     */
-    public final Class<?>[] getSuperClasses_NL(final Class<?> clazz, final boolean isArray) {
-        // this is never reset, since it never needs to be.
-        final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
-
-        Class<?>[] classes = local.get(clazz);
-
-        if (classes == null) {
-            // get all super types of class
-            final Class<?>[] superTypes = ReflectionUtils.getSuperTypes(clazz);
-            int length = superTypes.length;
-
-            ArrayList<Class<?>> newList = new ArrayList<Class<?>>(length);
-
-            Class<?> c;
-            if (isArray) {
-                for (int i=0;i<length;i++) {
-                    c = superTypes[i];
-
-                    c = getArrayClass(c);
-
-                    if (c != clazz) {
-                        newList.add(c);
-                    }
-                }
-            } else {
-                for (int i=0;i<length;i++) {
-                    c = superTypes[i];
-
-                    if (c != clazz) {
-                        newList.add(c);
-                    }
-                }
-            }
-
-
-            classes = newList.toArray(new Class<?>[newList.size()]);
-            local.put(clazz, classes);
-        }
-
-        return classes;
-    }
 
     // called inside sub/unsub write lock
     public final void cacheSuperClasses(final Class<?> clazz) {
-        getSuperClasses_NL(clazz, isArray(clazz));
+        this.superClass.getSuperClasses(clazz, clazz.isArray());
     }
 
     // called inside sub/unsub write lock
     public final void cacheSuperClasses(final Class<?> clazz, final boolean isArray) {
-        getSuperClasses_NL(clazz, isArray);
+        this.superClass.getSuperClasses(clazz, isArray);
     }
 
 //    public final Class<?>[] getSuperClasses(Class<?> clazz, boolean isArray) {
@@ -136,7 +75,7 @@ public class SubscriptionUtils {
 //        long stamp = lock.tryOptimisticRead();
 //
 //        if (stamp > 0) {
-//            ArrayList<Class<?>> arrayList = local.get(clazz);
+//            ArrayList<Class<?>> arrayList = local.getSubscriptions(clazz);
 //            if (arrayList != null) {
 //                classes = arrayList.toArray(SUPER_CLASS_EMPTY);
 //
@@ -145,7 +84,7 @@ public class SubscriptionUtils {
 //                } else {
 //                    stamp = lock.readLock();
 //
-//                    arrayList = local.get(clazz);
+//                    arrayList = local.getSubscriptions(clazz);
 //                    if (arrayList != null) {
 //                        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
 //                        lock.unlockRead(stamp);
@@ -155,7 +94,7 @@ public class SubscriptionUtils {
 //            }
 //        }
 //
-//        // unable to get a valid subscription. Have to acquire a write lock
+//        // unable to getSubscriptions a valid subscription. Have to acquire a write lock
 //        long origStamp = stamp;
 //        if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
 //            lock.unlockRead(origStamp);
@@ -163,7 +102,7 @@ public class SubscriptionUtils {
 //        }
 //
 //
-//        // get all super types of class
+//        // getSubscriptions all super types of class
 //        Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
 //        ArrayList<Class<?>> arrayList = new ArrayList<Class<?>>(superTypes.size());
 //        Iterator<Class<?>> iterator;
@@ -189,89 +128,51 @@ public class SubscriptionUtils {
 //        return classes;
 //    }
 
-    /**
-     * race conditions will result in duplicate answers, which we don't care if happens
-     * never returns null
-     * never reset
-     */
-    public final Class<?> getArrayClass(final Class<?> c) {
-        final Map<Class<?>, Class<?>> arrayVersionCache = this.arrayVersionCache;
-        Class<?> clazz = arrayVersionCache.get(c);
-
-        if (clazz == null) {
-            // messy, but the ONLY way to do it. Array super types are also arrays
-            final Object[] newInstance = (Object[]) Array.newInstance(c, 1);
-            clazz = newInstance.getClass();
-            arrayVersionCache.put(c, clazz);
-        }
-
-        return clazz;
-    }
-
-    /**
-     * Cache the values of JNI method, isArray(c)
-     * @return true if the class c is an array type
-     */
-//    @SuppressWarnings("boxing")
-    public final boolean isArray(final Class<?> c) {
-//        final Map<Class<?>, Boolean> isArrayCache = this.isArrayCache;
-//
-//        final Boolean isArray = isArrayCache.get(c);
-//        if (isArray == null) {
-            boolean b = c.isArray();
-//            isArrayCache.put(c, b);
-            return b;
-//        }
-//        return isArray;
-    }
 
 
     public void shutdown() {
-        this.isArrayCache.clear();
-        this.arrayVersionCache.clear();
-        this.superClassesCache.clear();
+        this.superClass.shutdown();
     }
 
 
-    private static Subscription[] EMPTY = new Subscription[0];
-    private static Class<?>[] EMPTY2 = new Class<?>[0];
-
-    private StampedLock superSubLock = new StampedLock();
-
     /**
      * Returns an array COPY of the super subscriptions for the specified type.
-     *
+     * <p>
      * This ALSO checks to see if the superClass accepts subtypes.
-     *
+     * <p>
      * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
-    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> superType) {
+    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
-        ArrayList<Subscription> superSubscriptions = local.get(superType);
+        ArrayList<Subscription> superSubscriptions = local.get(clazz);
+
         if (superSubscriptions == null) {
-            final Class<?>[] superClasses = getSuperClasses_NL(superType, isArray(superType));  // never returns null, cached response
-            final int length = superClasses.length;
-
-            // types was not empty, so get subscriptions for each type and collate them
+            // types was not empty, so getSubscriptions subscriptions for each type and collate them
             final Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
-            Class<?> superClass;
 
-            ArrayList<Subscription> subs;
+            // save the subscriptions
+            final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz, clazz.isArray());  // never returns null, cached response
+
+            Class<?> superClass;
+            ArrayList<Subscription> superSubs;
             Subscription sub;
 
+            final int length = superClasses.length;
+            int superSubLengh;
             superSubscriptions = new ArrayList<Subscription>(length);
 
-            for (int i=0;i<length;i++) {
+            for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
-                subs = local2.get(superClass);
+                superSubs = local2.get(superClass);
 
-                if (subs != null) {
-                    for (int j=0;j<subs.size();j++) {
-                        sub = subs.get(j);
+                if (superSubs != null) {
+                    superSubLengh = superSubs.size();
+                    for (int j = 0; j < superSubLengh; j++) {
+                        sub = superSubs.get(j);
 
                         if (sub.acceptsSubtypes()) {
                             superSubscriptions.add(sub);
@@ -280,7 +181,7 @@ public class SubscriptionUtils {
                 }
             }
 
-            local.put(superType, superSubscriptions);
+            local.put(clazz, superSubscriptions);
         }
 
         return superSubscriptions;
@@ -301,7 +202,7 @@ public class SubscriptionUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//            subsPerType = subHolderSingle.get();
+//            subsPerType = subHolderSingle.getSubscriptions();
 //
 //            // cache our subscriptions for super classes, so that their access can be fast!
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2);
@@ -387,7 +288,7 @@ public class SubscriptionUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//            subsPerType = subHolderSingle.get();
+//            subsPerType = subHolderSingle.getSubscriptions();
 //
 //            // cache our subscriptions for super classes, so that their access can be fast!
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2, superType3);

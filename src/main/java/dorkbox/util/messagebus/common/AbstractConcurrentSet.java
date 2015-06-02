@@ -4,8 +4,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-
-import dorkbox.util.messagebus.common.thread.StampedLock;
+import java.util.concurrent.locks.StampedLock;
 
 
 abstract class pad<T> extends item<T> {
@@ -21,15 +20,15 @@ abstract class pad<T> extends item<T> {
  * @author bennidi
  *         Date: 2/12/12
  */
-public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> {
+public abstract class AbstractConcurrentSet<T> implements Set<T> {
     private static final AtomicLong id = new AtomicLong();
     private final transient long ID = id.getAndIncrement();
 
     // Internal state
     protected final StampedLock lock = new StampedLock();
-    private final transient Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
+    private final Map<T, ISetEntry<T>> entries; // maintain a map of entries for O(log n) lookup
 
-    volatile long y0, y1, y2, y4, y5, y6 = 7L;
+    public volatile Entry<T> head; // reference to the first element
     volatile long z0, z1, z2, z4, z5, z6 = 7L;
 
 
@@ -44,7 +43,7 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
         if (element == null) {
             return false;
         }
-        boolean changed = false;
+        boolean changed;
 
         long stamp = this.lock.readLock();
         if (this.entries.containsKey(element)) {
@@ -67,15 +66,11 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
 
     @Override
     public boolean contains(Object element) {
-        long stamp = this.lock.tryOptimisticRead();
+        long stamp = this.lock.readLock();
 
         ISetEntry<T> entry = this.entries.get(element);
 
-        if (!this.lock.validate(stamp)) {
-            stamp = this.lock.readLock();
-            entry = this.entries.get(element);
-            this.lock.unlockRead(stamp);
-        }
+        this.lock.unlockRead(stamp);
 
         return entry != null && entry.getValue() != null;
     }
@@ -125,15 +120,11 @@ public abstract class AbstractConcurrentSet<T> extends pad<T> implements Set<T> 
     @Override
     public boolean remove(Object element) {
         StampedLock lock = this.lock;
-        long stamp = lock.tryOptimisticRead();
+        long stamp = lock.readLock();
 
         ISetEntry<T> entry = this.entries.get(element);
 
-        if (!lock.validate(stamp)) {
-            stamp = lock.readLock();
-            entry = this.entries.get(element);
-            lock.unlockRead(stamp);
-        }
+        lock.unlockRead(stamp);
 
         if (entry == null || entry.getValue() == null) {
             return false; // fast exit

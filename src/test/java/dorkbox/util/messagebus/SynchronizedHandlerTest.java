@@ -1,12 +1,11 @@
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Test;
-
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.annotations.Synchronized;
 import dorkbox.util.messagebus.common.MessageBusTest;
+import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Todo: Add javadoc
@@ -49,7 +48,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
         @Synchronized
         public void handleMessage(Object o){
             counter.getAndIncrement();
-//            System.err.println(counter.get());
+//            System.err.println(counter.getSubscriptions());
         }
     }
 }

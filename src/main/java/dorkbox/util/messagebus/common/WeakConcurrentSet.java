@@ -3,8 +3,7 @@ package dorkbox.util.messagebus.common;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.WeakHashMap;
-
-import dorkbox.util.messagebus.common.thread.StampedLock;
+import java.util.concurrent.locks.StampedLock;
 
 /**
  * This implementation uses weak references to the elements. Iterators automatically perform cleanups of
@@ -38,6 +37,8 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
 
                 StampedLock lock = WeakConcurrentSet.this.lock;
                 long stamp = lock.writeLock();
+//                final Lock writeLock = WeakConcurrentSet.this.lock.writeLock();
+//                writeLock.lock();
                 try{
                     do {
                         ISetEntry<T> orphaned = this.current;
@@ -47,6 +48,7 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
                 }
                 finally {
                     lock.unlockWrite(stamp);
+//                    writeLock.unlock();
                 }
             }
 
@@ -118,9 +120,5 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
         public T getValue() {
             return this.value.get();
         }
-
-
-
-
     }
 }

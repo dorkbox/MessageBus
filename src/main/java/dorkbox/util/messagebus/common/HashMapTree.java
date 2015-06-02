@@ -1,15 +1,15 @@
 package dorkbox.util.messagebus.common;
 
+import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
+
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 
-import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
-
 
 /**
- * Simple tree structure that is a map that contains a chain of keys to get to a value.
+ * Simple tree structure that is a map that contains a chain of keys to getSubscriptions to a value.
  * <p>
  * THREAD SAFE, each level in the tree has it's own write lock, and there a tree-global read lock, to prevent writes
  *
@@ -506,7 +506,7 @@ public class HashMapTree<KEY, VALUE> {
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
         HashMapTree<KEY, VALUE> objectTree = null;
-        // get value from our children
+        // getSubscriptions value from our children
         objectTree = getLeaf_NL(key); // protected by lock
 
         if (objectTree == null) {
@@ -525,7 +525,7 @@ public class HashMapTree<KEY, VALUE> {
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
         HashMapTree<KEY, VALUE> tree = null;
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(key1); // protected by lock
         if (tree != null) {
             tree = tree.getLeaf_NL(key2); // protected by lock
@@ -547,7 +547,7 @@ public class HashMapTree<KEY, VALUE> {
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
         HashMapTree<KEY, VALUE> tree = null;
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(key1);
         if (tree != null) {
             tree = tree.getLeaf_NL(key2);
@@ -573,7 +573,7 @@ public class HashMapTree<KEY, VALUE> {
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
         HashMapTree<KEY, VALUE> tree = null;
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(keys[0]);
 
         int size = keys.length;
@@ -625,7 +625,7 @@ public class HashMapTree<KEY, VALUE> {
         Lock READ = this.lock.readLock();
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(key1);
         if (tree != null) {
             tree = tree.getLeaf_NL(key2);
@@ -642,7 +642,7 @@ public class HashMapTree<KEY, VALUE> {
         Lock READ = this.lock.readLock();
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(key1);
         if (tree != null) {
             tree = tree.getLeaf_NL(key2);
@@ -668,7 +668,7 @@ public class HashMapTree<KEY, VALUE> {
         READ.lock(); // allows other readers, blocks others from acquiring update or write locks
 
         HashMapTree<KEY, VALUE> tree = null;
-        // get value from our children
+        // getSubscriptions value from our children
         tree = getLeaf_NL(keys[0]);
 
         for (int i=1;i<size;i++) {

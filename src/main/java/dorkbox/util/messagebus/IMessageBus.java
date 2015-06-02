@@ -14,7 +14,7 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  * <p/>
  * Each message publication is isolated from all other running publications such that it does not interfere with them.
  * Hence, the bus generally expects message handlers to be stateless as it may invoke them concurrently if multiple
- * messages get published asynchronously. If handlers are stateful and not thread-safe they can be marked to be invoked
+ * messages getSubscriptions published asynchronously. If handlers are stateful and not thread-safe they can be marked to be invoked
  * in a synchronized fashion using @Synchronized annotation
  *
  * <p/>
@@ -25,7 +25,7 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  * <p/>
  * By default, the bus uses weak references to all listeners such that registered listeners do not need to
  * be explicitly unregistered to be eligible for garbage collection. Dead (garbage collected) listeners are
- * removed on-the-fly as messages get dispatched. This can be changed using the @Listener annotation.
+ * removed on-the-fly as messages getSubscriptions dispatched. This can be changed using the @Listener annotation.
  *
  * <p/>
  * Generally message handlers will be invoked in inverse sequence of subscription but any
@@ -50,7 +50,7 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  *
  * <p/>
  * NOTE: Generic type parameters of messages will not be taken into account, e.g. a List<Long> will
- * get dispatched to all message handlers that take an instance of List as their parameter
+ * getSubscriptions dispatched to all message handlers that take an instance of List as their parameter
  *
  * @Author bennidi
  *         Date: 2/8/12

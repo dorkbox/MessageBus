@@ -1,19 +1,17 @@
 package dorkbox.util.messagebus.subscription;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.omg.CORBA.BooleanHolder;
-
 import com.esotericsoftware.reflectasm.MethodAccess;
-
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import org.omg.CORBA.BooleanHolder;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A subscription is a thread-safe container that manages exactly one message handler of all registered
@@ -43,9 +41,10 @@ public class Subscription {
 
     public Subscription(MessageHandler handler) {
         this.handlerMetadata = handler;
-        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F, 16);
+        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F, 15);
 //        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
 //        this.listeners = new ConcurrentLinkedQueue2<Object>();
+//        this.listeners = new CopyOnWriteArrayList<Object>();
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
@@ -59,26 +58,26 @@ public class Subscription {
         return this.handlerMetadata.getHandledMessages();
     }
 
-    public boolean acceptsSubtypes() {
+    public final boolean acceptsSubtypes() {
         return this.handlerMetadata.acceptsSubtypes();
     }
 
-    public boolean acceptsVarArgs() {
+    public final boolean acceptsVarArgs() {
         return this.handlerMetadata.acceptsVarArgs();
     }
 
-    public boolean isEmpty() {
+    public final boolean isEmpty() {
         return this.listeners.isEmpty();
     }
 
-    public void subscribe(Object listener) {
+    public final void subscribe(Object listener) {
         this.listeners.add(listener);
     }
 
     /**
      * @return TRUE if the element was removed
      */
-    public boolean unsubscribe(Object existingListener) {
+    public final boolean unsubscribe(Object existingListener) {
         return this.listeners.remove(existingListener);
     }
 
@@ -96,9 +95,9 @@ public class Subscription {
      * @return true if there were listeners for this publication, false if there was nothing
      */
     public final void publish(final Object message) throws Throwable {
-        MethodAccess handler = this.handlerMetadata.getHandler();
-        int handleIndex = this.handlerMetadata.getMethodIndex();
-        IHandlerInvocation invocation = this.invocation;
+        final MethodAccess handler = this.handlerMetadata.getHandler();
+        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;
         Object listener;
@@ -107,7 +106,6 @@ public class Subscription {
             listener = iterator.next();
 
 //            this.c++;
-
             invocation.invoke(listener, handler, handleIndex, message);
         }
     }

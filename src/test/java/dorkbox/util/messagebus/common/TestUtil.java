@@ -1,11 +1,11 @@
 package dorkbox.util.messagebus.common;
 
-import java.util.Iterator;
-import java.util.List;
-
 import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.PubSubSupport;
-import dorkbox.util.messagebus.SubscriptionManager;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
+
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Todo: Add javadoc
@@ -16,52 +16,48 @@ import dorkbox.util.messagebus.SubscriptionManager;
 public class TestUtil {
 
 
-    public static Runnable subscriber(final SubscriptionManager manager, final ListenerFactory listeners){
+    public static Runnable subscriber(final SubscriptionManager manager, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Object next;
-                while((next = source.next()) != null){
+                while ((next = source.next()) != null) {
                     manager.subscribe(next);
                 }
             }
         };
     }
 
-    public static Runnable unsubscriber(final SubscriptionManager manager, final ListenerFactory listeners){
+    public static Runnable unsubscriber(final SubscriptionManager manager, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Object next;
-                while((next = source.next()) != null){
+                while ((next = source.next()) != null) {
                     manager.unsubscribe(next);
                 }
             }
         };
     }
 
-    public static Runnable subscriber(final PubSubSupport bus, final ListenerFactory listeners){
+    public static Runnable subscriber(final PubSubSupport bus, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Object next;
-                while((next = source.next()) != null){
+                while ((next = source.next()) != null) {
                     bus.subscribe(next);
                 }
             }
         };
     }
 
-    public static Runnable unsubscriber(final PubSubSupport bus, final ListenerFactory listeners){
+    public static Runnable unsubscriber(final PubSubSupport bus, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Object next;
-                while((next = source.next()) != null){
+                while ((next = source.next()) != null) {
                     bus.unsubscribe(next);
                 }
             }
@@ -71,28 +67,25 @@ public class TestUtil {
     public static void setup(final PubSubSupport bus, final List<Object> listeners, int numberOfThreads) {
         Runnable[] setupUnits = new Runnable[numberOfThreads];
         int partitionSize;
-        if(listeners.size() >= numberOfThreads){
-          partitionSize =  (int)Math.floor(listeners.size() / numberOfThreads);
+        if (listeners.size() >= numberOfThreads) {
+            partitionSize = (int) Math.floor(listeners.size() / numberOfThreads);
         }
-        else{
+        else {
             partitionSize = 1;
             numberOfThreads = listeners.size();
         }
 
-        for(int i = 0; i < numberOfThreads; i++){
+        for (int i = 0; i < numberOfThreads; i++) {
             final int partitionStart = i * partitionSize;
-            final int partitionEnd = i+1 < numberOfThreads
-                    ? partitionStart + partitionSize + 1
-                    : listeners.size();
+            final int partitionEnd = i + 1 < numberOfThreads ? partitionStart + partitionSize + 1 : listeners.size();
             setupUnits[i] = new Runnable() {
 
                 private List<Object> listenerSubset = listeners.subList(partitionStart, partitionEnd);
 
-                @Override
-                public void run() {
-                   for(Object listener : this.listenerSubset){
-                       bus.subscribe(listener);
-                   }
+                @Override public void run() {
+                    for (Object listener : this.listenerSubset) {
+                        bus.subscribe(listener);
+                    }
                 }
             };
 

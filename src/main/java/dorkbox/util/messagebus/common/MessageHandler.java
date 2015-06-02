@@ -1,13 +1,12 @@
 package dorkbox.util.messagebus.common;
 
+import com.esotericsoftware.reflectasm.MethodAccess;
+import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.util.messagebus.annotations.Synchronized;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import com.esotericsoftware.reflectasm.MethodAccess;
-
-import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.annotations.Synchronized;
 
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
@@ -30,11 +29,11 @@ import dorkbox.util.messagebus.annotations.Synchronized;
  */
 public class MessageHandler {
 
-    // get all listeners defined by the given class (includes
+    // getSubscriptions all listeners defined by the given class (includes
     // listeners defined in super classes)
     public static final MessageHandler[] get(final Class<?> target) {
 
-        // get all handlers (this will include all (inherited) methods directly annotated using @Handler)
+        // getSubscriptions all handlers (this will include all (inherited) methods directly annotated using @Handler)
         final Method[] allMethods = ReflectionUtils.getMethods(target);
         final int length = allMethods.length;
 
@@ -97,32 +96,32 @@ public class MessageHandler {
         this.acceptsVarArgs = handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs();
     }
 
-    public boolean isSynchronized(){
+    public final boolean isSynchronized() {
         return this.isSynchronized;
     }
 
-    public MethodAccess getHandler() {
+    public final MethodAccess getHandler() {
         return this.handler;
     }
 
-    public int getMethodIndex() {
+    public final int getMethodIndex() {
         return this.methodIndex;
     }
 
-    public Class<?>[] getHandledMessages() {
+    public final Class<?>[] getHandledMessages() {
         return this.handledMessages;
     }
 
-    public boolean acceptsSubtypes() {
+    public final boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
     }
 
-    public boolean acceptsVarArgs() {
+    public final boolean acceptsVarArgs() {
         return this.acceptsVarArgs;
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + (this.acceptsSubtypes ? 1231 : 1237);
@@ -133,7 +132,7 @@ public class MessageHandler {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }

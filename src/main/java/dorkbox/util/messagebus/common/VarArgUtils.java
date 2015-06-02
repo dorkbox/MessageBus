@@ -1,12 +1,13 @@
 package dorkbox.util.messagebus.common;
 
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
-
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.subscription.SubscriptionUtils;
+
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 
 public class VarArgUtils {
     private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> varArgSubscriptions;
@@ -22,8 +23,8 @@ public class VarArgUtils {
     private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
 
 
-    public VarArgUtils(SubscriptionUtils utils, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
-                    float loadFactor, int stripeSize) {
+    public VarArgUtils(SubscriptionUtils utils, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle, float loadFactor,
+                       int stripeSize) {
 
         this.utils = utils;
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
@@ -53,7 +54,7 @@ public class VarArgUtils {
 //
 //        // whenever our subscriptions change, this map is cleared.
 //        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.get();
+//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.getSubscriptions();
 //
 //        // cache our subscriptions for super classes, so that their access can be fast!
 //        ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(messageClass, subsPerType);
@@ -67,7 +68,7 @@ public class VarArgUtils {
 //            Iterator<Subscription> iterator;
 //            Subscription sub;
 //
-//            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.get(arrayVersion);
+//            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.getSubscriptions(arrayVersion);
 //            if (subs != null) {
 //                for (iterator = subs.iterator(); iterator.hasNext();) {
 //                    sub = iterator.next();
@@ -95,7 +96,7 @@ public class VarArgUtils {
 //        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> local = this.varArgSuperClassSubscriptions;
 //
 //        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.get();
+//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.getSubscriptions();
 //
 //        // cache our subscriptions for super classes, so that their access can be fast!
 //        ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(messageClass, subsPerType);
@@ -122,7 +123,7 @@ public class VarArgUtils {
 //            for (iterator = types.iterator(); iterator.hasNext();) {
 //                superClass = iterator.next();
 //
-//                Collection<Subscription> subs = local2.get(superClass);
+//                Collection<Subscription> subs = local2.getSubscriptions(superClass);
 //                if (subs != null) {
 //                    for (subIterator = subs.iterator(); subIterator.hasNext();) {
 //                        sub = subIterator.next();
@@ -158,7 +159,7 @@ public class VarArgUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//            subsPerType = subHolderConcurrent.get();
+//            subsPerType = subHolderConcurrent.getSubscriptions();
 //
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, messageClass1, messageClass2);
 //            if (putIfAbsent != null) {
@@ -189,10 +190,11 @@ public class VarArgUtils {
     }
 
 
-      // CAN NOT RETURN NULL
+    // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2,
+                                                                   final Class<?> messageClass3) {
 //        HashMapTree<Class<?>, ConcurrentSet<Subscription>> local = this.varArgSuperClassSubscriptionsMulti;
 //
 //        // whenever our subscriptions change, this map is cleared.
@@ -205,7 +207,7 @@ public class VarArgUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//            subsPerType = subHolderConcurrent.get();
+//            subsPerType = subHolderConcurrent.getSubscriptions();
 //
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, messageClass1, messageClass2, messageClass3);
 //            if (putIfAbsent != null) {

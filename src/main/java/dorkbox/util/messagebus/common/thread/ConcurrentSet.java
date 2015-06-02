@@ -1,12 +1,12 @@
 package dorkbox.util.messagebus.common.thread;
 
+import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
+
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
-
-import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 
 /**
  * This data structure is optimized for non-blocking reads even when write operations occur.
@@ -39,7 +39,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
             return false;
         }
 
-        // had to modify the super implementation so we get Node<T> back
+        // had to modify the super implementation so we getSubscriptions Node<T> back
         Node<T> alreadyPresent = this.entries.putIfAbsent(element, this.IN_PROGRESS_MARKER);
         if (alreadyPresent == null) {
             // this doesn't already exist

@@ -1,24 +1,11 @@
 package dorkbox.util.messagebus.common.simpleq;
 
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lpItem1;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lpItem2;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lpItem3;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lpThread;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lpType;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lvMessageType;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.lvThread;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.soThread;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spItem1;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spItem2;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spItem3;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spMessageType;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spThread;
-import static dorkbox.util.messagebus.common.simpleq.MultiNode.spType;
+import org.jctools.queues.MpmcArrayQueue;
+import org.jctools.util.UnsafeAccess;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-import org.jctools.queues.MpmcArrayQueue;
-import org.jctools.util.UnsafeAccess;
+import static dorkbox.util.messagebus.common.simpleq.MultiNode.*;
 
 
 public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
@@ -445,7 +432,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
                         // Successful CAS: full barrier
 
                         final Thread myThread = Thread.currentThread();
-//                        final Object node = nodeThreadLocal.get();
+//                        final Object node = nodeThreadLocal.getSubscriptions();
 
                         spType(node, TYPE_CONSUMER);
                         spThread(node, myThread);
