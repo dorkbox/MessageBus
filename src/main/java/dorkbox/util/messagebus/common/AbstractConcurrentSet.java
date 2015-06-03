@@ -6,11 +6,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 
-
-abstract class pad<T> extends item<T> {
-    volatile long z0, z1, z2, z4, z5, z6 = 7L;
-}
-
 /**
  * This data structure is optimized for non-blocking reads even when write operations occur.
  * Running read iterators will not be affected by add operations since writes always insert at the head of the
@@ -45,32 +40,34 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
         }
         boolean changed;
 
-        long stamp = this.lock.readLock();
+        final StampedLock lock = this.lock;
+        long stamp = lock.readLock();
         if (this.entries.containsKey(element)) {
-            this.lock.unlockRead(stamp);
+            lock.unlockRead(stamp);
             return false;
         }
 
         long origStamp = stamp;
-        if ((stamp = this.lock.tryConvertToWriteLock(stamp)) == 0) {
-            this.lock.unlockRead(origStamp);
-            stamp = this.lock.writeLock();
+        if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
+            lock.unlockRead(origStamp);
+            stamp = lock.writeLock();
         }
 
 
         changed = insert(element);
-        this.lock.unlock(stamp);
+        lock.unlock(stamp);
 
         return changed;
     }
 
     @Override
     public boolean contains(Object element) {
-        long stamp = this.lock.readLock();
+        final StampedLock lock = this.lock;
+        long stamp = lock.readLock();
 
         ISetEntry<T> entry = this.entries.get(element);
 
-        this.lock.unlockRead(stamp);
+        lock.unlockRead(stamp);
 
         return entry != null && entry.getValue() != null;
     }
