@@ -29,7 +29,7 @@ public class SuperClassUtils {
         Class<?>[] classes = local.get(clazz);
 
         if (classes == null) {
-            // getSubscriptions all super types of class
+            // publish all super types of class
             final Class<?>[] superTypes = ReflectionUtils.getSuperTypes(clazz);
             final int length = superTypes.length;
 

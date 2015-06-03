@@ -38,7 +38,7 @@ public class SubscriptionValidator extends AssertSupport {
 
             // we split subs + superSubs into TWO calls.
             Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
-            Subscription[] subscriptions = manager.getSubscriptions(messageType);
+            Subscription[] subscriptions = manager.getSubscriptions(messageType, messageType.isArray());
             if (subscriptions != null) {
                 collection.addAll(Arrays.asList(subscriptions));
             }

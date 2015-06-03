@@ -39,7 +39,7 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
             return false;
         }
 
-        // had to modify the super implementation so we getSubscriptions Node<T> back
+        // had to modify the super implementation so we publish Node<T> back
         Node<T> alreadyPresent = this.entries.putIfAbsent(element, this.IN_PROGRESS_MARKER);
         if (alreadyPresent == null) {
             // this doesn't already exist

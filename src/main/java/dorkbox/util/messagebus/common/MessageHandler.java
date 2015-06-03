@@ -29,11 +29,11 @@ import java.util.Arrays;
  */
 public class MessageHandler {
 
-    // getSubscriptions all listeners defined by the given class (includes
+    // publish all listeners defined by the given class (includes
     // listeners defined in super classes)
     public static final MessageHandler[] get(final Class<?> target) {
 
-        // getSubscriptions all handlers (this will include all (inherited) methods directly annotated using @Handler)
+        // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)
         final Method[] allMethods = ReflectionUtils.getMethods(target);
         final int length = allMethods.length;
 

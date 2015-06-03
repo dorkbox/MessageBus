@@ -73,20 +73,19 @@ public class MultiMBassador implements IMessageBus {
         if (forceExactMatches) {
             subscriptionMatcher = new Matcher() {
                 @Override
-                public Subscription[] getSubscriptions(Class<?> messageClass) {
-                    return subscriptionManager.getSubscriptionsForcedExact(messageClass);
+                public boolean publish(Object message) throws Throwable {
+                    return subscriptionManager.publishExact(message);
                 }
             };
         }
         else {
             subscriptionMatcher = new Matcher() {
                 @Override
-                public Subscription[] getSubscriptions(Class<?> messageClass) {
-                    return subscriptionManager.getSubscriptions(messageClass);
+                public boolean publish(Object message) throws Throwable {
+                    return subscriptionManager.publish(message);
                 }
             };
         }
-
 
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
 
@@ -101,6 +100,7 @@ public class MultiMBassador implements IMessageBus {
                     MultiNode node = new MultiNode();
                     while (!MultiMBassador.this.shuttingDown) {
                         try {
+                            //noinspection InfiniteLoopStatement
                             while (true) {
                                 IN_QUEUE.take(node);
                                 switch (node.messageType) {
@@ -112,7 +112,6 @@ public class MultiMBassador implements IMessageBus {
                                         continue;
                                     case 3:
                                         publish(node.item1, node.item2, node.item3);
-                                        continue;
                                 }
                             }
                         } catch (InterruptedException e) {
@@ -120,22 +119,21 @@ public class MultiMBassador implements IMessageBus {
                                 switch (node.messageType) {
                                     case 1: {
                                         handlePublicationError(
-                                                        new PublicationError().setMessage("Thread interupted while processing message")
+                                                        new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e).setPublishedObject(node.item1));
                                         continue;
                                     }
                                     case 2: {
                                         handlePublicationError(
-                                                        new PublicationError().setMessage("Thread interupted while processing message")
+                                                        new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e).setPublishedObject(node.item1, node.item2));
                                         continue;
                                     }
                                     case 3: {
                                         handlePublicationError(
-                                                        new PublicationError().setMessage("Thread interupted while processing message")
+                                                        new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e)
                                                                         .setPublishedObject(node.item1, node.item2, node.item3));
-                                        continue;
                                     }
                                 }
                             }
@@ -202,97 +200,19 @@ public class MultiMBassador implements IMessageBus {
         return this.dispatchQueue.hasPendingMessages();
     }
 
-
-
     @Override
     public void publish(final Object message) {
         try {
-            boolean subsPublished = false;
-            final SubscriptionManager manager = this.subscriptionManager;
-            final Class<?> messageClass = message.getClass();
+            boolean subsPublished = subscriptionMatcher.publish(message);
 
-            Subscription[] subscriptions;
-            Subscription sub;
-
-            subscriptions = subscriptionMatcher.getSubscriptions(messageClass);
-            int c = 0;
-            // Run subscriptions
-            if (subscriptions != null) {
-                subsPublished = true;
-
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message);
-                    c = sub.c();
-                }
-            }
-
-
-//            if (!this.forceExactMatches) {
-//                Subscription[] superSubscriptions = manager.getSuperSubscriptions(messageClass); // NOT return null
-//                // now getSubscriptions superClasses
-//                int length = superSubscriptions.length;
-//
-//                if (length > 0) {
-//                    for (int i=0;i<length;i++) {
-//                        sub = superSubscriptions[i];
-//
-//                        sub.publish(message);
-//                    }
-//
-//                    subsPublished = true;
-//                }
-
-
-//                if (superSubscriptions != null && !superSubscriptions.isEmpty()) {
-//                    for (iterator = superSubscriptions.iterator(); iterator.hasNext();) {
-//                        sub = iterator.next();
-            //
-//                        // this catches all exception types
-//                        sub.publishToSubscription(this, message);
-//                    }
-//                    subsPublished = true;
-//                }
-
-
-//                // publish to var arg, only if not already an array
-//                if (manager.hasVarArgPossibility() && !manager.utils.isArray(messageClass)) {
-//                    Object[] asArray = null;
-            //
-//                    ConcurrentSet<Subscription> varargSubscriptions = manager.getVarArgSubscriptions(messageClass);
-//                    if (varargSubscriptions != null && !varargSubscriptions.isEmpty()) {
-//                        asArray = (Object[]) Array.newInstance(messageClass, 1);
-//                        asArray[0] = message;
-            //
-//                        for (iterator = varargSubscriptions.iterator(); iterator.hasNext();) {
-//                            sub = iterator.next();
-//                            // this catches all exception types
-//                            sub.publishToSubscription(this, subsPublished, asArray);
-//                        }
-//                    }
-            //
-//                    ConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass);
-//                    // now getSubscriptions array based superClasses (but only if those ALSO accept vararg)
-//                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
-//                        if (asArray == null) {
-//                            asArray = (Object[]) Array.newInstance(messageClass, 1);
-//                            asArray[0] = message;
-//                        }
-//                        for (iterator = varargSuperSubscriptions.iterator(); iterator.hasNext();) {
-//                            sub = iterator.next();
-//                            // this catches all exception types
-//                            sub.publishToSubscription(this, subsPublished, asArray);
-//                        }
-//                    }
-//                }
-//            }
-
-            if (c == 0 && !subsPublished) {
+            if (!subsPublished) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                Subscription[] deadSubscriptions = manager.getSubscriptionsForcedExact(DeadMessage.class);
+                Subscription[] deadSubscriptions = subscriptionManager.getSubscriptionsForcedExact(DeadMessage.class);
                 if (deadSubscriptions != null) {
                     DeadMessage deadMessage = new DeadMessage(message);
 
+                    Subscription sub;
+                    //noinspection ForLoopReplaceableByForEach
                     for (int i = 0; i < deadSubscriptions.length; i++) {
                         sub = deadSubscriptions[i];
 
@@ -314,7 +234,7 @@ public class MultiMBassador implements IMessageBus {
 //        Class<?> messageClass2 = message2.getClass();
 //
 //        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2);
-//        BooleanHolder subsPublished = this.booleanThreadLocal.getSubscriptions();
+//        BooleanHolder subsPublished = this.booleanThreadLocal.publish();
 //        subsPublished.bool = false;
 //
 //        ISetEntry<Subscription> current;
@@ -334,7 +254,7 @@ public class MultiMBassador implements IMessageBus {
 //
 //        if (!this.forceExactMatches) {
 //            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2);
-//            // now getSubscriptions superClasses
+//            // now publish superClasses
 //            if (superSubscriptions != null) {
 //                current = superSubscriptions.head;
 //                while (current != null) {
@@ -368,7 +288,7 @@ public class MultiMBassador implements IMessageBus {
 //                    }
 //
 //                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-//                    // now getSubscriptions array based superClasses (but only if those ALSO accept vararg)
+//                    // now publish array based superClasses (but only if those ALSO accept vararg)
 //                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
 //                        if (asArray == null) {
 //                            asArray = (Object[]) Array.newInstance(messageClass1, 2);
@@ -388,7 +308,7 @@ public class MultiMBassador implements IMessageBus {
 //                } else {
 //                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2);
 //
-//                    // now getSubscriptions array based superClasses (but only if those ALSO accept vararg)
+//                    // now publish array based superClasses (but only if those ALSO accept vararg)
 //                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
 //                        current = varargSuperMultiSubscriptions.head;
 //                        while (current != null) {
@@ -438,7 +358,7 @@ public class MultiMBassador implements IMessageBus {
 //        Class<?> messageClass3 = message3.getClass();
 //
 //        StrongConcurrentSet<Subscription> subscriptions = manager.getSubscriptionsByMessageType(messageClass1, messageClass2, messageClass3);
-//        BooleanHolder subsPublished = this.booleanThreadLocal.getSubscriptions();
+//        BooleanHolder subsPublished = this.booleanThreadLocal.publish();
 //        subsPublished.bool = false;
 //
 //        ISetEntry<Subscription> current;
@@ -459,7 +379,7 @@ public class MultiMBassador implements IMessageBus {
 //
 //        if (!this.forceExactMatches) {
 //            StrongConcurrentSet<Subscription> superSubscriptions = manager.getSuperSubscriptions(messageClass1, messageClass2, messageClass3);
-//            // now getSubscriptions superClasses
+//            // now publish superClasses
 //            if (superSubscriptions != null) {
 //                current = superSubscriptions.head;
 //                while (current != null) {
@@ -493,7 +413,7 @@ public class MultiMBassador implements IMessageBus {
 //                    }
 //
 //                    StrongConcurrentSet<Subscription> varargSuperSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1);
-//                    // now getSubscriptions array based superClasses (but only if those ALSO accept vararg)
+//                    // now publish array based superClasses (but only if those ALSO accept vararg)
 //                    if (varargSuperSubscriptions != null && !varargSuperSubscriptions.isEmpty()) {
 //                        if (asArray == null) {
 //                            asArray = (Object[]) Array.newInstance(messageClass1, 3);
@@ -514,7 +434,7 @@ public class MultiMBassador implements IMessageBus {
 //                } else {
 //                    StrongConcurrentSet<Subscription> varargSuperMultiSubscriptions = manager.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
 //
-//                    // now getSubscriptions array based superClasses (but only if those ALSO accept vararg)
+//                    // now publish array based superClasses (but only if those ALSO accept vararg)
 //                    if (varargSuperMultiSubscriptions != null && !varargSuperMultiSubscriptions.isEmpty()) {
 //                        current = varargSuperMultiSubscriptions.head;
 //                        while (current != null) {

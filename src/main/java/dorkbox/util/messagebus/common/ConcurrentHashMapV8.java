@@ -27,14 +27,14 @@ import java.util.concurrent.ForkJoinPool;
  * interoperable with {@code Hashtable} in programs that rely on its
  * thread safety but not on its synchronization details.
  *
- * <p>Retrieval operations (including {@code getSubscriptions}) generally do not
+ * <p>Retrieval operations (including {@code get}) generally do not
  * block, so may overlap with update operations (including {@code put}
  * and {@code remove}). Retrievals reflect the results of the most
  * recently <em>completed</em> update operations holding upon their
  * onset. (More formally, an update operation for a given key bears a
  * <em>happens-before</em> relation with any (non-null) retrieval for
  * that key reporting the updated value.)  For aggregate operations
- * such as {@code putAll} and {@code shutdown}, concurrent retrievals may
+ * such as {@code putAll} and {@code clear}, concurrent retrievals may
  * reflect insertion or removal of only some entries.  Similarly,
  * Iterators and Enumerations return elements reflecting the state of
  * the hash table at some point at or since the creation of the
@@ -141,7 +141,7 @@ import java.util.concurrent.ForkJoinPool;
  *
  * <p>The concurrency properties of bulk operations follow
  * from those of ConcurrentHashMapV8: Any non-null result returned
- * from {@code getSubscriptions(key)} and related access methods bears a
+ * from {@code get(key)} and related access methods bears a
  * happens-before relation with the associated insertion or
  * update.  The result of any bulk operation reflects the
  * composition of these per-element relations (but is not
@@ -275,7 +275,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //     * Overview:
 //     *
 //     * The primary design goal of this hash table is to maintain
-//     * concurrent readability (typically method getSubscriptions(), but also
+//     * concurrent readability (typically method publish(), but also
 //     * iterators and related methods) while minimizing update
 //     * contention. Secondary goals are to keep space consumption about
 //     * the same or better than java.util.HashMap, and to support high
@@ -632,7 +632,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //        }
 //
 //        /**
-//         * Virtualized support for map.getSubscriptions(); overridden in subclasses.
+//         * Virtualized support for map.publish(); overridden in subclasses.
 //         */
 //        Node<K,V> find(int h, Object k) {
 //            Node<K,V> e = this;
@@ -931,7 +931,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //     * @throws NullPointerException if the specified key is null
 //     */
 //    @Override
-//    public V getSubscriptions(Object key) {
+//    public V publish(Object key) {
 //        Node<K,V>[] tab; Node<K,V> e, p; int n, eh; K ek;
 //        int h = spread(key.hashCode());
 //        if ((tab = this.table) != null && (n = tab.length) > 0 &&
@@ -965,7 +965,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //     */
 //    @Override
 //    public boolean containsKey(Object key) {
-//        return getSubscriptions(key) != null;
+//        return publish(key) != null;
 //    }
 //
 //    /**
@@ -1000,7 +1000,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //     * Maps the specified key to the specified value in this table.
 //     * Neither the key nor the value can be null.
 //     *
-//     * <p>The value can be retrieved by calling the {@code getSubscriptions} method
+//     * <p>The value can be retrieved by calling the {@code publish} method
 //     * with a key that is equal to the original key.
 //     *
 //     * @param key key with which the specified value is to be associated
@@ -1381,7 +1381,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //            Traverser<K,V> it = new Traverser<K,V>(t, f, 0, f);
 //            for (Node<K,V> p; (p = it.advance()) != null; ) {
 //                V val = p.val;
-//                Object v = m.getSubscriptions(p.key);
+//                Object v = m.publish(p.key);
 //                if (v == null || v != val && !v.equals(val)) {
 //                    return false;
 //                }
@@ -1390,7 +1390,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //                Object mk, mv, v;
 //                if ((mk = e.getKey()) == null ||
 //                    (mv = e.getValue()) == null ||
-//                    (v = getSubscriptions(mk)) == null ||
+//                    (v = publish(mk)) == null ||
 //                    mv != v && !mv.equals(v)) {
 //                    return false;
 //                }
@@ -1628,7 +1628,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //     */
 //    public V getOrDefault(Object key, V defaultValue) {
 //        V v;
-//        return (v = getSubscriptions(key)) == null ? defaultValue : v;
+//        return (v = publish(key)) == null ? defaultValue : v;
 //    }
 //
 //    public void forEach(BiAction<? super K, ? super V> action) {
@@ -1659,7 +1659,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //                        throw new NullPointerException();
 //                    }
 //                    if (replaceNode(key, newValue, oldValue) != null ||
-//                        (oldValue = getSubscriptions(key)) == null) {
+//                        (oldValue = publish(key)) == null) {
 //                        break;
 //                    }
 //                }
@@ -2328,7 +2328,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //            !U.compareAndSwapLong(this, BASECOUNT, b = this.baseCount, s = b + x)) {
 //            CounterHashCode hc; CounterCell a; long v; int m;
 //            boolean uncontended = true;
-//            if ((hc = threadCounterHashCode.getSubscriptions()) == null ||
+//            if ((hc = threadCounterHashCode.publish()) == null ||
 //                as == null || (m = as.length - 1) < 0 ||
 //                (a = as[m & hc.code]) == null ||
 //                !(uncontended =
@@ -4037,7 +4037,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //            Object k, v, r; Map.Entry<?,?> e;
 //            return o instanceof Map.Entry &&
 //                    (k = (e = (Map.Entry<?,?>)o).getKey()) != null &&
-//                    (r = this.map.getSubscriptions(k)) != null &&
+//                    (r = this.map.publish(k)) != null &&
 //                    (v = e.getValue()) != null &&
 //                    (v == r || v.equals(r));
 //        }
@@ -4328,7 +4328,7 @@ public class ConcurrentHashMapV8<K, V> extends ConcurrentHashMap<K, V>
 //                    Class<sun.misc.Unsafe> k = sun.misc.Unsafe.class;
 //                    for (java.lang.reflect.Field f : k.getDeclaredFields()) {
 //                        f.setAccessible(true);
-//                        Object x = f.getSubscriptions(null);
+//                        Object x = f.publish(null);
 //                        if (k.isInstance(x)) {
 //                            return k.cast(x);
 //                        }

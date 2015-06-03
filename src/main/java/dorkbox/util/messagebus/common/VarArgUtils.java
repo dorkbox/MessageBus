@@ -6,12 +6,12 @@ import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionUtils;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 
 public class VarArgUtils {
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> varArgSubscriptions;
-    private final ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> varArgSuperClassSubscriptions;
+    private final Map<Class<?>, ArrayList<Subscription>> varArgSubscriptions;
+    private final Map<Class<?>, List<Subscription>> varArgSuperClassSubscriptions;
     private final HashMapTree<Class<?>, ConcurrentSet<Subscription>> varArgSuperClassSubscriptionsMulti;
 
     private final SubscriptionHolder subHolderConcurrent;
@@ -20,19 +20,22 @@ public class VarArgUtils {
     private final int stripeSize;
 
     private final SubscriptionUtils utils;
+    private final SuperClassUtils superClassUtils;
     private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
 
 
-    public VarArgUtils(SubscriptionUtils utils, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle, float loadFactor,
+    public VarArgUtils(SubscriptionUtils utils, SuperClassUtils superClassUtils,
+                       Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle, float loadFactor,
                        int stripeSize) {
 
         this.utils = utils;
+        this.superClassUtils = superClassUtils;
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
         this.loadFactor = loadFactor;
         this.stripeSize = stripeSize;
 
-        this.varArgSubscriptions = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(16, loadFactor, stripeSize);
-        this.varArgSuperClassSubscriptions = new ConcurrentHashMapV8<Class<?>, ConcurrentSet<Subscription>>(16, loadFactor, stripeSize);
+        this.varArgSubscriptions = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(16, loadFactor, stripeSize);
+        this.varArgSuperClassSubscriptions = new ConcurrentHashMapV8<Class<?>, List<Subscription>>(16, loadFactor, stripeSize);
         this.varArgSuperClassSubscriptionsMulti = new HashMapTree<Class<?>, ConcurrentSet<Subscription>>(4, loadFactor);
 
         this.subHolderConcurrent = new SubscriptionHolder();
@@ -49,12 +52,38 @@ public class VarArgUtils {
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSubscriptions(Class<?> messageClass) {
-//        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> local = this.varArgSubscriptions;
-//
-//        // whenever our subscriptions change, this map is cleared.
+    public ArrayList<Subscription> getVarArgSubscriptions(Class<?> messageClass) {
+        Map<Class<?>, ArrayList<Subscription>> local = this.varArgSubscriptions;
+
+        ArrayList<Subscription> varArgSubs = local.get(messageClass);
+
+        if (varArgSubs == null) {
+            // this gets (and caches) our array type. This is never cleared.
+            final Class<?> arrayVersion = this.superClassUtils.getArrayClass(messageClass);
+
+            ArrayList<Subscription> subs = this.subscriptionsPerMessageSingle.get(arrayVersion);
+            if (subs != null) {
+                int length = subs.size();
+                varArgSubs = new ArrayList<Subscription>(length);
+
+                Subscription sub;
+                for (int i = 0; i < length; i++) {
+                    sub = subs.get(i);
+
+                    if (sub.acceptsVarArgs()) {
+                        varArgSubs.add(sub);
+                    }
+                }
+
+                local.put(messageClass, varArgSubs);
+            }
+        }
+
+        return varArgSubs;
+
+        // whenever our subscriptions change, this map is cleared.
 //        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.getSubscriptions();
+//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.publish();
 //
 //        // cache our subscriptions for super classes, so that their access can be fast!
 //        ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(messageClass, subsPerType);
@@ -62,13 +91,11 @@ public class VarArgUtils {
 //            // we are the first one in the map
 //            subHolderConcurrent.set(subHolderConcurrent.initialValue());
 //
-//            // this caches our array type. This is never cleared.
-//            Class<?> arrayVersion = this.utils.getArrayClass(messageClass);
 //
 //            Iterator<Subscription> iterator;
 //            Subscription sub;
 //
-//            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.getSubscriptions(arrayVersion);
+//            Collection<Subscription> subs = this.subscriptionsPerMessageSingle.publish(arrayVersion);
 //            if (subs != null) {
 //                for (iterator = subs.iterator(); iterator.hasNext();) {
 //                    sub = iterator.next();
@@ -83,7 +110,7 @@ public class VarArgUtils {
 //            return putIfAbsent;
 //        }
 
-        return null;
+//        return null;
     }
 
 
@@ -96,7 +123,7 @@ public class VarArgUtils {
 //        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> local = this.varArgSuperClassSubscriptions;
 //
 //        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.getSubscriptions();
+//        ConcurrentSet<Subscription> subsPerType = subHolderConcurrent.publish();
 //
 //        // cache our subscriptions for super classes, so that their access can be fast!
 //        ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(messageClass, subsPerType);
@@ -123,7 +150,7 @@ public class VarArgUtils {
 //            for (iterator = types.iterator(); iterator.hasNext();) {
 //                superClass = iterator.next();
 //
-//                Collection<Subscription> subs = local2.getSubscriptions(superClass);
+//                Collection<Subscription> subs = local2.publish(superClass);
 //                if (subs != null) {
 //                    for (subIterator = subs.iterator(); subIterator.hasNext();) {
 //                        sub = subIterator.next();
@@ -159,7 +186,7 @@ public class VarArgUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//            subsPerType = subHolderConcurrent.getSubscriptions();
+//            subsPerType = subHolderConcurrent.publish();
 //
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, messageClass1, messageClass2);
 //            if (putIfAbsent != null) {
@@ -207,7 +234,7 @@ public class VarArgUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
-//            subsPerType = subHolderConcurrent.getSubscriptions();
+//            subsPerType = subHolderConcurrent.publish();
 //
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, messageClass1, messageClass2, messageClass3);
 //            if (putIfAbsent != null) {

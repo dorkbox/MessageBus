@@ -48,7 +48,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
         @Synchronized
         public void handleMessage(Object o){
             counter.getAndIncrement();
-//            System.err.println(counter.getSubscriptions());
+//            System.err.println(counter.publish());
         }
     }
 }

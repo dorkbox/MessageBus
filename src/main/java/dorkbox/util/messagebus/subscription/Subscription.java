@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *         Date: 2/2/15
  */
 public class Subscription {
-    private static AtomicInteger ID_COUNTER = new AtomicInteger();
+    private static final AtomicInteger ID_COUNTER = new AtomicInteger();
     public final int ID = ID_COUNTER.getAndIncrement();
 
 
@@ -86,11 +86,6 @@ public class Subscription {
         return this.listeners.size();
     }
 
-    int c = 0;
-    public int c() {
-        return this.c;
-    }
-
     /**
      * @return true if there were listeners for this publication, false if there was nothing
      */
@@ -105,7 +100,6 @@ public class Subscription {
         for (iterator = this.listeners.iterator(); iterator.hasNext();) {
             listener = iterator.next();
 
-//            this.c++;
             invocation.invoke(listener, handler, handleIndex, message);
         }
     }

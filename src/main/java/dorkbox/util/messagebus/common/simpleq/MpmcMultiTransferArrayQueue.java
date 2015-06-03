@@ -432,7 +432,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
                         // Successful CAS: full barrier
 
                         final Thread myThread = Thread.currentThread();
-//                        final Object node = nodeThreadLocal.getSubscriptions();
+//                        final Object node = nodeThreadLocal.publish();
 
                         spType(node, TYPE_CONSUMER);
                         spThread(node, myThread);

@@ -30,11 +30,10 @@ public class SubscriptionUtils {
     private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
 
-    public SubscriptionUtils(Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
+    public SubscriptionUtils(SuperClassUtils superClass, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
                              HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti, float loadFactor,
                              int stripeSize) {
-
-        this.superClass = new SuperClassUtils(loadFactor, 1);
+        this.superClass = superClass;
 
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
         this.subscriptionsPerMessageMulti = subscriptionsPerMessageMulti;
@@ -75,7 +74,7 @@ public class SubscriptionUtils {
 //        long stamp = lock.tryOptimisticRead();
 //
 //        if (stamp > 0) {
-//            ArrayList<Class<?>> arrayList = local.getSubscriptions(clazz);
+//            ArrayList<Class<?>> arrayList = local.publish(clazz);
 //            if (arrayList != null) {
 //                classes = arrayList.toArray(SUPER_CLASS_EMPTY);
 //
@@ -84,7 +83,7 @@ public class SubscriptionUtils {
 //                } else {
 //                    stamp = lock.readLock();
 //
-//                    arrayList = local.getSubscriptions(clazz);
+//                    arrayList = local.publish(clazz);
 //                    if (arrayList != null) {
 //                        classes = arrayList.toArray(SUPER_CLASS_EMPTY);
 //                        lock.unlockRead(stamp);
@@ -94,7 +93,7 @@ public class SubscriptionUtils {
 //            }
 //        }
 //
-//        // unable to getSubscriptions a valid subscription. Have to acquire a write lock
+//        // unable to publish a valid subscription. Have to acquire a write lock
 //        long origStamp = stamp;
 //        if ((stamp = lock.tryConvertToWriteLock(stamp)) == 0) {
 //            lock.unlockRead(origStamp);
@@ -102,7 +101,7 @@ public class SubscriptionUtils {
 //        }
 //
 //
-//        // getSubscriptions all super types of class
+//        // publish all super types of class
 //        Collection<Class<?>> superTypes = ReflectionUtils.getSuperTypes(clazz);
 //        ArrayList<Class<?>> arrayList = new ArrayList<Class<?>>(superTypes.size());
 //        Iterator<Class<?>> iterator;
@@ -144,25 +143,25 @@ public class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz) {
+    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, boolean isArray) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
         ArrayList<Subscription> superSubscriptions = local.get(clazz);
 
         if (superSubscriptions == null) {
-            // types was not empty, so getSubscriptions subscriptions for each type and collate them
+            // types was not empty, so publish subscriptions for each type and collate them
             final Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
 
             // save the subscriptions
-            final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz, clazz.isArray());  // never returns null, cached response
+            final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz, isArray);  // never returns null, cached response
 
             Class<?> superClass;
             ArrayList<Subscription> superSubs;
             Subscription sub;
 
             final int length = superClasses.length;
-            int superSubLengh;
+            int superSubLength;
             superSubscriptions = new ArrayList<Subscription>(length);
 
             for (int i = 0; i < length; i++) {
@@ -170,8 +169,8 @@ public class SubscriptionUtils {
                 superSubs = local2.get(superClass);
 
                 if (superSubs != null) {
-                    superSubLengh = superSubs.size();
-                    for (int j = 0; j < superSubLengh; j++) {
+                    superSubLength = superSubs.size();
+                    for (int j = 0; j < superSubLength; j++) {
                         sub = superSubs.get(j);
 
                         if (sub.acceptsSubtypes()) {
@@ -181,6 +180,7 @@ public class SubscriptionUtils {
                 }
             }
 
+            superSubscriptions.trimToSize();
             local.put(clazz, superSubscriptions);
         }
 
@@ -202,7 +202,7 @@ public class SubscriptionUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//            subsPerType = subHolderSingle.getSubscriptions();
+//            subsPerType = subHolderSingle.publish();
 //
 //            // cache our subscriptions for super classes, so that their access can be fast!
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2);
@@ -288,7 +288,7 @@ public class SubscriptionUtils {
 //            subsPerType = subsPerTypeLeaf.getValue();
 //        } else {
 //            SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//            subsPerType = subHolderSingle.getSubscriptions();
+//            subsPerType = subHolderSingle.publish();
 //
 //            // cache our subscriptions for super classes, so that their access can be fast!
 //            ConcurrentSet<Subscription> putIfAbsent = local.putIfAbsent(subsPerType, superType1, superType2, superType3);

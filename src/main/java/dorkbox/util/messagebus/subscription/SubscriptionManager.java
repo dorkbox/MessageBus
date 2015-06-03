@@ -1,12 +1,14 @@
 package dorkbox.util.messagebus.subscription;
 
 import dorkbox.util.messagebus.common.*;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.StampedLock;
 
 /**
@@ -37,7 +39,7 @@ public class SubscriptionManager {
     private final Map<Class<?>, Boolean> nonListeners;
 
     // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
-    private final VarArgPossibility varArgPossibility = new VarArgPossibility();
+    private AtomicBoolean varArgPossibility = new AtomicBoolean(false);
 
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
@@ -52,7 +54,9 @@ public class SubscriptionManager {
     private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
 
+    private final SuperClassUtils superClass;
     private final VarArgUtils varArgUtils;
+
 
 
     private final StampedLock lock = new StampedLock();
@@ -72,12 +76,13 @@ public class SubscriptionManager {
             this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, Subscription[]>();
         }
 
-        this.utils = new SubscriptionUtils(this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, loadFactor,
+        this.superClass = new SuperClassUtils(loadFactor, 1);
+        this.utils = new SubscriptionUtils(superClass, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, loadFactor,
                                            numberOfThreads);
 
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(this.utils, this.subscriptionsPerMessageSingle, loadFactor, numberOfThreads);
+        this.varArgUtils = new VarArgUtils(this.utils, superClass, this.subscriptionsPerMessageSingle, loadFactor, numberOfThreads);
     }
 
     public void shutdown() {
@@ -89,10 +94,6 @@ public class SubscriptionManager {
 
         this.utils.shutdown();
         clearConcurrentCollections();
-    }
-
-    public boolean hasVarArgPossibility() {
-        return this.varArgPossibility.get();
     }
 
     public void subscribe(Object listener) {
@@ -138,8 +139,6 @@ public class SubscriptionManager {
                     return;
                 }
 
-
-                VarArgPossibility varArgPossibility = this.varArgPossibility;
                 Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
                 HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
 
@@ -160,7 +159,7 @@ public class SubscriptionManager {
 
                     // now add this subscription to each of the handled types
                     subsForPublication = getSubsForPublication(messageHandler.getHandledMessages(), subsPerMessageSingle,
-                                                               subsPerMessageMulti, varArgPossibility);
+                                                               subsPerMessageMulti);
                     subsForPublication.add(subscription);  // activates this sub for publication
                 }
 
@@ -177,7 +176,7 @@ public class SubscriptionManager {
         }
 
         // subscriptions already exist and must only be updated
-        // only getSubscriptions here if our single-check was OK, or our double-check was OK
+        // only publish here if our single-check was OK, or our double-check was OK
         Subscription subscription;
 
         for (int i = 0; i < subscriptions.length; i++) {
@@ -190,8 +189,7 @@ public class SubscriptionManager {
     // also puts it into the correct map if it's not already there
     private Collection<Subscription> getSubsForPublication(final Class<?>[] messageHandlerTypes,
                                                            final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                                                           final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                                                           final VarArgPossibility varArgPossibility) {
+                                                           final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti) {
 
         final int size = messageHandlerTypes.length;
 
@@ -208,11 +206,11 @@ public class SubscriptionManager {
 
                     boolean isArray = type0.isArray();
                     if (isArray) {
-                        varArgPossibility.set(true);
+                        varArgPossibility.lazySet(true);
                     }
 
                     // cache the super classes
-//                    utils.cacheSuperClasses(type0, isArray);
+                    //utils.cacheSuperClasses(type0, isArray);
 
                     subsPerMessageSingle.put(type0, subs);
                 }
@@ -222,7 +220,7 @@ public class SubscriptionManager {
             case 2: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
 //                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.getSubscriptions();
+//                subsPerType = subHolderSingle.publish();
 //
 //                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1]);
 //                if (putIfAbsent != null) {
@@ -240,7 +238,7 @@ public class SubscriptionManager {
             case 3: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
 //                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.getSubscriptions();
+//                subsPerType = subHolderSingle.publish();
 //
 //                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1], types[2]);
 //                if (putIfAbsent != null) {
@@ -259,7 +257,7 @@ public class SubscriptionManager {
             default: {
                 // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
 //                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.getSubscriptions();
+//                subsPerType = subHolderSingle.publish();
 //
 //                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
 //                if (putIfAbsent != null) {
@@ -356,26 +354,39 @@ public class SubscriptionManager {
     }
 
     // never return null
-    public final Subscription[] getSubscriptions(final Class<?> messageClass) {
-        ArrayList<Subscription> collection;
-
-
+    public final Subscription[] getSubscriptions(final Class<?> messageClass, boolean isArray) {
         StampedLock lock = this.lock;
         long stamp = lock.readLock();
 //        Lock readLock = this.lock.readLock();
 //        readLock.lock();
 
+        final Subscription[] subscriptions = getSubscriptions_NL(messageClass, isArray);
+
+        lock.unlockRead(stamp);
+//        readLock.unlock();
+
+        return subscriptions;
+    }
+
+    // never return null
+    private Subscription[] getSubscriptions_NL(final Class<?> messageClass, boolean isArray) {
+        ArrayList<Subscription> collection;
+
         collection = this.subscriptionsPerMessageSingle.get(messageClass); // can return null
 
-        // now getSubscriptions superClasses
-        ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass); // NOT return null
+        // now publish superClasses
+        ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass, isArray); // NOT return null
 
         if (collection != null) {
             collection = new ArrayList<Subscription>(collection);
-            collection.addAll(superSubscriptions);
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
         }
         else {
-            collection = superSubscriptions;
+            if (!superSubscriptions.isEmpty()) {
+                collection = superSubscriptions;
+            }
         }
 
         final Subscription[] subscriptions;
@@ -385,9 +396,6 @@ public class SubscriptionManager {
         else {
             subscriptions = null;
         }
-
-        lock.unlockRead(stamp);
-//        readLock.unlock();
 
         return subscriptions;
     }
@@ -403,7 +411,7 @@ public class SubscriptionManager {
 //        readLock.lock();
 //
 //        try {
-//            collection = this.subscriptionsPerMessageSingle.getSubscriptions(messageType);
+//            collection = this.subscriptionsPerMessageSingle.publish(messageType);
 //            if (collection != null) {
 //                subscriptions = collection.toArray(EMPTY);
 //            }
@@ -416,7 +424,7 @@ public class SubscriptionManager {
 //
 ////        long stamp = this.lock.tryOptimisticRead(); // non blocking
 ////
-////        collection = this.subscriptionsPerMessageSingle.getSubscriptions(messageType);
+////        collection = this.subscriptionsPerMessageSingle.publish(messageType);
 ////        if (collection != null) {
 //////            subscriptions = new ArrayDeque<>(collection);
 ////            subscriptions = new ArrayList<>(collection);
@@ -429,7 +437,7 @@ public class SubscriptionManager {
 ////        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
 ////            stamp = this.lock.readLock();
 ////            try {
-////                collection = this.subscriptionsPerMessageSingle.getSubscriptions(messageType);
+////                collection = this.subscriptionsPerMessageSingle.publish(messageType);
 ////                if (collection != null) {
 //////                    subscriptions = new ArrayDeque<>(collection);
 ////                    subscriptions = new ArrayList<>(collection);
@@ -480,12 +488,6 @@ public class SubscriptionManager {
         return this.subscriptionsPerMessageMulti.get(messageTypes);
     }
 
-    // CAN NOT RETURN NULL
-    // check to see if the messageType can convert/publish to the "array" version, without the hit to JNI
-    // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSubscriptions(Class<?> messageClass) {
-        return this.varArgUtils.getVarArgSubscriptions(messageClass);
-    }
 
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
@@ -526,5 +528,104 @@ public class SubscriptionManager {
     // ALSO checks to see if the superClass accepts subtypes.
     public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
         return this.utils.getSuperSubscriptions(superType1, superType2, superType3);
+    }
+
+    /**
+     * @return true if subscriptions were published
+     */
+    public boolean publishExact(Object message) throws Throwable {
+        final Class<?> messageClass = message.getClass();
+        final boolean isArray = messageClass.isArray();
+
+        StampedLock lock = this.lock;
+        long stamp = lock.readLock();
+
+        final Subscription[] subscriptions = getSubscriptions_NL(messageClass, isArray);
+        Subscription sub;
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message);
+            }
+
+            lock.unlockRead(stamp);
+            return true;
+        }
+
+        lock.unlockRead(stamp);
+        return false;
+    }
+
+    /**
+     * @return true if subscriptions were published
+     */
+    public boolean publish(Object message) throws Throwable {
+        final Class<?> messageClass = message.getClass();
+        final boolean isArray = messageClass.isArray();
+
+        StampedLock lock = this.lock;
+        long stamp = lock.readLock();
+
+
+        final Subscription[] subscriptions = getSubscriptions_NL(messageClass, isArray);
+        Subscription sub;
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message);
+            }
+
+            // publish to var arg, only if not already an array
+            if (varArgPossibility.get() && !isArray) {
+                final ArrayList<Subscription> varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass);
+
+                if (varArgSubscriptions != null && !varArgSubscriptions.isEmpty()) {
+                    Object[] asArray = (Object[]) Array.newInstance(messageClass, 1);
+                    asArray[0] = message;
+
+                    Iterator<Subscription> iterator;
+                    for (iterator = varArgSubscriptions.iterator(); iterator.hasNext(); ) {
+                        sub = iterator.next();
+
+                        sub.publish(asArray);
+                    }
+
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Collection<Subscription> varArgSuperSubscriptions = getVarArgSuperSubscriptions(messageClass);
+                    if (varArgSuperSubscriptions != null && !varArgSuperSubscriptions.isEmpty()) {
+                        for (iterator = varArgSubscriptions.iterator(); iterator.hasNext(); ) {
+                            sub = iterator.next();
+
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+                else {
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Collection<Subscription> varArgSuperSubscriptions = getVarArgSuperSubscriptions(messageClass);
+                    if (varArgSuperSubscriptions != null && !varArgSuperSubscriptions.isEmpty()) {
+                        Object[] asArray = (Object[]) Array.newInstance(messageClass, 1);
+                        asArray[0] = message;
+
+                        Iterator<Subscription> iterator;
+                        for (iterator = varArgSuperSubscriptions.iterator(); iterator.hasNext(); ) {
+                            sub = iterator.next();
+
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+            }
+
+            lock.unlockRead(stamp);
+            return true;
+        }
+
+        lock.unlockRead(stamp);
+        return false;
     }
 }
