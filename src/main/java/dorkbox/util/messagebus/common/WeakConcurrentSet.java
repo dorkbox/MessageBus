@@ -8,9 +8,6 @@ import java.util.concurrent.locks.StampedLock;
 /**
  * This implementation uses weak references to the elements. Iterators automatically perform cleanups of
  * garbage collected objects during iteration -> no dedicated maintenance operations need to be called or run in background.
- * <p/>
- * <p/>
- * <p/>
  *
  * @author bennidi
  *         Date: 2/12/12
@@ -26,7 +23,7 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
     public Iterator<T> iterator() {
         return new Iterator<T>() {
 
-            // the current listelement of this iterator
+            // the current list element of this iterator
             // used to keep track of the iteration process
             private ISetEntry<T> current = WeakConcurrentSet.this.head;
 
@@ -59,8 +56,8 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
                     return false;
                 }
                 if (this.current.getValue() == null) {
-                // trigger removal of orphan references
-                // because a null value indicates that the value has been garbage collected
+                    // trigger removal of orphan references
+                    // because a null value indicates that the value has been garbage collected
                     removeOrphans();
                     return this.current != null; // if any entry is left then it will have a value
                 } else {
