@@ -1,6 +1,7 @@
 package dorkbox.util.messagebus.subscription;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
+import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
@@ -9,8 +10,11 @@ import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import org.omg.CORBA.BooleanHolder;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -52,6 +56,10 @@ public class Subscription {
         }
 
         this.invocation = invocation;
+    }
+
+    public final MessageHandler getHandlerMetadata() {
+        return handlerMetadata;
     }
 
     public Class<?>[] getHandledMessageTypes() {
@@ -235,5 +243,100 @@ public class Subscription {
         }
         Subscription other = (Subscription) obj;
         return this.ID == other.ID;
+    }
+
+    // inside a write lock
+    // also puts it into the correct map if it's not already there
+    public Collection<Subscription> createPublicationSubscriptions(final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
+                                                                   final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
+                                                                   AtomicBoolean varArgPossibility, SubscriptionUtils utils) {
+
+        final Class<?>[] messageHandlerTypes = handlerMetadata.getHandledMessages();
+        final int size = messageHandlerTypes.length;
+
+//        ConcurrentSet<Subscription> subsPerType;
+
+//        SubscriptionUtils utils = this.utils;
+        Class<?> type0 = messageHandlerTypes[0];
+
+        switch (size) {
+            case 1: {
+                ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    boolean isArray = type0.isArray();
+                    if (isArray) {
+                        varArgPossibility.lazySet(true);
+                    }
+                    utils.cacheSuperClasses(type0);
+
+                    subsPerMessageSingle.put(type0, subs);
+                }
+
+                return subs;
+            }
+            case 2: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.publish();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1]);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    // cache the super classes
+//                    utils.cacheSuperClasses(type0);
+//                    utils.cacheSuperClasses(types[1]);
+//
+//                    return subsPerType;
+//                }
+            }
+            case 3: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.publish();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1], types[2]);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    // cache the super classes
+//                    utils.cacheSuperClasses(type0);
+//                    utils.cacheSuperClasses(types[1]);
+//                    utils.cacheSuperClasses(types[2]);
+//
+//                    return subsPerType;
+//                }
+            }
+            default: {
+                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
+//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
+//                subsPerType = subHolderSingle.publish();
+//
+//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
+//                if (putIfAbsent != null) {
+//                    return putIfAbsent;
+//                } else {
+//                    subHolderSingle.set(subHolderSingle.initialValue());
+//
+//                    Class<?> c;
+//                    int length = types.length;
+//                    for (int i = 0; i < length; i++) {
+//                        c = types[i];
+//
+//                        // cache the super classes
+//                        utils.cacheSuperClasses(c);
+//                    }
+//
+//                    return subsPerType;
+//                }
+                return null;
+            }
+        }
     }
 }
