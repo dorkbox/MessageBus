@@ -57,7 +57,8 @@ public class SuperClassUtils {
                 }
             }
 
-            classes = newList.toArray(new Class<?>[newList.size()]);
+            classes = new Class<?>[newList.size()];
+            newList.toArray(classes);
             local.put(clazz, classes);
         }
 

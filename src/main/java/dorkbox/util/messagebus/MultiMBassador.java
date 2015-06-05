@@ -50,7 +50,7 @@ public class MultiMBassador implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MultiMBassador(int numberOfThreads) {
-        this(Mode.Exact, numberOfThreads);
+        this(Mode.ExactWithSuperTypes, numberOfThreads);
     }
 
     /**
@@ -109,14 +109,17 @@ public class MultiMBassador implements IMessageBus {
                             while (true) {
                                 IN_QUEUE.take(node);
                                 switch (node.messageType) {
-                                    case 1:
+                                    case 1: {
                                         publish(node.item1);
-                                        continue;
-                                    case 2:
+                                        break;
+                                    }
+                                    case 2: {
                                         publish(node.item1, node.item2);
-                                        continue;
-                                    case 3:
+                                        break;
+                                    }
+                                    default: {
                                         publish(node.item1, node.item2, node.item3);
+                                    }
                                 }
                             }
                         } catch (InterruptedException e) {
@@ -126,15 +129,15 @@ public class MultiMBassador implements IMessageBus {
                                         handlePublicationError(
                                                         new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e).setPublishedObject(node.item1));
-                                        continue;
+                                        break;
                                     }
                                     case 2: {
                                         handlePublicationError(
                                                         new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e).setPublishedObject(node.item1, node.item2));
-                                        continue;
+                                        break;
                                     }
-                                    case 3: {
+                                    default: {
                                         handlePublicationError(
                                                         new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e)

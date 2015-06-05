@@ -143,7 +143,7 @@ public class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, boolean isArray) {
+    public final ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final boolean isArray) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 

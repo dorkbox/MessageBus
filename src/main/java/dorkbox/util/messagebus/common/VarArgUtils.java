@@ -52,7 +52,7 @@ public class VarArgUtils {
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ArrayList<Subscription> getVarArgSubscriptions(Class<?> messageClass) {
+    public Subscription[] getVarArgSubscriptions(Class<?> messageClass) {
         Map<Class<?>, ArrayList<Subscription>> local = this.varArgSubscriptions;
 
         ArrayList<Subscription> varArgSubs = local.get(messageClass);
@@ -79,7 +79,10 @@ public class VarArgUtils {
             }
         }
 
-        return varArgSubs;
+//        return varArgSubs;
+
+        return null;
+
 
         // whenever our subscriptions change, this map is cleared.
 //        SubscriptionHolder subHolderConcurrent = this.subHolderConcurrent;
@@ -115,10 +118,10 @@ public class VarArgUtils {
 
 
 
-    // CAN NOT RETURN NULL
+    // CAN  RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public ConcurrentSet<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass) {
+    public Subscription[] getVarArgSuperSubscriptions(Class<?> messageClass) {
 //        // whenever our subscriptions change, this map is cleared.
 //        ConcurrentMap<Class<?>, ConcurrentSet<Subscription>> local = this.varArgSuperClassSubscriptions;
 //

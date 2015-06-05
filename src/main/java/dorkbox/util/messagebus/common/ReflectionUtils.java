@@ -1,13 +1,13 @@
 package dorkbox.util.messagebus.common;
 
+import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.util.messagebus.common.thread.ConcurrentSet;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
-
-import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 
 /**
  * @author bennidi
@@ -22,7 +22,9 @@ public class ReflectionUtils {
         ArrayList<Method> methods = new ArrayList<Method>();
 
         getMethods(target, methods);
-        return methods.toArray(new Method[methods.size()]);
+        final Method[] array = new Method[methods.size()];
+        methods.toArray(array);
+        return array;
     }
 
     private static void getMethods(Class<?> target, ArrayList<Method> methods) {
@@ -81,7 +83,9 @@ public class ReflectionUtils {
             collectInterfaces( from, superclasses );
         }
 
-        return superclasses.toArray(new Class<?>[superclasses.size()]);
+        final Class<?>[] classes = new Class<?>[superclasses.size()];
+        superclasses.toArray(classes);
+        return classes;
     }
 
     public static void collectInterfaces( Class<?> from, Collection<Class<?>> accumulator ) {
