@@ -1,13 +1,11 @@
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Matcher;
-import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 import org.jctools.util.Pow2;
 
@@ -52,16 +50,14 @@ public class MultiMBassador implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MultiMBassador(int numberOfThreads) {
-        this(false, numberOfThreads);
+        this(Mode.Exact, numberOfThreads);
     }
 
     /**
-     * @param forceExactMatches if TRUE, only exact matching will be performed on classes. Setting this to true
-     *                          removes the ability to have subTypes and VarArg matching, and doing so doubles the speed of the
-     *                          system. By default, this is FALSE, to support subTypes and VarArg matching.
+     * @param mode Specifies which mode to operate the publication of messages.
      * @param numberOfThreads   how many threads to have for dispatching async messages
      */
-    public MultiMBassador(boolean forceExactMatches, int numberOfThreads) {
+    public MultiMBassador(Mode mode, int numberOfThreads) {
         if (numberOfThreads < 2) {
             numberOfThreads = 2; // at LEAST 2 threads
         }
@@ -69,22 +65,31 @@ public class MultiMBassador implements IMessageBus {
         this.dispatchQueue = new MpmcMultiTransferArrayQueue(numberOfThreads);
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
 
-
-        if (forceExactMatches) {
-            subscriptionMatcher = new Matcher() {
-                @Override
-                public boolean publish(Object message) throws Throwable {
-                    return subscriptionManager.publishExact(message);
-                }
-            };
-        }
-        else {
-            subscriptionMatcher = new Matcher() {
-                @Override
-                public boolean publish(Object message) throws Throwable {
-                    return subscriptionManager.publish(message);
-                }
-            };
+        switch (mode) {
+            case Exact:
+                subscriptionMatcher = new Matcher() {
+                    @Override
+                    public void publish(Object message) throws Throwable {
+                        subscriptionManager.publishExact(message);
+                    }
+                };
+                break;
+            case ExactWithSuperTypes:
+                subscriptionMatcher = new Matcher() {
+                    @Override
+                    public void publish(Object message) throws Throwable {
+                        subscriptionManager.publishExactAndSuper(message);
+                    }
+                };
+                break;
+            case ExactWithSuperTypesAndVarArgs:
+            default:
+                subscriptionMatcher = new Matcher() {
+                    @Override
+                    public void publish(Object message) throws Throwable {
+                        subscriptionManager.publishAll(message);
+                    }
+                };
         }
 
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -203,23 +208,7 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object message) {
         try {
-            boolean subsPublished = subscriptionMatcher.publish(message);
-
-            if (!subsPublished) {
-                // Dead Event must EXACTLY MATCH (no subclasses)
-                Subscription[] deadSubscriptions = subscriptionManager.getSubscriptionsForcedExact(DeadMessage.class);
-                if (deadSubscriptions != null) {
-                    DeadMessage deadMessage = new DeadMessage(message);
-
-                    Subscription sub;
-                    //noinspection ForLoopReplaceableByForEach
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-
-                        sub.publish(deadMessage);
-                    }
-                }
-            }
+            subscriptionMatcher.publish(message);
         } catch (Throwable e) {
             handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
                                                    .setPublishedObject(message));

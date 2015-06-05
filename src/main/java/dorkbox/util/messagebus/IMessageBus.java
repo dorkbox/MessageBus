@@ -59,6 +59,24 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  */
 public interface IMessageBus extends PubSubSupport, ErrorHandlingSupport {
 
+    enum Mode {
+        /**
+         * Will only publish to listeners with this exact message signature. This is the fastest
+         */
+        Exact,
+        /**
+         * Will publish to listeners with this exact message signature, as well as listeners that match the super class types signatures.
+         */
+        ExactWithSuperTypes,
+
+        /**
+         * Will publish to listeners with this exact message signature, as well as listeners that match the super class types signatures.
+         * and to listeners that have matching varity arguments. (ie: a listener that matches Obeject[], will accept messages of type Object)
+         */
+        ExactWithSuperTypesAndVarArgs,
+    }
+
+
     /**
      * Check whether any asynchronous message publications are pending to be processed
      *
