@@ -336,7 +336,7 @@ public final class SubscriptionManager {
             }
         }
         else if (!superSubscriptions.isEmpty()) {
-                collection = superSubscriptions;
+            collection = superSubscriptions;
         }
 
         if (collection != null) {
@@ -622,7 +622,7 @@ public final class SubscriptionManager {
 
                     for (int i = 0; i < length; i++) {
                         sub = varArgSubscriptions[i];
-                        sub.publish(message);
+                        sub.publish(asArray);
                     }
 
                     stamp = lock.readLock();
@@ -668,6 +668,167 @@ public final class SubscriptionManager {
             for (int i = 0; i < deadSubscriptions.length; i++) {
                 sub = deadSubscriptions[i];
                 sub.publish(deadMessage);
+            }
+        }
+    }
+
+    public void publishAll(final Object message1, final Object message2) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2);
+            }
+
+            // publish to var arg, only if not already an array AND we are all of the same type
+            if (varArgPossibility.get() && messageClass1 == messageClass2 && !messageClass1.isArray()) {
+                long stamp = lock.readLock();
+                final Subscription[] varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass1); // can return null
+                lock.unlockRead(stamp);
+
+                if (varArgSubscriptions != null) {
+                    final int length = varArgSubscriptions.length;
+                    Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
+                    asArray[0] = message1;
+                    asArray[1] = message2;
+
+
+                    for (int i = 0; i < length; i++) {
+                        sub = varArgSubscriptions[i];
+                        sub.publish(asArray);
+                    }
+
+                    stamp = lock.readLock();
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
+                    lock.unlockRead(stamp);
+
+                    if (varArgSuperSubscriptions != null) {
+                        for (int i = 0; i < length; i++) {
+                            sub = varArgSuperSubscriptions[i];
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+                else {
+                    stamp = lock.readLock();
+
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
+                    lock.unlockRead(stamp);
+
+                    if (varArgSuperSubscriptions != null) {
+                        Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
+                        asArray[0] = message1;
+                        asArray[1] = message2;
+
+                        for (int i = 0; i < varArgSuperSubscriptions.length; i++) {
+                            sub = varArgSuperSubscriptions[i];
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
+            }
+        }
+    }
+
+    public void publishAll(final Object message1, final Object message2, final Object message3) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
+        final Class<?> messageClass3 = message3.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2, message3);
+            }
+
+            // publish to var arg, only if not already an array AND we are all of the same type
+            if (varArgPossibility.get() && messageClass1 == messageClass2 && messageClass1 == messageClass3 && !messageClass1.isArray()) {
+                long stamp = lock.readLock();
+                final Subscription[] varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass1); // can return null
+                lock.unlockRead(stamp);
+
+                if (varArgSubscriptions != null) {
+                    final int length = varArgSubscriptions.length;
+                    Object[] asArray = (Object[]) Array.newInstance(messageClass1, 3);
+                    asArray[0] = message1;
+                    asArray[1] = message2;
+                    asArray[2] = message3;
+
+
+                    for (int i = 0; i < length; i++) {
+                        sub = varArgSubscriptions[i];
+                        sub.publish(asArray);
+                    }
+
+                    stamp = lock.readLock();
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
+                    lock.unlockRead(stamp);
+
+                    if (varArgSuperSubscriptions != null) {
+                        for (int i = 0; i < length; i++) {
+                            sub = varArgSuperSubscriptions[i];
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+                else {
+                    stamp = lock.readLock();
+
+                    // now publish array based superClasses (but only if those ALSO accept vararg)
+                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
+                    lock.unlockRead(stamp);
+
+                    if (varArgSuperSubscriptions != null) {
+                        Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
+                        asArray[0] = message1;
+                        asArray[1] = message2;
+                        asArray[2] = message3;
+
+                        for (int i = 0; i < varArgSuperSubscriptions.length; i++) {
+                            sub = varArgSuperSubscriptions[i];
+                            sub.publish(asArray);
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
             }
         }
     }

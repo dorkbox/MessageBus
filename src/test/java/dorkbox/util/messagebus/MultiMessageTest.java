@@ -3,12 +3,11 @@
  */
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Test;
-
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.MessageBusTest;
+import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author dorkbox, llc
@@ -29,6 +28,7 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publish("s");
         bus.publish("s", "s");
         bus.publish("s", "s", "s");
+        bus.publish(1, "s");
         bus.publish(1, 2, "s");
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
 
@@ -36,9 +36,10 @@ public class MultiMessageTest extends MessageBusTest {
 
         bus.subscribe(listener1);
 
-        bus.publish("s");
-        bus.publish("s", "s");
-        bus.publish("s", "s", "s");
+        bus.publish("s"); // 4
+        bus.publish("s", "s"); // 3
+        bus.publish("s", "s", "s"); // 3
+        bus.publish(1, "s");
         bus.publish(1, 2, "s");
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
 
@@ -49,6 +50,7 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publishAsync("s");
         bus.publishAsync("s", "s");
         bus.publishAsync("s", "s", "s");
+        bus.publish(1, "s");
         bus.publishAsync(1, 2, "s");
         bus.publishAsync(new Integer[] {1, 2, 3, 4, 5, 6});
 
@@ -70,6 +72,12 @@ public class MultiMessageTest extends MessageBusTest {
 
     @SuppressWarnings("unused")
     public static class Listener {
+        @Handler
+        public void handleSync(Object o) {
+            count.getAndIncrement();
+            System.err.println("match Object");
+        }
+
         @Handler
         public void handleSync(String o1) {
             count.getAndIncrement();

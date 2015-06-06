@@ -51,14 +51,14 @@ public class MultiMBassador implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MultiMBassador(int numberOfThreads) {
-        this(Mode.ExactWithSuperTypes, numberOfThreads);
+        this(PublishMode.ExactWithSuperTypesAndVarArgs, numberOfThreads);
     }
 
     /**
-     * @param mode Specifies which mode to operate the publication of messages.
+     * @param publishMode Specifies which publishMode to operate the publication of messages.
      * @param numberOfThreads   how many threads to have for dispatching async messages
      */
-    public MultiMBassador(Mode mode, int numberOfThreads) {
+    public MultiMBassador(final PublishMode publishMode, int numberOfThreads) {
         if (numberOfThreads < 2) {
             numberOfThreads = 2; // at LEAST 2 threads
         }
@@ -66,80 +66,16 @@ public class MultiMBassador implements IMessageBus {
         this.dispatchQueue = new MpmcMultiTransferArrayQueue(numberOfThreads);
         this.subscriptionManager = new SubscriptionManager(numberOfThreads);
 
-        switch (mode) {
+        switch (publishMode) {
             case Exact:
-                subscriptionMatcher = new Matcher() {
-                    @Override
-                    public void publish(final Object message1) throws Throwable {
-                        subscriptionManager.publishExact(message1);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2) throws Throwable {
-                        subscriptionManager.publishExact(message1, message2);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-                        subscriptionManager.publishExact(message1, message2, message3);
-                    }
-
-                    @Override
-                    public void publish(final Object[] messages) throws Throwable {
-                        subscriptionManager.publishExact(messages);
-                    }
-
-                };
+                subscriptionMatcher = new MatcherExact();
                 break;
             case ExactWithSuperTypes:
-                subscriptionMatcher = new Matcher() {
-                    @Override
-                    public void publish(final Object message1) throws Throwable {
-                        subscriptionManager.publishExactAndSuper(message1);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2) throws Throwable {
-                        subscriptionManager.publishExactAndSuper(message1, message2);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-                        subscriptionManager.publishExactAndSuper(message1, message2, message3);
-                    }
-
-                    @Override
-                    public void publish(final Object[] messages) throws Throwable {
-                        subscriptionManager.publishExactAndSuper(messages);
-                    }
-                };
+                subscriptionMatcher = new MatcherExactWithSuperTypes();
                 break;
             case ExactWithSuperTypesAndVarArgs:
             default:
-                subscriptionMatcher = new Matcher() {
-                    @Override
-                    public void publish(final Object message1) throws Throwable {
-                        subscriptionManager.publishAll(message1);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2) throws Throwable {
-                        // we don't support var-args for multiple messages (var-args can only be a single type)
-                        subscriptionManager.publishExactAndSuper(message1, message2);
-                    }
-
-                    @Override
-                    public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-                        // we don't support var-args for multiple messages (var-args can only be a single type)
-                        subscriptionManager.publishExactAndSuper(message1, message2, message3);
-                    }
-
-                    @Override
-                    public void publish(final Object[] messages) throws Throwable {
-                        // we don't support var-args for multiple messages (var-args can only be a single type)
-                        subscriptionManager.publishExactAndSuper(messages);
-                    }
-                };
+                subscriptionMatcher = new MatcherAll();
         }
 
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
@@ -191,11 +127,17 @@ public class MultiMBassador implements IMessageBus {
                                                                         .setCause(e).setPublishedObject(node.item1, node.item2));
                                         break;
                                     }
-                                    default: {
+                                    case 3: {
                                         handlePublicationError(
                                                         new PublicationError().setMessage("Thread interrupted while processing message")
                                                                         .setCause(e)
                                                                         .setPublishedObject(node.item1, node.item2, node.item3));
+                                        break;
+                                    }
+                                    default: {
+                                        handlePublicationError(
+                                                        new PublicationError().setMessage("Thread interrupted while processing message")
+                                                                        .setCause(e).setPublishedObject(node.item1));
                                     }
                                 }
                             }
@@ -265,7 +207,7 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object message) {
         try {
-            subscriptionMatcher.publish(message);
+            subscriptionMatcher.publish(subscriptionManager, message);
         } catch (Throwable e) {
             handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
                                                    .setPublishedObject(message));
@@ -275,7 +217,7 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object message1, final Object message2) {
         try {
-            subscriptionMatcher.publish(message1, message2);
+            subscriptionMatcher.publish(subscriptionManager, message1, message2);
         } catch (Throwable e) {
             handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
                                                    .setPublishedObject(message1, message2));
@@ -285,7 +227,7 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object message1, final Object message2, final Object message3) {
         try {
-            subscriptionMatcher.publish(message1, message2, message3);
+            subscriptionMatcher.publish(subscriptionManager, message1, message2, message3);
         } catch (Throwable e) {
             handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
                                                    .setPublishedObject(message1, message2, message3));
@@ -295,7 +237,7 @@ public class MultiMBassador implements IMessageBus {
     @Override
     public void publish(final Object[] messages) {
         try {
-            subscriptionMatcher.publish(messages);
+            subscriptionMatcher.publish(subscriptionManager, messages);
         } catch (Throwable e) {
             handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
                                                    .setPublishedObject(messages));
