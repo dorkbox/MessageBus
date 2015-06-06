@@ -60,7 +60,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
      * The item can be a single object (MessageType.ONE), or an array object (MessageType.ARRAY)
      * </p>
      */
-    public void transfer(final Object item) throws InterruptedException {
+    public void transfer(final Object item, final int messageType) throws InterruptedException {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final Object[] buffer = this.buffer;
@@ -106,7 +106,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
                         spType(node, TYPE_PRODUCER);
                         spThread(node, myThread);
 
-                        spMessageType(node, MessageType.ONE);
+                        spMessageType(node, messageType);
                         spItem1(node, item);
 
 
@@ -148,7 +148,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
                         // (seeing this value from a consumer will lead to retry 2)
                         soSequence(sBuffer, cSeqOffset, mask + newConsumerIndex); // StoreStore
 
-                        spMessageType(e, MessageType.ONE);
+                        spMessageType(e, messageType);
                         spItem1(e, item);
 
                         unpark(e);  // StoreStore

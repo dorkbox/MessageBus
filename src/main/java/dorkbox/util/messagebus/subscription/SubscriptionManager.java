@@ -672,13 +672,6 @@ public final class SubscriptionManager {
         }
     }
 
-    public void publishAll(final Object message1, final Object message2) throws Throwable {
-    }
-
-    public void publishAll(final Object message1, final Object message2, final Object message3) throws Throwable {
-    }
-
-
 
 //    public static final Comparator<Subscription> SubscriptionByPriorityDesc = new Comparator<Subscription>() {
 //        @Override

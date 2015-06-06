@@ -54,17 +54,23 @@ public interface PubSubSupport {
     void publish(Object message1, Object message2, Object message3);
 
     /**
+     * Synchronously publish <b>AN ARRAY</b> of messages to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured
+     * to reject valid subtypes. The call returns when all matching handlers of all registered listeners have
+     * been notified (invoked) of the message.
+     */
+    void publish(Object[] message);
+
+    /**
      * Publish the message asynchronously to all registered listeners (that match the signature). This includes
      * listeners defined for super types of the given message type, provided they are not configured to reject
      * valid subtypes. The call returns when all matching handlers of all registered listeners have been notified
      * (invoked) of the message.
      * <p>
      * <p>
-     * The behavior of this method depends on the configured queuing strategy:
-     * <p>
-     * <p>
-     * If an unbound queuing strategy is used the call returns immediately.
-     * If a bounded queue is used the call might block until the message can be placed in the queue.
+     * The behavior of this method depends on availability of workers. If all workers are busy, then this method
+     * will block until there is an available worker. If workers are available, then this method will immediately
+     * return.
      */
     void publishAsync(Object message);
 
@@ -75,11 +81,9 @@ public interface PubSubSupport {
      * been notified (invoked) of the message.
      * <p>
      * <p>
-     * The behavior of this method depends on the configured queuing strategy:
-     * <p>
-     * <p>
-     * If an unbound queuing strategy is used the call returns immediately.
-     * If a bounded queue is used the call might block until the message can be placed in the queue.
+     * The behavior of this method depends on availability of workers. If all workers are busy, then this method
+     * will block until there is an available worker. If workers are available, then this method will immediately
+     * return.
      */
     void publishAsync(Object message1, Object message2);
 
@@ -90,11 +94,22 @@ public interface PubSubSupport {
      * notified (invoked) of the message.
      * <p>
      * <p>
-     * The behavior of this method depends on the configured queuing strategy:
-     * <p>
-     * <p>
-     * If an unbound queuing strategy is used the call returns immediately.
-     * If a bounded queue is used the call might block until the message can be placed in the queue.
+     * The behavior of this method depends on availability of workers. If all workers are busy, then this method
+     * will block until there is an available worker. If workers are available, then this method will immediately
+     * return.
      */
     void publishAsync(Object message1, Object message2, Object message3);
+
+    /**
+     * Publish <b>AN ARRAY</b> of messages asynchronously to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured to
+     * reject valid subtypes. The call returns when all matching handlers of all registered listeners have been
+     * notified (invoked) of the message.
+     * <p>
+     * <p>
+     * The behavior of this method depends on availability of workers. If all workers are busy, then this method
+     * will block until there is an available worker. If workers are available, then this method will immediately
+     * return.
+     */
+    void publishAsync(Object[] messages);
 }

@@ -1,5 +1,6 @@
 package dorkbox.util.messagebus.queuePerf;
 
+import dorkbox.util.messagebus.common.simpleq.MessageType;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
 
@@ -132,12 +133,10 @@ public class PerfTest_MpmcTransferArrayQueue_Block {
 
             try {
                 do {
-                    producer.transfer(TEST_VALUE);
+                    producer.transfer(TEST_VALUE, MessageType.ONE);
                 } while (0 != --i);
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
-                // log.error(e);
             }
         }
     }

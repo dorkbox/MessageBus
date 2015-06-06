@@ -59,6 +59,7 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  */
 public interface IMessageBus extends PubSubSupport, ErrorHandlingSupport {
 
+
     enum Mode {
         /**
          * Will only publish to listeners with this exact message signature. This is the fastest

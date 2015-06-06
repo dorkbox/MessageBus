@@ -70,8 +70,8 @@ public class MultiMBassador implements IMessageBus {
             case Exact:
                 subscriptionMatcher = new Matcher() {
                     @Override
-                    public void publish(final Object message) throws Throwable {
-                        subscriptionManager.publishExact(message);
+                    public void publish(final Object message1) throws Throwable {
+                        subscriptionManager.publishExact(message1);
                     }
 
                     @Override
@@ -83,13 +83,19 @@ public class MultiMBassador implements IMessageBus {
                     public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
                         subscriptionManager.publishExact(message1, message2, message3);
                     }
+
+                    @Override
+                    public void publish(final Object[] messages) throws Throwable {
+                        subscriptionManager.publishExact(messages);
+                    }
+
                 };
                 break;
             case ExactWithSuperTypes:
                 subscriptionMatcher = new Matcher() {
                     @Override
-                    public void publish(final Object message) throws Throwable {
-                        subscriptionManager.publishExactAndSuper(message);
+                    public void publish(final Object message1) throws Throwable {
+                        subscriptionManager.publishExactAndSuper(message1);
                     }
 
                     @Override
@@ -101,24 +107,37 @@ public class MultiMBassador implements IMessageBus {
                     public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
                         subscriptionManager.publishExactAndSuper(message1, message2, message3);
                     }
+
+                    @Override
+                    public void publish(final Object[] messages) throws Throwable {
+                        subscriptionManager.publishExactAndSuper(messages);
+                    }
                 };
                 break;
             case ExactWithSuperTypesAndVarArgs:
             default:
                 subscriptionMatcher = new Matcher() {
                     @Override
-                    public void publish(final Object message) throws Throwable {
-                        subscriptionManager.publishAll(message);
+                    public void publish(final Object message1) throws Throwable {
+                        subscriptionManager.publishAll(message1);
                     }
 
                     @Override
                     public void publish(final Object message1, final Object message2) throws Throwable {
-                        subscriptionManager.publishAll(message1, message2);
+                        // we don't support var-args for multiple messages (var-args can only be a single type)
+                        subscriptionManager.publishExactAndSuper(message1, message2);
                     }
 
                     @Override
                     public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-                        subscriptionManager.publishAll(message1, message2, message3);
+                        // we don't support var-args for multiple messages (var-args can only be a single type)
+                        subscriptionManager.publishExactAndSuper(message1, message2, message3);
+                    }
+
+                    @Override
+                    public void publish(final Object[] messages) throws Throwable {
+                        // we don't support var-args for multiple messages (var-args can only be a single type)
+                        subscriptionManager.publishExactAndSuper(messages);
                     }
                 };
         }
@@ -148,8 +167,12 @@ public class MultiMBassador implements IMessageBus {
                                         publish(node.item1, node.item2);
                                         break;
                                     }
-                                    default: {
+                                    case 3: {
                                         publish(node.item1, node.item2, node.item3);
+                                        break;
+                                    }
+                                    default: {
+                                        publish(node.item1);
                                     }
                                 }
                             }
@@ -270,6 +293,16 @@ public class MultiMBassador implements IMessageBus {
     }
 
     @Override
+    public void publish(final Object[] messages) {
+        try {
+            subscriptionMatcher.publish(messages);
+        } catch (Throwable e) {
+            handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
+                                                   .setPublishedObject(messages));
+        }
+    }
+
+    @Override
     public void publishAsync(final Object message) {
         if (message != null) {
             try {
@@ -313,4 +346,20 @@ public class MultiMBassador implements IMessageBus {
             throw new NullPointerException("Messages cannot be null.");
         }
     }
+
+    @Override
+    public void publishAsync(final Object[] messages) {
+        if (messages != null) {
+            try {
+                this.dispatchQueue.transfer(messages, MessageType.ARRAY);
+            } catch (Exception e) {
+                handlePublicationError(new PublicationError().setMessage("Error while adding an asynchronous message").setCause(e)
+                                                       .setPublishedObject(messages));
+            }
+        }
+        else {
+            throw new NullPointerException("Message cannot be null.");
+        }
+    }
+
 }
