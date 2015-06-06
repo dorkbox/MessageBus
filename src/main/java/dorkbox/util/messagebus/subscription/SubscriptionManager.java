@@ -54,28 +54,29 @@ public final class SubscriptionManager {
     private final VarArgUtils varArgUtils;
 
     private final StampedLock lock = new StampedLock();
+    private final int numberOfThreads;
 
     public SubscriptionManager(int numberOfThreads) {
-        float loadFactor = SubscriptionManager.LOAD_FACTOR;
+        this.numberOfThreads = numberOfThreads;
 
         // modified ONLY during SUB/UNSUB
         {
-            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, loadFactor, numberOfThreads);
+            this.nonListeners = new ConcurrentHashMapV8<Class<?>, Boolean>(4, LOAD_FACTOR, numberOfThreads);
 
             this.subscriptionsPerMessageSingle = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(32, LOAD_FACTOR, 1);
-            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
+            this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, LOAD_FACTOR);
 
             // only used during SUB/UNSUB
             this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, Subscription[]>(32, LOAD_FACTOR, 1);
         }
 
-        final SuperClassUtils superClass = new SuperClassUtils(loadFactor, 1);
-        this.utils = new SubscriptionUtils(superClass, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, loadFactor,
+        final SuperClassUtils superClass = new SuperClassUtils(LOAD_FACTOR, 1);
+        this.utils = new SubscriptionUtils(superClass, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, LOAD_FACTOR,
                                            numberOfThreads);
 
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(this.utils, superClass, this.subscriptionsPerMessageSingle, loadFactor, numberOfThreads);
+        this.varArgUtils = new VarArgUtils(this.utils, superClass, this.subscriptionsPerMessageSingle, LOAD_FACTOR, numberOfThreads);
     }
 
     public final void shutdown() {
@@ -126,7 +127,6 @@ public final class SubscriptionManager {
             final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
 
             final Subscription[] subsPerListener = new Subscription[handlersSize];
-            Collection<Subscription> subsForPublication;
 
             // create the subscription
             MessageHandler messageHandler;
@@ -136,12 +136,15 @@ public final class SubscriptionManager {
                 messageHandler = messageHandlers[i];
 
                 // create the subscription
-                subscription = new Subscription(messageHandler);
+                subscription = new Subscription(messageHandler, LOAD_FACTOR, numberOfThreads);
                 subscription.subscribe(listener);
 
                 subsPerListener[i] = subscription; // activates this sub for sub/unsub
             }
 
+            final ConcurrentMap<Class<?>, Subscription[]> subsPerListenerMap = this.subscriptionsPerListener;
+            final AtomicBoolean varArgPossibility = this.varArgPossibility;
+            final SubscriptionUtils utils = this.utils;
 
             // now write lock for the least expensive part. This is a deferred "double checked lock", but is necessary because
             // of the huge number of reads compared to writes.
@@ -149,23 +152,16 @@ public final class SubscriptionManager {
             final StampedLock lock = this.lock;
             final long stamp = lock.writeLock();
 
-            final ConcurrentMap<Class<?>, Subscription[]> subsPerListenerMap = this.subscriptionsPerListener;
             subscriptions = subsPerListenerMap.get(listenerClass);
 
             // it was still null, so we actually have to create the rest of the subs
             if (subscriptions == null) {
-                final AtomicBoolean varArgPossibility = this.varArgPossibility;
-                final SubscriptionUtils utils = this.utils;
-
                 for (int i = 0; i < handlersSize; i++) {
                     subscription = subsPerListener[i];
 
                     // now add this subscription to each of the handled types
-                    subsForPublication = subscription
-                                    .createPublicationSubscriptions(subsPerMessageSingle, subsPerMessageMulti, varArgPossibility, utils);
-
-                    //noinspection ConstantConditions
-                    subsForPublication.add(subscription);  // activates this sub for publication
+                    // to activate this sub for publication
+                    subscription.registerForPublication(subsPerMessageSingle, subsPerMessageMulti, varArgPossibility, utils);
                 }
 
                 subsPerListenerMap.put(listenerClass, subsPerListener);
@@ -182,7 +178,6 @@ public final class SubscriptionManager {
         // subscriptions already exist and must only be updated
         // only publish here if our single-check was OK, or our double-check was OK
         Subscription subscription;
-
         for (int i = 0; i < subscriptions.length; i++) {
             subscription = subscriptions[i];
             subscription.subscribe(listener);

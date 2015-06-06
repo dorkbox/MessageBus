@@ -7,8 +7,6 @@ import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
-import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import org.omg.CORBA.BooleanHolder;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,9 +41,9 @@ public class Subscription {
     private final IHandlerInvocation invocation;
     private final Collection<Object> listeners;
 
-    public Subscription(MessageHandler handler) {
+    public Subscription(final MessageHandler handler, final float loadFactor, final int stripeSize) {
         this.handlerMetadata = handler;
-        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.85F, 15);
+        this.listeners = new StrongConcurrentSetV8<Object>(16, loadFactor, stripeSize);
 //        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
 //        this.listeners = new ConcurrentLinkedQueue2<Object>();
 //        this.listeners = new CopyOnWriteArrayList<Object>();
@@ -62,7 +60,7 @@ public class Subscription {
         return handlerMetadata;
     }
 
-    public Class<?>[] getHandledMessageTypes() {
+    public final Class<?>[] getHandledMessageTypes() {
         return this.handlerMetadata.getHandledMessages();
     }
 
@@ -90,13 +88,10 @@ public class Subscription {
     }
 
     // only used in unit-test
-    public int size() {
+    public final int size() {
         return this.listeners.size();
     }
 
-    /**
-     * @return true if there were listeners for this publication, false if there was nothing
-     */
     public final void publish(final Object message) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
@@ -112,126 +107,59 @@ public class Subscription {
         }
     }
 
-    /**
-     * @return true if there were listeners for this publication, false if there was nothing
-     */
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message1, Object message2) {
-//        StrongConcurrentSet<Object> listeners = this.listeners;
-//
-//        if (!listeners.isEmpty()) {
-//            MethodAccess handler = this.handlerMetadata.getHandler();
-//            int handleIndex = this.handlerMetadata.getMethodIndex();
-//            IHandlerInvocation invocation = this.invocation;
-//
-//
-//            ISetEntry<Object> current = listeners.head;
-//            Object listener;
-//            while (current != null) {
-//                listener = current.getValue();
-//                current = current.next();
-//
-//                try {
-//                    invocation.invoke(listener, handler, handleIndex, message1, message2);
-//                } catch (IllegalAccessException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "The class or method is not accessible")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2));
-//                } catch (IllegalArgumentException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "Wrong arguments passed to method. Was: " +
-//                                                                            message1.getClass() + ", " +
-//                                                                            message2.getClass()
-//                                                                        + ".  Expected: " + handler.getParameterTypes()[0] + ", " +
-//                                                                                            handler.getParameterTypes()[1]
-//                                                                            )
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2));
-//                } catch (Throwable e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "The Message handler code threw an exception")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2));
-//                }
-//            }
-//            booleanHolder.bool = true;
-//        }
+    public final void publishToSubscription(final Object message1, final Object message2) throws Throwable {
+        final MethodAccess handler = this.handlerMetadata.getHandler();
+        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
+
+        Iterator<Object> iterator;
+        Object listener;
+
+        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+            listener = iterator.next();
+
+            invocation.invoke(listener, handler, handleIndex, message1, message2);
+        }
     }
 
-    /**
-     * @return true if there were listeners for this publication, false if there was nothing
-     */
-    public void publishToSubscription(ErrorHandlingSupport errorHandler, BooleanHolder booleanHolder, Object message1, Object message2, Object message3) {
-//        StrongConcurrentSet<Object> listeners = this.listeners;
-//
-//        if (!listeners.isEmpty()) {
-//            MethodAccess handler = this.handlerMetadata.getHandler();
-//            int handleIndex = this.handlerMetadata.getMethodIndex();
-//            IHandlerInvocation invocation = this.invocation;
-//
-//
-//            ISetEntry<Object> current = listeners.head;
-//            Object listener;
-//            while (current != null) {
-//                listener = current.getValue();
-//                current = current.next();
-//
-//                try {
-//                    invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
-//                } catch (IllegalAccessException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "The class or method is not accessible")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2, message3));
-//                } catch (IllegalArgumentException e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "Wrong arguments passed to method. Was: " +
-//                                                            message1.getClass() + ", " +
-//                                                            message2.getClass() + ", " +
-//                                                            message3.getClass()
-//                                                            + ".  Expected: " + handler.getParameterTypes()[0] + ", " +
-//                                                                                handler.getParameterTypes()[1] + ", " +
-//                                                                                handler.getParameterTypes()[2]
-//                                                            )
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2, message3));
-//                } catch (Throwable e) {
-//                    errorHandler.handlePublicationError(new PublicationError()
-//                                                            .setMessage("Error during invocation of message handler. " +
-//                                                                        "The Message handler code threw an exception")
-//                                                            .setCause(e)
-//                                                            .setMethodName(handler.getMethodNames()[handleIndex])
-//                                                            .setListener(listener)
-//                                                            .setPublishedObject(message1, message2, message3));
-//                }
-//            }
-//            booleanHolder.bool = true;
-//        }
+    public final void publishToSubscription(final Object message1, final Object message2, final Object message3) throws Throwable {
+        final MethodAccess handler = this.handlerMetadata.getHandler();
+        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
+
+        Iterator<Object> iterator;
+        Object listener;
+
+        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+            listener = iterator.next();
+
+            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+        }
+    }
+
+    public final void publishToSubscription(final Object... messages) throws Throwable {
+        final MethodAccess handler = this.handlerMetadata.getHandler();
+        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
+
+        Iterator<Object> iterator;
+        Object listener;
+
+        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+            listener = iterator.next();
+
+            invocation.invoke(listener, handler, handleIndex, messages);
+        }
     }
 
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         return this.ID;
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -246,17 +174,15 @@ public class Subscription {
     }
 
     // inside a write lock
-    // also puts it into the correct map if it's not already there
-    public Collection<Subscription> createPublicationSubscriptions(final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                                                                   final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                                                                   AtomicBoolean varArgPossibility, SubscriptionUtils utils) {
+    // add this subscription to each of the handled types
+    // to activate this sub for publication
+    public void registerForPublication(final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
+                                       final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
+                                       final AtomicBoolean varArgPossibility, final SubscriptionUtils utils) {
 
         final Class<?>[] messageHandlerTypes = handlerMetadata.getHandledMessages();
         final int size = messageHandlerTypes.length;
 
-//        ConcurrentSet<Subscription> subsPerType;
-
-//        SubscriptionUtils utils = this.utils;
         Class<?> type0 = messageHandlerTypes[0];
 
         switch (size) {
@@ -269,73 +195,45 @@ public class Subscription {
                     if (isArray) {
                         varArgPossibility.lazySet(true);
                     }
-                    utils.cacheSuperClasses(type0);
 
                     subsPerMessageSingle.put(type0, subs);
                 }
 
-                return subs;
+                subs.add(this);
+                return;
             }
             case 2: {
-                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.publish();
-//
-//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1]);
-//                if (putIfAbsent != null) {
-//                    return putIfAbsent;
-//                } else {
-//                    subHolderSingle.set(subHolderSingle.initialValue());
-//
-//                    // cache the super classes
-//                    utils.cacheSuperClasses(type0);
-//                    utils.cacheSuperClasses(types[1]);
-//
-//                    return subsPerType;
-//                }
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1]);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1]);
+                }
+
+                subs.add(this);
+                return;
             }
             case 3: {
-                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.publish();
-//
-//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, type0, types[1], types[2]);
-//                if (putIfAbsent != null) {
-//                    return putIfAbsent;
-//                } else {
-//                    subHolderSingle.set(subHolderSingle.initialValue());
-//
-//                    // cache the super classes
-//                    utils.cacheSuperClasses(type0);
-//                    utils.cacheSuperClasses(types[1]);
-//                    utils.cacheSuperClasses(types[2]);
-//
-//                    return subsPerType;
-//                }
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1], messageHandlerTypes[2]);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1], messageHandlerTypes[2]);
+                }
+
+                subs.add(this);
+                return;
             }
             default: {
-                // the HashMapTree uses read/write locks, so it is only accessible one thread at a time
-//                SubscriptionHolder subHolderSingle = this.subHolderSingle;
-//                subsPerType = subHolderSingle.publish();
-//
-//                Collection<Subscription> putIfAbsent = subsPerMessageMulti.putIfAbsent(subsPerType, types);
-//                if (putIfAbsent != null) {
-//                    return putIfAbsent;
-//                } else {
-//                    subHolderSingle.set(subHolderSingle.initialValue());
-//
-//                    Class<?> c;
-//                    int length = types.length;
-//                    for (int i = 0; i < length; i++) {
-//                        c = types[i];
-//
-//                        // cache the super classes
-//                        utils.cacheSuperClasses(c);
-//                    }
-//
-//                    return subsPerType;
-//                }
-                return null;
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(messageHandlerTypes);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, messageHandlerTypes);
+                }
+
+                subs.add(this);
+                return;
             }
         }
     }

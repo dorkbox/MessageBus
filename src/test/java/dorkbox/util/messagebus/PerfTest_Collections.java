@@ -1,16 +1,5 @@
 package dorkbox.util.messagebus;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.LinkedTransferQueue;
-
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.MessageHandler;
@@ -19,6 +8,11 @@ import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.common.thread.ConcurrentLinkedQueue2;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.subscription.Subscription;
+
+import java.lang.ref.WeakReference;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedTransferQueue;
 
 
 public class PerfTest_Collections {
@@ -75,7 +69,7 @@ public class PerfTest_Collections {
 
         for (int i=0;i<size;i++) {
             for (MessageHandler x : allHandlers) {
-                set.add(new Subscription(x));
+                set.add(new Subscription(x, .85F, 1));
             }
         }
 

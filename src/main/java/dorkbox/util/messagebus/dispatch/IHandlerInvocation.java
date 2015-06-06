@@ -61,5 +61,5 @@ public interface IHandlerInvocation {
      *                 type that the handler consumes
      * @param handler  The handler (method) that will be called via reflection
      */
-    void invoke(Object listener, MethodAccess handler, int methodIndex, Object... message) throws Throwable;
+    void invoke(Object listener, MethodAccess handler, int methodIndex, Object... messages) throws Throwable;
 }

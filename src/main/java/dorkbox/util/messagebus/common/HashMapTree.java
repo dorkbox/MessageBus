@@ -1,11 +1,8 @@
 package dorkbox.util.messagebus.common;
 
-import com.googlecode.concurentlocks.ReentrantReadWriteUpdateLock;
-
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.Lock;
 
 
 /**
@@ -17,14 +14,13 @@ import java.util.concurrent.locks.Lock;
  *         Date: 2/2/15
  */
 public class HashMapTree<KEY, VALUE> {
-    private final ReentrantReadWriteUpdateLock lock = new ReentrantReadWriteUpdateLock();
+    private Map<KEY, HashMapTree<KEY, VALUE>> children;
+    private volatile VALUE value;
 
-    private ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> children; // protected by read/write lock
-    private volatile VALUE value; // protected by read/write lock
     private final int defaultSize;
     private final float loadFactor;
 
-    public HashMapTree(int defaultSize, float loadFactor) {
+    public HashMapTree(final int defaultSize, final float loadFactor) {
         this.defaultSize = defaultSize;
         this.loadFactor = loadFactor;
     }
@@ -33,30 +29,26 @@ public class HashMapTree<KEY, VALUE> {
     /**
      * can be overridden to provide a custom backing map
      */
-    protected ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> createChildren(int defaultSize, float loadFactor) {
+    protected Map<KEY, HashMapTree<KEY, VALUE>> createChildren(int defaultSize, float loadFactor) {
         return new ConcurrentHashMapV8<KEY, HashMapTree<KEY, VALUE>>(defaultSize, loadFactor, 1);
     }
 
-    public VALUE getValue() {
-        VALUE returnValue = this.value;
-        return returnValue;
+    public final VALUE getValue() {
+        return this.value;
     }
 
 
-    public void putValue(VALUE value) {
+    public final void putValue(VALUE value) {
         this.value = value;
     }
 
 
-    public void removeValue() {
+    public final void removeValue() {
         this.value = null;
     }
 
 
-    public void clear() {
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
+    public final void clear() {
         if (this.children != null) {
             Set<Entry<KEY, HashMapTree<KEY, VALUE>>> entrySet = this.children.entrySet();
             for (Entry<KEY, HashMapTree<KEY, VALUE>> entry : entrySet) {
@@ -66,8 +58,6 @@ public class HashMapTree<KEY, VALUE> {
             this.children.clear();
             this.value = null;
         }
-
-        WRITE.unlock();
     }
 
 
@@ -76,7 +66,7 @@ public class HashMapTree<KEY, VALUE> {
      * <p>
      * Removes a branch from the tree, and cleans up, if necessary
      */
-    public void remove(KEY key) {
+    public final void remove(KEY key) {
         if (key != null) {
             removeLeaf(key);
         }
@@ -88,35 +78,24 @@ public class HashMapTree<KEY, VALUE> {
      * <p>
      * Removes a branch from the tree, and cleans up, if necessary
      */
-    public void remove(KEY key1, KEY key2) {
+    public final void remove(KEY key1, KEY key2) {
         if (key1 == null || key2 == null) {
             return;
         }
 
-        Lock UPDATE = this.lock.updateLock();
-        UPDATE.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> leaf = null;
+        HashMapTree<KEY, VALUE> leaf;
         if (this.children != null) {
             leaf = this.children.get(key1);
 
             if (leaf != null) {
-                // promote to writelock and try again - Concurrency in Practice,16.4.2, last sentence on page. Careful for stale state
-                Lock WRITE = this.lock.writeLock();
-                WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
                 leaf.removeLeaf(key2);
                 this.children.remove(key1);
 
                 if (this.children.isEmpty()) {
                     this.children = null;
                 }
-
-                WRITE.unlock();
             }
         }
-
-        UPDATE.unlock();
     }
 
     /**
@@ -124,35 +103,24 @@ public class HashMapTree<KEY, VALUE> {
      * <p>
      * Removes a branch from the tree, and cleans up, if necessary
      */
-    public void remove(KEY key1, KEY key2, KEY key3) {
+    public final void remove(KEY key1, KEY key2, KEY key3) {
         if (key1 == null || key2 == null) {
             return;
         }
 
-        Lock UPDATE = this.lock.updateLock();
-        UPDATE.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> leaf = null;
+        HashMapTree<KEY, VALUE> leaf;
         if (this.children != null) {
             leaf = this.children.get(key1);
 
             if (leaf != null) {
-                // promote to writelock and try again - Concurrency in Practice,16.4.2, last sentence on page. Careful for stale state
-                Lock WRITE = this.lock.writeLock();
-                WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
                 leaf.remove(key2, key3);
                 this.children.remove(key1);
 
                 if (this.children.isEmpty()) {
                     this.children = null;
                 }
-
-                WRITE.unlock();
             }
         }
-
-        UPDATE.unlock();
     }
 
 
@@ -162,7 +130,7 @@ public class HashMapTree<KEY, VALUE> {
      * Removes a branch from the tree, and cleans up, if necessary
      */
     @SuppressWarnings("unchecked")
-    public void remove(KEY... keys) {
+    public final void remove(KEY... keys) {
         if (keys == null) {
             return;
         }
@@ -174,11 +142,8 @@ public class HashMapTree<KEY, VALUE> {
     /**
      * Removes a branch from the tree, and cleans up, if necessary
      */
-    private final void removeLeaf(KEY key) {
+    private void removeLeaf(KEY key) {
         if (key != null) {
-            Lock WRITE = this.lock.writeLock();
-            WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
             if (this.children != null) {
                 HashMapTree<KEY, VALUE> leaf = this.children.get(key);
 
@@ -195,16 +160,11 @@ public class HashMapTree<KEY, VALUE> {
                     }
                 }
             }
-
-            WRITE.unlock();
         }
     }
 
     // keys CANNOT be null here!
-    private final void removeLeaf(int index, KEY[] keys) {
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
+    private void removeLeaf(int index, KEY[] keys) {
         if (index == keys.length) {
             // we have reached the leaf to remove!
             this.value = null;
@@ -223,249 +183,89 @@ public class HashMapTree<KEY, VALUE> {
                 }
             }
         }
-
-        WRITE.unlock();
     }
 
-    public VALUE put(VALUE value, KEY key) {
+    public final VALUE put(VALUE value, KEY key) {
         if (key == null) {
             throw new NullPointerException("keys");
         }
 
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
         // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key);
+        HashMapTree<KEY, VALUE> leaf = createLeaf(key);
         VALUE prev = leaf.value;
         leaf.value = value;
 
-        WRITE.unlock();
-
         return prev;
     }
 
-    public VALUE putIfAbsent(VALUE value, KEY key) {
-        if (key == null) {
-            throw new NullPointerException("keys");
-        }
-
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
-        // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key);
-
-        VALUE prev = leaf.value;
-        if (prev == null) {
-            leaf.value = value;
-        }
-
-        WRITE.unlock();
-
-        return prev;
-    }
-
-    public VALUE put(VALUE value, KEY key1, KEY key2) {
+    public final VALUE put(VALUE value, KEY key1, KEY key2) {
         if (key1 == null || key2 == null) {
             throw new NullPointerException("keys");
         }
 
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
         // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key1);
-        Lock WRITE2 = leaf.lock.writeLock();
-        WRITE2.lock();
-        leaf = leaf.createLeaf_NL(key2);
-        WRITE2.unlock();
+        HashMapTree<KEY, VALUE> leaf = createLeaf(key1);
+        leaf = leaf.createLeaf(key2);
 
         VALUE prev = leaf.value;
         leaf.value = value;
 
-        WRITE.unlock();
-
         return prev;
     }
 
-    public VALUE putIfAbsent(VALUE value, KEY key1, KEY key2) {
-        if (key1 == null || key2 == null) {
-            throw new NullPointerException("keys");
-        }
-
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
-        // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key1);
-        Lock WRITE2 = leaf.lock.writeLock();
-        WRITE2.lock();
-        leaf = leaf.createLeaf_NL(key2);
-        WRITE2.unlock();
-
-        VALUE prev = leaf.value;
-        if (prev == null) {
-            leaf.value = value;
-        }
-
-        WRITE.unlock();
-
-        return prev;
-    }
-
-    public VALUE put(VALUE value, KEY key1, KEY key2, KEY key3) {
+    public final VALUE put(VALUE value, KEY key1, KEY key2, KEY key3) {
         if (key1 == null || key2 == null || key3 == null) {
             throw new NullPointerException("keys");
         }
 
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
         // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key1);
-        Lock WRITE2 = leaf.lock.writeLock();
-        WRITE2.lock();
-        leaf = leaf.createLeaf_NL(key2);
-        Lock WRITE3 = leaf.lock.writeLock();
-        WRITE3.lock();
-        leaf = leaf.createLeaf_NL(key3);
-        WRITE3.unlock();
-        WRITE2.unlock();
+        HashMapTree<KEY, VALUE> leaf = createLeaf(key1);
+        leaf = leaf.createLeaf(key2);
+        leaf = leaf.createLeaf(key3);
 
         VALUE prev = leaf.value;
         leaf.value = value;
 
-        WRITE.unlock();
-
         return prev;
     }
 
-    public VALUE putIfAbsent(VALUE value, KEY key1, KEY key2, KEY key3) {
-        if (key1 == null || key2 == null || key3 == null) {
-            throw new NullPointerException("keys");
-        }
-
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
-        // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(key1);
-        Lock WRITE2 = leaf.lock.writeLock();
-        WRITE2.lock();
-        leaf = leaf.createLeaf_NL(key2);
-        Lock WRITE3 = leaf.lock.writeLock();
-        WRITE3.lock();
-        leaf = leaf.createLeaf_NL(key3);
-        WRITE3.unlock();
-        WRITE2.unlock();
-
-        VALUE prev = leaf.value;
-        if (prev == null) {
-            leaf.value = value;
-        }
-
-        WRITE.unlock();
-
-        return prev;
-    }
-
-    @SuppressWarnings("unchecked")
-    public VALUE put(VALUE value, KEY... keys) {
+    public final VALUE put(VALUE value, KEY... keys) {
         if (keys == null) {
             throw new NullPointerException("keys");
         }
 
         int length = keys.length;
-        Lock[] locks = new Lock[length];
-
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
 
         // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(keys[0]);
+        HashMapTree<KEY, VALUE> leaf = createLeaf(keys[0]);
         for (int i=1;i<length;i++) {
-            locks[i] = leaf.lock.writeLock();
-            locks[i].lock();
-            leaf = leaf.createLeaf_NL(keys[i]);
-        }
-
-        for (int i=length-1;i>0;i--) {
-            locks[i].unlock();
+            leaf = leaf.createLeaf(keys[i]);
         }
 
         VALUE prev = leaf.value;
         leaf.value = value;
 
-        WRITE.unlock();
-
         return prev;
     }
 
-    @SuppressWarnings("unchecked")
-    public VALUE putIfAbsent(VALUE value, KEY... keys) {
-        if (keys == null) {
-            throw new NullPointerException("keys");
-        }
-
-        int length = keys.length;
-        Lock[] locks = new Lock[length];
-
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
-
-        // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(keys[0]);
-        for (int i=1;i<length;i++) {
-            locks[i] = leaf.lock.writeLock();
-            locks[i].lock();
-            leaf = leaf.createLeaf_NL(keys[i]);
-        }
-
-        for (int i=length-1;i>0;i--) {
-            locks[i].unlock();
-        }
-
-        VALUE prev = leaf.value;
-        if (prev == null) {
-            leaf.value = value;
-        }
-
-        WRITE.unlock();
-
-        return prev;
-    }
-
-    @SuppressWarnings("unchecked")
-    public HashMapTree<KEY, VALUE> createLeaf(KEY... keys) {
+    public final HashMapTree<KEY, VALUE> createLeaf(KEY... keys) {
         if (keys == null) {
             return this;
         }
-        int length = keys.length;
-        Lock[] locks = new Lock[length];
 
-        Lock WRITE = this.lock.writeLock();
-        WRITE.lock();  // upgrade to the write lock, at this point blocks other readers
+        int length = keys.length;
 
         // have to put value into our children
-        HashMapTree<KEY, VALUE> leaf = createLeaf_NL(keys[0]);
+        HashMapTree<KEY, VALUE> leaf = createLeaf(keys[0]);
         for (int i=1;i<length;i++) {
-            locks[i] = leaf.lock.writeLock();
-            locks[i].lock();
-            leaf = leaf.createLeaf_NL(keys[i]);
+            leaf = leaf.createLeaf(keys[i]);
         }
-
-        for (int i=length-1;i>0;i--) {
-            locks[i].unlock();
-        }
-
-        WRITE.unlock();
 
         return leaf;
     }
 
 
-    private final HashMapTree<KEY, VALUE> createLeaf_NL(KEY key) {
+    private HashMapTree<KEY, VALUE> createLeaf(KEY key) {
         if (key == null) {
             return null;
         }
@@ -497,105 +297,76 @@ public class HashMapTree<KEY, VALUE> {
     /////////////////////////////////////////
     /////////////////////////////////////////
 
-    public VALUE get(KEY key) {
+    public final VALUE get(KEY key) {
         if (key == null) {
             return null;
         }
 
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> objectTree = null;
+        HashMapTree<KEY, VALUE> objectTree;
         // publish value from our children
-        objectTree = getLeaf_NL(key); // protected by lock
+        objectTree = getLeaf(key); // protected by lock
 
         if (objectTree == null) {
-            READ.unlock();
             return null;
         }
 
-        VALUE returnValue = objectTree.value;
-
-        READ.unlock();
-        return returnValue;
+        return objectTree.value;
     }
 
-    public VALUE get(KEY key1, KEY key2) {
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> tree = null;
+    public final VALUE get(KEY key1, KEY key2) {
+        HashMapTree<KEY, VALUE> tree;
         // publish value from our children
-        tree = getLeaf_NL(key1); // protected by lock
+        tree = getLeaf(key1); // protected by lock
         if (tree != null) {
-            tree = tree.getLeaf_NL(key2); // protected by lock
+            tree = tree.getLeaf(key2); // protected by lock
         }
 
         if (tree == null) {
-            READ.unlock();
             return null;
         }
 
-        VALUE returnValue = tree.value;
-
-        READ.unlock();
-        return returnValue;
+        return tree.value;
     }
 
-    public VALUE getValue(KEY key1, KEY key2, KEY key3) {
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> tree = null;
+    public final VALUE getValue(KEY key1, KEY key2, KEY key3) {
+        HashMapTree<KEY, VALUE> tree;
         // publish value from our children
-        tree = getLeaf_NL(key1);
+        tree = getLeaf(key1);
         if (tree != null) {
-            tree = tree.getLeaf_NL(key2);
+            tree = tree.getLeaf(key2);
         }
         if (tree != null) {
-            tree = tree.getLeaf_NL(key3);
+            tree = tree.getLeaf(key3);
         }
 
         if (tree == null) {
-            READ.unlock();
             return null;
         }
 
-        VALUE returnValue = tree.value;
-
-        READ.unlock();
-        return returnValue;
+        return tree.value;
     }
 
     @SuppressWarnings("unchecked")
-    public VALUE get(KEY... keys) {
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
+    public final VALUE get(KEY... keys) {
+        HashMapTree<KEY, VALUE> tree;
 
-        HashMapTree<KEY, VALUE> tree = null;
         // publish value from our children
-        tree = getLeaf_NL(keys[0]);
+        tree = getLeaf(keys[0]);
 
         int size = keys.length;
         for (int i=1;i<size;i++) {
             if (tree != null) {
-                tree = tree.getLeaf_NL(keys[i]);
+                tree = tree.getLeaf(keys[i]);
             } else {
-                READ.unlock();
                 return null;
             }
         }
 
         if (tree == null) {
-            READ.unlock();
             return null;
         }
 
-        VALUE returnValue = tree.value;
-
-        READ.unlock();
-
-        return returnValue;
+        return tree.value;
     }
 
     public final HashMapTree<KEY, VALUE> getLeaf(KEY key) {
@@ -605,53 +376,38 @@ public class HashMapTree<KEY, VALUE> {
 
         HashMapTree<KEY, VALUE> tree;
 
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
-
         if (this.children == null) {
             tree = null;
         } else {
             tree = this.children.get(key);
         }
 
-        READ.unlock();
-
         return tree;
     }
 
     public final HashMapTree<KEY, VALUE> getLeaf(KEY key1, KEY key2) {
-        HashMapTree<KEY, VALUE> tree = null;
-
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
+        HashMapTree<KEY, VALUE> tree;
 
         // publish value from our children
-        tree = getLeaf_NL(key1);
+        tree = getLeaf(key1);
         if (tree != null) {
-            tree = tree.getLeaf_NL(key2);
+            tree = tree.getLeaf(key2);
         }
-
-        READ.unlock();
 
         return tree;
     }
 
     public final HashMapTree<KEY, VALUE> getLeaf(KEY key1, KEY key2, KEY key3) {
-        HashMapTree<KEY, VALUE> tree = null;
-
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
+        HashMapTree<KEY, VALUE> tree;
 
         // publish value from our children
-        tree = getLeaf_NL(key1);
+        tree = getLeaf(key1);
         if (tree != null) {
-            tree = tree.getLeaf_NL(key2);
+            tree = tree.getLeaf(key2);
         }
         if (tree != null) {
-            tree = tree.getLeaf_NL(key3);
+            tree = tree.getLeaf(key3);
         }
-
-        READ.unlock();
 
         return tree;
     }
@@ -664,34 +420,16 @@ public class HashMapTree<KEY, VALUE> {
             return null;
         }
 
-        Lock READ = this.lock.readLock();
-        READ.lock(); // allows other readers, blocks others from acquiring update or write locks
-
-        HashMapTree<KEY, VALUE> tree = null;
+        HashMapTree<KEY, VALUE> tree;
         // publish value from our children
-        tree = getLeaf_NL(keys[0]);
+        tree = getLeaf(keys[0]);
 
         for (int i=1;i<size;i++) {
             if (tree != null) {
-                tree = tree.getLeaf_NL(keys[i]);
+                tree = tree.getLeaf(keys[i]);
             } else {
-                READ.unlock();
                 return null;
             }
-        }
-
-        READ.unlock();
-
-        return tree;
-    }
-
-    private final HashMapTree<KEY, VALUE> getLeaf_NL(KEY key) {
-        HashMapTree<KEY, VALUE> tree;
-
-        if (this.children == null) {
-            tree = null;
-        } else {
-            tree = this.children.get(key);
         }
 
         return tree;
