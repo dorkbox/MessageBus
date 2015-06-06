@@ -107,7 +107,7 @@ public class Subscription {
         }
     }
 
-    public final void publishToSubscription(final Object message1, final Object message2) throws Throwable {
+    public final void publish(final Object message1, final Object message2) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -122,7 +122,7 @@ public class Subscription {
         }
     }
 
-    public final void publishToSubscription(final Object message1, final Object message2, final Object message3) throws Throwable {
+    public final void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -178,7 +178,7 @@ public class Subscription {
     // to activate this sub for publication
     public void registerForPublication(final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
                                        final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                                       final AtomicBoolean varArgPossibility, final SubscriptionUtils utils) {
+                                       final AtomicBoolean varArgPossibility) {
 
         final Class<?>[] messageHandlerTypes = handlerMetadata.getHandledMessages();
         final int size = messageHandlerTypes.length;

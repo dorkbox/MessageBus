@@ -44,7 +44,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
         this.consumerCount = consumerCount;
     }
 
-    private final static ThreadLocal<Object> nodeThreadLocal = new ThreadLocal<Object>() {
+    private static final ThreadLocal<Object> nodeThreadLocal = new ThreadLocal<Object>() {
         @Override
         protected Object initialValue() {
             return new MultiNode();
@@ -56,8 +56,11 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
      * PRODUCER method
      * <p>
      * Place an item on the queue, and wait as long as necessary for a corresponding consumer to take it.
+     * <p>
+     * The item can be a single object (MessageType.ONE), or an array object (MessageType.ARRAY)
+     * </p>
      */
-    public final void transfer(final Object item) throws InterruptedException {
+    public void transfer(final Object item) throws InterruptedException {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final Object[] buffer = this.buffer;
@@ -391,7 +394,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
      * <p>
      * Also, the node used by this method will contain the data.
      */
-    public final void take(final MultiNode node) throws InterruptedException {
+    public void take(final MultiNode node) throws InterruptedException {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final Object[] buffer = this.buffer;
@@ -495,7 +498,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
 
     // modification of super implementation, as to include a small busySpin on contention
     @Override
-    public final boolean offer(Object item) {
+    public boolean offer(Object item) {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final long capacity = mask + 1;
@@ -594,7 +597,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
     }
 
     @Override
-    public final boolean isEmpty() {
+    public boolean isEmpty() {
         // Order matters!
         // Loading consumer before producer allows for producer increments after consumer index is read.
         // This ensures this method is conservative in it's estimate. Note that as this is an MPMC there is
@@ -638,7 +641,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
         }
     }
 
-    public final boolean hasPendingMessages() {
+    public boolean hasPendingMessages() {
         // local load of field to avoid repeated loads after volatile reads
         final long mask = this.mask;
         final Object[] buffer = this.buffer;
@@ -665,7 +668,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
         }
     }
 
-    private static final void busySpin(int spins) {
+    private static void busySpin(int spins) {
         for (;;) {
             if (spins > 0) {
                 --spins;
@@ -676,7 +679,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
     }
 
     @SuppressWarnings("null")
-    private final void park(final Object node, final Thread myThread) throws InterruptedException {
+    private void park(final Object node, final Thread myThread) throws InterruptedException {
         int spins = -1; // initialized after first item and cancel checks
         ThreadLocalRandom randomYields = null; // bound if needed
 
@@ -700,7 +703,7 @@ public final class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
         }
     }
 
-    private final void unpark(Object node) {
+    private void unpark(Object node) {
         final Object thread = lpThread(node);
         soThread(node, null);  // StoreStore
         UnsafeAccess.UNSAFE.unpark(thread);

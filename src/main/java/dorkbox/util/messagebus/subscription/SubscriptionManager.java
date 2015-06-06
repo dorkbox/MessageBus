@@ -4,7 +4,6 @@ import dorkbox.util.messagebus.common.*;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -71,6 +70,7 @@ public final class SubscriptionManager {
         }
 
         final SuperClassUtils superClass = new SuperClassUtils(LOAD_FACTOR, 1);
+
         this.utils = new SubscriptionUtils(superClass, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, LOAD_FACTOR,
                                            numberOfThreads);
 
@@ -79,7 +79,7 @@ public final class SubscriptionManager {
         this.varArgUtils = new VarArgUtils(this.utils, superClass, this.subscriptionsPerMessageSingle, LOAD_FACTOR, numberOfThreads);
     }
 
-    public final void shutdown() {
+    public void shutdown() {
         this.nonListeners.clear();
 
         this.subscriptionsPerMessageSingle.clear();
@@ -91,7 +91,7 @@ public final class SubscriptionManager {
         this.utils.shutdown();
     }
 
-    public final void subscribe(final Object listener) {
+    public void subscribe(final Object listener) {
         if (listener == null) {
             return;
         }
@@ -161,7 +161,7 @@ public final class SubscriptionManager {
 
                     // now add this subscription to each of the handled types
                     // to activate this sub for publication
-                    subscription.registerForPublication(subsPerMessageSingle, subsPerMessageMulti, varArgPossibility, utils);
+                    subscription.registerForPublication(subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
                 }
 
                 subsPerListenerMap.put(listenerClass, subsPerListener);
@@ -184,7 +184,7 @@ public final class SubscriptionManager {
         }
     }
 
-    public final void unsubscribe(final Object listener) {
+    public void unsubscribe(final Object listener) {
         if (listener == null) {
             return;
         }
@@ -228,7 +228,7 @@ public final class SubscriptionManager {
 
 
     // can return null
-    public final Subscription[] getSubscriptionsExact(final Class<?> messageClass) {
+    public Subscription[] getSubscriptionsExact(final Class<?> messageClass) {
         final StampedLock lock = this.lock;
         final long stamp = lock.readLock();
 
@@ -247,23 +247,86 @@ public final class SubscriptionManager {
     }
 
     // can return null
-    // public because it is also used by unit tests
-    public final Subscription[] getSubscriptionsExactAndSuper(final Class<?> messageClass, final boolean isArray) {
+    public Subscription[] getSubscriptionsExact(final Class<?> messageClass1, final Class<?> messageClass2) {
         final StampedLock lock = this.lock;
         final long stamp = lock.readLock();
 
-        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass, isArray);
+        final ArrayList<Subscription> collection = this.subscriptionsPerMessageMulti.get(messageClass1, messageClass2);
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            lock.unlockRead(stamp);
+            return subscriptions;
+        }
+
+        lock.unlockRead(stamp);
+        return null;
+    }
+
+    // can return null
+    public Subscription[] getSubscriptionsExact(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+        final StampedLock lock = this.lock;
+        final long stamp = lock.readLock();
+
+        final ArrayList<Subscription> collection = this.subscriptionsPerMessageMulti.get(messageClass1, messageClass2, messageClass3);
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            lock.unlockRead(stamp);
+            return subscriptions;
+        }
+
+        lock.unlockRead(stamp);
+        return null;
+    }
+
+
+    // can return null
+    // public because it is also used by unit tests
+    public Subscription[] getSubscriptionsExactAndSuper(final Class<?> messageClass) {
+        final StampedLock lock = this.lock;
+        final long stamp = lock.readLock();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass);
 
         lock.unlockRead(stamp);
         return subscriptions;
     }
 
     // can return null
-    private Subscription[] getSubscriptionsExactAndSuper_NoLock(final Class<?> messageClass, final boolean isArray) {
+    private Subscription[] getSubscriptionsExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
+        final StampedLock lock = this.lock;
+        final long stamp = lock.readLock();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass1, messageClass2);
+
+        lock.unlockRead(stamp);
+        return subscriptions;
+    }
+
+    // can return null
+    private Subscription[] getSubscriptionsExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2,
+                                                         final Class<?> messageClass3) {
+        final StampedLock lock = this.lock;
+        final long stamp = lock.readLock();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass1, messageClass2, messageClass3);
+
+        lock.unlockRead(stamp);
+        return subscriptions;
+    }
+
+
+    // can return null
+    private Subscription[] getSubscriptionsExactAndSuper_NoLock(final Class<?> messageClass) {
         ArrayList<Subscription> collection = this.subscriptionsPerMessageSingle.get(messageClass); // can return null
 
         // now publish superClasses
-        final ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass, isArray); // NOT return null
+        final ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass); // NOT return null
 
         if (collection != null) {
             collection = new ArrayList<Subscription>(collection);
@@ -286,131 +349,68 @@ public final class SubscriptionManager {
         }
     }
 
+    // can return null
+    private Subscription[] getSubscriptionsExactAndSuper_NoLock(final Class<?> messageClass1, final Class<?> messageClass2) {
 
-    // CAN RETURN NULL
-//    public final Subscription[] getSubscriptionsByMessageType(final Class<?> messageType) {
-//        Collection<Subscription> collection;
-//        Subscription[] subscriptions = null;
-//
-////        long stamp = this.lock.readLock();
-//        Lock readLock = this.lock.readLock();
-//        readLock.lock();
-//
-//        try {
-//            collection = this.subscriptionsPerMessageSingle.publish(messageType);
-//            if (collection != null) {
-//                subscriptions = collection.toArray(EMPTY);
-//            }
-//        }
-//        finally {
-////            this.lock.unlockRead(stamp);
-//            readLock.unlock();
-//        }
-//
-//
-////        long stamp = this.lock.tryOptimisticRead(); // non blocking
-////
-////        collection = this.subscriptionsPerMessageSingle.publish(messageType);
-////        if (collection != null) {
-//////            subscriptions = new ArrayDeque<>(collection);
-////            subscriptions = new ArrayList<>(collection);
-//////            subscriptions = new LinkedList<>();
-//////            subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-////
-//////            subscriptions.addAll(collection);
-////        }
-////
-////        if (!this.lock.validate(stamp)) { // if a write occurred, try again with a read lock
-////            stamp = this.lock.readLock();
-////            try {
-////                collection = this.subscriptionsPerMessageSingle.publish(messageType);
-////                if (collection != null) {
-//////                    subscriptions = new ArrayDeque<>(collection);
-////                    subscriptions = new ArrayList<>(collection);
-//////                    subscriptions = new LinkedList<>();
-//////                    subscriptions = new TreeSet<Subscription>(SubscriptionByPriorityDesc);
-////
-//////                    subscriptions.addAll(collection);
-////                }
-////            }
-////            finally {
-////                this.lock.unlockRead(stamp);
-////            }
-////        }
-//
-//        return subscriptions;
-//    }
+        ArrayList<Subscription> collection = this.subscriptionsPerMessageMulti.get(messageClass1, messageClass2); // can return null
 
-//    public static final Comparator<Subscription> SubscriptionByPriorityDesc = new Comparator<Subscription>() {
-//        @Override
-//        public int compare(Subscription o1, Subscription o2) {
-////            int byPriority = ((Integer)o2.getPriority()).compareTo(o1.getPriority());
-////            return byPriority == 0 ? o2.id.compareTo(o1.id) : byPriority;
-//            if (o2.ID > o1.ID) {
-//                return 1;
-//            } else if (o2.ID < o1.ID) {
-//                return -1;
-//            } else {
-//                return 0;
-//            }
-//        }
-//    };
+        // now publish superClasses
+        final ArrayList<Subscription> superSubs = this.utils.getSuperSubscriptions(messageClass1, messageClass2); // NOT return null
 
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
 
-    // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2) {
-        return this.subscriptionsPerMessageMulti.get(messageType1, messageType2);
+            if (!superSubs.isEmpty()) {
+                collection.addAll(superSubs);
+            }
+        }
+        else if (!superSubs.isEmpty()) {
+            collection = superSubs;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
     }
 
-
-    // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?> messageType1, Class<?> messageType2,
-                                                                        Class<?> messageType3) {
-        return this.subscriptionsPerMessageMulti.getValue(messageType1, messageType2, messageType3);
-    }
-
-    // CAN RETURN NULL
-    public final Collection<Subscription> getSubscriptionsByMessageType(Class<?>... messageTypes) {
-        return this.subscriptionsPerMessageMulti.get(messageTypes);
-    }
-
-
-
-    // CAN NOT RETURN NULL
-    // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
-    // and then, returns the array'd version subscriptions
-    public Collection<Subscription> getVarArgSuperSubscriptions(Class<?> messageClass1, Class<?> messageClass2) {
-        return this.varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2);
-    }
-
-    // CAN NOT RETURN NULL
-    // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
-    // and then, returns the array'd version subscriptions
-    public Collection<Subscription> getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2,
+    // can return null
+    private Subscription[] getSubscriptionsExactAndSuper_NoLock(final Class<?> messageClass1, final Class<?> messageClass2,
                                                                 final Class<?> messageClass3) {
-        return this.varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3);
+
+        ArrayList<Subscription> collection = this.subscriptionsPerMessageMulti
+                        .get(messageClass1, messageClass2, messageClass3); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubs = this.utils
+                        .getSuperSubscriptions(messageClass1, messageClass2, messageClass3); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubs.isEmpty()) {
+                collection.addAll(superSubs);
+            }
+        }
+        else if (!superSubs.isEmpty()) {
+            collection = superSubs;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
     }
 
-
-//    // CAN NOT RETURN NULL
-//    // ALSO checks to see if the superClass accepts subtypes.
-//    public final Subscription[] getSuperSubscriptions(Class<?> superType) {
-//        return this.utils.getSuperSubscriptions(superType);
-//    }
-
-    // CAN NOT RETURN NULL
-    // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2) {
-        return this.utils.getSuperSubscriptions(superType1, superType2);
-    }
-
-    // CAN NOT RETURN NULL
-    // ALSO checks to see if the superClass accepts subtypes.
-    public Collection<Subscription> getSuperSubscriptions(Class<?> superType1, Class<?> superType2, Class<?> superType3) {
-        return this.utils.getSuperSubscriptions(superType1, superType2, superType3);
-    }
-
-    public final void publishExact(final Object message) throws Throwable {
+    public void publishExact(final Object message) throws Throwable {
         final Class<?> messageClass = message.getClass();
 
         final Subscription[] subscriptions = getSubscriptionsExact(messageClass); // can return null
@@ -438,11 +438,71 @@ public final class SubscriptionManager {
         }
     }
 
-    public final void publishExactAndSuper(final Object message) throws Throwable {
-        final Class<?> messageClass = message.getClass();
-        final boolean isArray = messageClass.isArray();
+    public void publishExact(final Object message1, final Object message2) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
 
-        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass, isArray); // can return null
+        final Subscription[] subscriptions = getSubscriptionsExact(messageClass1, messageClass2); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2);
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
+            }
+        }
+    }
+
+    public void publishExact(final Object message1, final Object message2, final Object message3) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
+        final Class<?> messageClass3 = message3.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExact(messageClass1, messageClass2, messageClass3); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2, message3);
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
+            }
+        }
+    }
+
+
+
+    public void publishExactAndSuper(final Object message) throws Throwable {
+        final Class<?> messageClass = message.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass); // can return null
 
         // Run subscriptions
         if (subscriptions != null) {
@@ -467,14 +527,75 @@ public final class SubscriptionManager {
         }
     }
 
-    public final void publishAll(final Object message) throws Throwable {
+    public void publishExactAndSuper(final Object message1, final Object message2) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2);
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
+            }
+        }
+    }
+
+    public void publishExactAndSuper(final Object message1, final Object message2, final Object message3) throws Throwable {
+        final Class<?> messageClass1 = message1.getClass();
+        final Class<?> messageClass2 = message2.getClass();
+        final Class<?> messageClass3 = message3.getClass();
+
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
+
+        // Run subscriptions
+        if (subscriptions != null) {
+            Subscription sub;
+            for (int i = 0; i < subscriptions.length; i++) {
+                sub = subscriptions[i];
+                sub.publish(message1, message2, message3);
+            }
+        }
+        else {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
+
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
+            }
+        }
+    }
+
+
+
+    public void publishAll(final Object message) throws Throwable {
         final Class<?> messageClass = message.getClass();
         final boolean isArray = messageClass.isArray();
 
         final StampedLock lock = this.lock;
         long stamp = lock.readLock();
 
-        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass, isArray); // can return null
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass); // can return null
 
         lock.unlockRead(stamp);
 
@@ -550,4 +671,29 @@ public final class SubscriptionManager {
             }
         }
     }
+
+    public void publishAll(final Object message1, final Object message2) throws Throwable {
+    }
+
+    public void publishAll(final Object message1, final Object message2, final Object message3) throws Throwable {
+    }
+
+
+
+//    public static final Comparator<Subscription> SubscriptionByPriorityDesc = new Comparator<Subscription>() {
+//        @Override
+//        public int compare(Subscription o1, Subscription o2) {
+////            int byPriority = ((Integer)o2.getPriority()).compareTo(o1.getPriority());
+////            return byPriority == 0 ? o2.id.compareTo(o1.id) : byPriority;
+//            if (o2.ID > o1.ID) {
+//                return 1;
+//            } else if (o2.ID < o1.ID) {
+//                return -1;
+//            } else {
+//                return 0;
+//            }
+//        }
+//    };
+
+
 }

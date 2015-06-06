@@ -2,12 +2,6 @@ package dorkbox.util.messagebus.common.simpleq;
 
 import org.jctools.util.UnsafeAccess;
 
-class MessageType {
-    public static final int ONE = 1;
-    public static final int TWO = 2;
-    public static final int THREE = 3;
-}
-
 abstract class ColdItems {
     public int type = 0;
 
@@ -18,6 +12,7 @@ abstract class ColdItems {
 }
 
 abstract class Pad0 extends ColdItems {
+    @SuppressWarnings("unused")
     volatile long y0, y1, y2, y4, y5, y6 = 7L;
 }
 
@@ -132,6 +127,7 @@ public class MultiNode extends HotItem1 {
 
 
     // post-padding
+    @SuppressWarnings("unused")
     volatile long z0, z1, z2, z4, z5, z6 = 7L;
 
     public MultiNode() {

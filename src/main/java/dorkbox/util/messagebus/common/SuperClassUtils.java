@@ -22,7 +22,7 @@ public class SuperClassUtils {
      * <p>
      * protected by read lock by caller. The cache version is called first, by write lock
      */
-    public final Class<?>[] getSuperClasses(final Class<?> clazz, final boolean isArray) {
+    public final Class<?>[] getSuperClasses(final Class<?> clazz) {
         // this is never reset, since it never needs to be.
         final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
 
@@ -36,6 +36,8 @@ public class SuperClassUtils {
             ArrayList<Class<?>> newList = new ArrayList<Class<?>>(length);
 
             Class<?> c;
+            final boolean isArray = clazz.isArray();
+
             if (isArray) {
                 for (int i = 0; i < length; i++) {
                     c = superTypes[i];
