@@ -179,8 +179,8 @@ public final class Subscription {
                 if (subs == null) {
                     subs = new ArrayList<Subscription>();
 
-                    boolean isArray = type0.isArray();
-                    if (isArray) {
+                    // is this handler able to accept var args?
+                    if (handlerMetadata.getVarArgClass() != null) {
                         varArgPossibility.lazySet(true);
                     }
 

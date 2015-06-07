@@ -51,7 +51,7 @@ public class MultiMBassador implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MultiMBassador(int numberOfThreads) {
-        this(PublishMode.ExactWithSuperTypesAndVarArgs, numberOfThreads);
+        this(PublishMode.ExactWithSuperTypes, numberOfThreads);
     }
 
     /**
