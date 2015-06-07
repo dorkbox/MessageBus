@@ -1,20 +1,14 @@
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.ConcurrentExecutor;
-import dorkbox.util.messagebus.common.DeadMessage;
-import dorkbox.util.messagebus.common.ListenerFactory;
-import dorkbox.util.messagebus.common.MessageBusTest;
-import dorkbox.util.messagebus.common.TestUtil;
+import dorkbox.util.messagebus.common.*;
 import dorkbox.util.messagebus.listeners.IMessageListener;
 import dorkbox.util.messagebus.listeners.MessagesListener;
 import dorkbox.util.messagebus.listeners.ObjectListener;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Verify correct behaviour in case of message publications that do not have any matching subscriptions
@@ -35,7 +29,7 @@ public class DeadMessageTest extends MessageBusTest{
 
     @Test
     public void testDeadMessage(){
-        final MultiMBassador bus = createBus();
+        final MessageBus bus = createBus();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
@@ -71,7 +65,7 @@ public class DeadMessageTest extends MessageBusTest{
 
     @Test
     public void testUnsubscribingAllListeners() {
-        final MultiMBassador bus = createBus();
+        final MessageBus bus = createBus();
         ListenerFactory deadMessageListener = new ListenerFactory()
                 .create(InstancesPerListener, DeadMessagHandler.class);
 

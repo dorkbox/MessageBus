@@ -15,7 +15,7 @@ public class PerfTest_MBassador {
         final int warmupRuns = 4;
         final int runs = 5;
 
-        MultiMBassador bus = new MultiMBassador(2);
+        MessageBus bus = new MessageBus(2);
         Listener listener1 = new Listener();
         bus.subscribe(listener1);
 
@@ -24,7 +24,8 @@ public class PerfTest_MBassador {
         System.out.format("summary,PublishPerfTest, %,d\n", average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, MultiMBassador bus, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, MessageBus bus, boolean showStats, int concurrency, int repetitions)
+                    throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -40,7 +41,8 @@ public class PerfTest_MBassador {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, MultiMBassador bus, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, MessageBus bus, boolean showStats, int concurrency, int repetitions)
+                    throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Thread[] threads = new Thread[concurrency*2];
@@ -82,19 +84,19 @@ public class PerfTest_MBassador {
     }
 
     public static class Producer implements Runnable {
-        private final MultiMBassador bus;
+        private final MessageBus bus;
         volatile long start;
         volatile long end;
         private int repetitions;
 
-        public Producer(MultiMBassador bus, int repetitions) {
+        public Producer(MessageBus bus, int repetitions) {
             this.bus = bus;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            MultiMBassador bus = this.bus;
+            MessageBus bus = this.bus;
             int i = this.repetitions;
             this.start = System.nanoTime();
 

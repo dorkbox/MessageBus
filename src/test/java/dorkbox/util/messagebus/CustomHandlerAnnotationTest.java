@@ -1,19 +1,13 @@
 package dorkbox.util.messagebus;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.junit.Test;
-
-import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.annotations.Synchronized;
 import dorkbox.util.messagebus.common.MessageBusTest;
+import org.junit.Test;
+
+import java.lang.annotation.*;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Tests a custom handler annotation with a @Handler meta annotation and a default filter.
@@ -95,7 +89,7 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
 
     @Test
     public void testMetaHandlerFiltering() {
-        MultiMBassador bus = createBus();
+        MessageBus bus = createBus();
 
         NamedMessageListener listener = new NamedMessageListener();
         bus.subscribe( listener );

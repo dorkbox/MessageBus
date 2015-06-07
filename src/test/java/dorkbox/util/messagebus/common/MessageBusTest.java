@@ -1,6 +1,6 @@
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.MultiMBassador;
+import dorkbox.util.messagebus.MessageBus;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.messages.MessageTypes;
@@ -32,22 +32,22 @@ public abstract class MessageBusTest extends AssertSupport {
     };
 
     @Before
-    public void setUp(){
-        for(MessageTypes mes : MessageTypes.values()) {
+    public void setUp() {
+        for (MessageTypes mes : MessageTypes.values()) {
             mes.reset();
         }
     }
 
 
-    public MultiMBassador createBus() {
-        MultiMBassador bus = new MultiMBassador();
+    public MessageBus createBus() {
+        MessageBus bus = new MessageBus();
         bus.addErrorHandler(TestFailingHandler);
         bus.start();
         return bus;
     }
 
-    public MultiMBassador createBus(ListenerFactory listeners) {
-        MultiMBassador bus = new MultiMBassador();
+    public MessageBus createBus(ListenerFactory listeners) {
+        MessageBus bus = new MessageBus();
         bus.addErrorHandler(TestFailingHandler);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
         bus.start();

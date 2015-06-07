@@ -3,11 +3,11 @@
  */
 package dorkbox.util.messagebus;
 
-import junit.framework.Assert;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
+import junit.framework.Assert;
 
 /**
  * @author dorkbox, llc Date: 2/2/15
@@ -29,7 +29,7 @@ public class PerformanceTest {
     };
 
     public static void main(String[] args) throws Exception {
-        final MultiMBassador bus = new MultiMBassador(CONCURRENCY_LEVEL);
+        final MessageBus bus = new MessageBus(CONCURRENCY_LEVEL);
         bus.addErrorHandler(TestFailingHandler);
 
 
@@ -44,7 +44,8 @@ public class PerformanceTest {
                 while (true) {
                     bus.publish(num);
                 }
-            }}, CONCURRENCY_LEVEL);
+            }
+        }, CONCURRENCY_LEVEL);
 
 
         bus.shutdown();

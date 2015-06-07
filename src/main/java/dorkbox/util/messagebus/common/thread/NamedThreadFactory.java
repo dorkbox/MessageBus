@@ -14,7 +14,7 @@ public class NamedThreadFactory implements ThreadFactory {
     /**
      * The stack size is arbitrary based on JVM implementation. Default is 0
      * 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
-     *<p>
+     * <p>
      * To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)
      * Setting the size MAY or MAY NOT have any effect!!!
      * <p>
@@ -42,12 +42,14 @@ public class NamedThreadFactory implements ThreadFactory {
         if (stackSize != null) {
             int value = 0;
             if (stackSize.endsWith("k")) {
-                stackSize = stackSize.substring(4, stackSize.length()-1);
+                stackSize = stackSize.substring(4, stackSize.length() - 1);
                 value = Integer.parseInt(stackSize) * 1024;
-            } else if (stackSize.endsWith("m")) {
-                stackSize = stackSize.substring(4, stackSize.length()-1);
+            }
+            else if (stackSize.endsWith("m")) {
+                stackSize = stackSize.substring(4, stackSize.length() - 1);
                 value = Integer.parseInt(stackSize) * 1024 * 1024;
-            } else {
+            }
+            else {
                 try {
                     value = Integer.parseInt(stackSize.substring(4));
                 } catch (Exception e) {
@@ -55,7 +57,8 @@ public class NamedThreadFactory implements ThreadFactory {
             }
 
             stackSizeForThreads = value;
-        } else {
+        }
+        else {
             stackSizeForThreads = 8192;
         }
     }
@@ -81,7 +84,7 @@ public class NamedThreadFactory implements ThreadFactory {
     }
 
     public Thread newThread(String name, Runnable r) {
-     // stack size is arbitrary based on JVM implementation. Default is 0
+        // stack size is arbitrary based on JVM implementation. Default is 0
         // 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
         // To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)
         // Setting the size MAY or MAY NOT have any effect!!!

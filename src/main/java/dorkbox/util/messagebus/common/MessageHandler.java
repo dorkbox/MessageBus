@@ -3,6 +3,7 @@ package dorkbox.util.messagebus.common;
 import com.esotericsoftware.reflectasm.MethodAccess;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.annotations.Synchronized;
+import dorkbox.util.messagebus.utils.ReflectionUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;

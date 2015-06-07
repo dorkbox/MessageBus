@@ -19,7 +19,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSending(){
-        IMessageBus bus = new MultiMBassador();
+        IMessageBus bus = new MessageBus();
         bus.start();
 
         Listener listener1 = new Listener();

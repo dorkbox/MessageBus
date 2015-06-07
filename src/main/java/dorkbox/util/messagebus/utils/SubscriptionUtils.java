@@ -5,7 +5,6 @@ import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.thread.ClassHolder;
 import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 import dorkbox.util.messagebus.subscription.Subscription;
-import dorkbox.util.messagebus.utils.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.Map;

@@ -29,7 +29,7 @@ public class MBassadorTest extends MessageBusTest {
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, Listeners.synchronous())
                 .create(InstancesPerListener, Listeners.noHandlers());
-        final MultiMBassador bus = createBus(listeners);
+        final MessageBus bus = createBus(listeners);
 
 
         Runnable publishAndCheck = new Runnable() {
@@ -63,7 +63,7 @@ public class MBassadorTest extends MessageBusTest {
 
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, Listeners.noHandlers());
-        final MultiMBassador bus = createBus(listeners);
+        final MessageBus bus = createBus(listeners);
 
 
         final MessageManager messageManager = new MessageManager();
@@ -100,7 +100,7 @@ public class MBassadorTest extends MessageBusTest {
             }
         };
 
-        final MultiMBassador bus = new MultiMBassador();
+        final MessageBus bus = new MessageBus();
         bus.addErrorHandler(ExceptionCounter);
         bus.start();
         ListenerFactory listeners = new ListenerFactory()

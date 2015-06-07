@@ -28,7 +28,7 @@ public class SyncBusTest extends MessageBusTest {
     @Test
     public void testSynchronousMessagePublication() throws Exception {
 
-        final IMessageBus bus = new MultiMBassador();
+        final IMessageBus bus = new MessageBus();
         bus.start();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
@@ -82,7 +82,7 @@ public class SyncBusTest extends MessageBusTest {
             }
         };
 
-        final IMessageBus bus = new MultiMBassador();
+        final IMessageBus bus = new MessageBus();
         bus.addErrorHandler(ExceptionCounter);
         bus.start();
         ListenerFactory listeners = new ListenerFactory()

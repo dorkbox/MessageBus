@@ -1,6 +1,6 @@
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.MultiMBassador;
+import dorkbox.util.messagebus.MessageBus;
 import dorkbox.util.messagebus.PubSubSupport;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
@@ -95,7 +95,7 @@ public class TestUtil {
 
     }
 
-    public static void setup(MultiMBassador bus, ListenerFactory listeners, int numberOfThreads) {
+    public static void setup(MessageBus bus, ListenerFactory listeners, int numberOfThreads) {
         setup(bus, listeners.getAll(), numberOfThreads);
 
     }
