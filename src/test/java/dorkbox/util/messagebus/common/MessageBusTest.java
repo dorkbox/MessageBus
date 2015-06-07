@@ -1,13 +1,11 @@
 package dorkbox.util.messagebus.common;
 
-import junit.framework.Assert;
-
-import org.junit.Before;
-
 import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.messages.MessageTypes;
+import junit.framework.Assert;
+import org.junit.Before;
 
 /**
  * A base test that provides a factory for message bus that makes tests fail if any
@@ -44,6 +42,7 @@ public abstract class MessageBusTest extends AssertSupport {
     public MultiMBassador createBus() {
         MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(TestFailingHandler);
+        bus.start();
         return bus;
     }
 
@@ -51,6 +50,7 @@ public abstract class MessageBusTest extends AssertSupport {
         MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(TestFailingHandler);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
+        bus.start();
         return bus;
     }
 }

@@ -1,8 +1,8 @@
 package dorkbox.util.messagebus.subscription;
 
+import dorkbox.util.messagebus.common.ClassUtils;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
-import dorkbox.util.messagebus.common.SuperClassUtils;
 import dorkbox.util.messagebus.common.thread.ClassHolder;
 import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 
@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.Map;
 
 public final class SubscriptionUtils {
-    private final SuperClassUtils superClass;
+    private final ClassUtils superClass;
 
     private final ClassHolder classHolderSingle;
 
@@ -28,9 +28,9 @@ public final class SubscriptionUtils {
     private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
 
-    public SubscriptionUtils(SuperClassUtils superClass, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
-                             HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti, float loadFactor,
-                             int stripeSize) {
+    public SubscriptionUtils(final ClassUtils superClass, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
+                             final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti, final float loadFactor,
+                             final int stripeSize) {
         this.superClass = superClass;
 
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
@@ -50,11 +50,7 @@ public final class SubscriptionUtils {
 
     public void clear() {
         this.superClassSubscriptions.clear();
-    }
-
-
-    public void shutdown() {
-        this.superClass.shutdown();
+        this.superClassSubscriptionsMulti.clear();
     }
 
 
@@ -71,9 +67,9 @@ public final class SubscriptionUtils {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
-        ArrayList<Subscription> superSubscriptions = local.get(clazz);
+        ArrayList<Subscription> subs = local.get(clazz);
 
-        if (superSubscriptions == null) {
+        if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
             final Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
 
@@ -86,7 +82,7 @@ public final class SubscriptionUtils {
 
             final int length = superClasses.length;
             int superSubLength;
-            superSubscriptions = new ArrayList<Subscription>(length);
+            subs = new ArrayList<Subscription>(length);
 
             for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
@@ -97,18 +93,18 @@ public final class SubscriptionUtils {
                     for (int j = 0; j < superSubLength; j++) {
                         sub = superSubs.get(j);
 
-                        if (sub.acceptsSubtypes()) {
-                            superSubscriptions.add(sub);
+                        if (sub.getHandler().acceptsSubtypes()) {
+                            subs.add(sub);
                         }
                     }
                 }
             }
 
-            superSubscriptions.trimToSize();
-            local.put(clazz, superSubscriptions);
+            subs.trimToSize();
+            local.put(clazz, subs);
         }
 
-        return superSubscriptions;
+        return subs;
     }
 
     /**
@@ -122,12 +118,11 @@ public final class SubscriptionUtils {
      */
     public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2) {
         // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
+        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
 
-        HashMapTree<Class<?>, ArrayList<Subscription>> subsLeaf = local.getLeaf(clazz1, clazz2);
-        ArrayList<Subscription> subs;
+        ArrayList<Subscription> subs = local.get(clazz1, clazz2);
 
-        if (subsLeaf == null) {
+        if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
             final HashMapTree<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageMulti;
 
@@ -166,7 +161,7 @@ public final class SubscriptionUtils {
                         for (int k = 0; k < superSubs.size(); k++) {
                             sub = superSubs.get(k);
 
-                            if (sub.acceptsSubtypes()) {
+                            if (sub.getHandler().acceptsSubtypes()) {
                                 subs.add(sub);
                             }
                         }
@@ -175,10 +170,6 @@ public final class SubscriptionUtils {
             }
             subs.trimToSize();
             local.put(subs, clazz1, clazz2);
-        }
-        else {
-            // if the leaf exists, then the value exists.
-            subs = subsLeaf.getValue();
         }
 
         return subs;
@@ -193,14 +184,13 @@ public final class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(Class<?> clazz1, Class<?> clazz2, Class<?> clazz3) {
+    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3) {
         // whenever our subscriptions change, this map is cleared.
-        HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
+        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
 
-        HashMapTree<Class<?>, ArrayList<Subscription>> subsLeaf = local.getLeaf(clazz1, clazz2, clazz3);
-        ArrayList<Subscription> subs;
+        ArrayList<Subscription> subs = local.get(clazz1, clazz2, clazz3);
 
-        if (subsLeaf == null) {
+        if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
             final HashMapTree<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageMulti;
 
@@ -250,7 +240,7 @@ public final class SubscriptionUtils {
                             for (int m = 0; m < superSubs.size(); m++) {
                                 sub = superSubs.get(m);
 
-                                if (sub.acceptsSubtypes()) {
+                                if (sub.getHandler().acceptsSubtypes()) {
                                     subs.add(sub);
                                 }
                             }
@@ -260,10 +250,6 @@ public final class SubscriptionUtils {
             }
             subs.trimToSize();
             local.put(subs, clazz1, clazz2, clazz3);
-        }
-        else {
-            // if the leaf exists, then the value exists.
-            subs = subsLeaf.getValue();
         }
 
         return subs;

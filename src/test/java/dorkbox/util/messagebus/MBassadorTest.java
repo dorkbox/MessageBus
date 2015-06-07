@@ -1,15 +1,6 @@
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Test;
-
-import dorkbox.util.messagebus.MultiMBassador;
-import dorkbox.util.messagebus.common.ConcurrentExecutor;
-import dorkbox.util.messagebus.common.ListenerFactory;
-import dorkbox.util.messagebus.common.MessageBusTest;
-import dorkbox.util.messagebus.common.MessageManager;
-import dorkbox.util.messagebus.common.TestUtil;
+import dorkbox.util.messagebus.common.*;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.listeners.ExceptionThrowingListener;
@@ -19,6 +10,9 @@ import dorkbox.util.messagebus.listeners.MessagesListener;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
+import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test synchronous and asynchronous dispatch in single and multi-threaded scenario.
@@ -108,6 +102,7 @@ public class MBassadorTest extends MessageBusTest {
 
         final MultiMBassador bus = new MultiMBassador();
         bus.addErrorHandler(ExceptionCounter);
+        bus.start();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
@@ -134,8 +129,8 @@ public class MBassadorTest extends MessageBusTest {
         while (bus.hasPendingMessages()) {
             pause(10);
         }
-        assertEquals(InstancesPerListener * ConcurrentUnits, exceptionCount.get());
 
+        assertEquals(InstancesPerListener * ConcurrentUnits, exceptionCount.get());
         bus.shutdown();
     }
 

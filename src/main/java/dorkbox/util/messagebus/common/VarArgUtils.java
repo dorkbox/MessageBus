@@ -1,57 +1,50 @@
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
 import dorkbox.util.messagebus.subscription.Subscription;
-import dorkbox.util.messagebus.subscription.SubscriptionUtils;
 
 import java.util.ArrayList;
 import java.util.Map;
 
 public final class VarArgUtils {
-    private final Map<Class<?>, ArrayList<Subscription>> varArgSubscriptions;
-    private final Map<Class<?>, ArrayList<Subscription>> varArgSuperClassSubscriptions;
-    private final HashMapTree<Class<?>, ArrayList<Subscription>> varArgSuperClassSubscriptionsMulti;
+    private final Map<Class<?>, ArrayList<Subscription>> varArgSubscriptionsSingle;
+    private final HashMapTree<Class<?>, ArrayList<Subscription>> varArgSubscriptionsMulti;
 
-    private final SubscriptionHolder subHolderConcurrent;
+    private final Map<Class<?>, ArrayList<Subscription>> varArgSuperSubscriptionsSingle;
+    private final HashMapTree<Class<?>, ArrayList<Subscription>> varArgSuperSubscriptionsMulti;
 
-    private final float loadFactor;
-    private final int stripeSize;
-
-    private final SubscriptionUtils utils;
-    private final SuperClassUtils superClassUtils;
+    private final ClassUtils superClassUtils;
     private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
 
 
-    public VarArgUtils(SubscriptionUtils utils, SuperClassUtils superClassUtils,
-                       Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle, float loadFactor, int stripeSize) {
+    public VarArgUtils(final ClassUtils superClassUtils, final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
+                       final float loadFactor, final int stripeSize) {
 
-        this.utils = utils;
         this.superClassUtils = superClassUtils;
         this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
-        this.loadFactor = loadFactor;
-        this.stripeSize = stripeSize;
 
-        this.varArgSubscriptions = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(16, loadFactor, stripeSize);
-        this.varArgSuperClassSubscriptions = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(16, loadFactor, stripeSize);
-        this.varArgSuperClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
+        this.varArgSubscriptionsSingle = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(16, loadFactor, stripeSize);
+        this.varArgSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
 
-        this.subHolderConcurrent = new SubscriptionHolder();
+        this.varArgSuperSubscriptionsSingle = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>(16, loadFactor, stripeSize);
+        this.varArgSuperSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
     }
 
 
     public void clear() {
-        this.varArgSubscriptions.clear();
-        this.varArgSuperClassSubscriptions.clear();
-        this.varArgSuperClassSubscriptionsMulti.clear();
+        this.varArgSubscriptionsSingle.clear();
+        this.varArgSubscriptionsMulti.clear();
+
+        this.varArgSuperSubscriptionsSingle.clear();
+        this.varArgSuperSubscriptionsMulti.clear();
     }
 
 
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" version, without the hit to JNI
     // and then, returns the array'd version subscriptions
-    public Subscription[] getVarArgSubscriptions(Class<?> messageClass) {
+    public Subscription[] getVarArgSubscriptions(final Class<?> messageClass) {
         // whenever our subscriptions change, this map is cleared.
-        final Map<Class<?>, ArrayList<Subscription>> local = this.varArgSubscriptions;
+        final Map<Class<?>, ArrayList<Subscription>> local = this.varArgSubscriptionsSingle;
 
         ArrayList<Subscription> varArgSubs = local.get(messageClass);
 
@@ -68,7 +61,7 @@ public final class VarArgUtils {
                 for (int i = 0; i < length; i++) {
                     sub = subs.get(i);
 
-                    if (sub.acceptsVarArgs()) {
+                    if (sub.getHandler().acceptsVarArgs()) {
                         varArgSubs.add(sub);
                     }
                 }
@@ -84,6 +77,7 @@ public final class VarArgUtils {
 
 
 
+
     // CAN NOT RETURN NULL
     // check to see if the messageType can convert/publish to the "array" superclass version, without the hit to JNI
     // and then, returns the array'd version superclass subscriptions
@@ -95,9 +89,10 @@ public final class VarArgUtils {
         return subscriptions;
     }
 
+    // CAN NOT RETURN NULL
     private ArrayList<Subscription> getVarArgSuperSubscriptions_List(final Class<?> messageClass) {
         // whenever our subscriptions change, this map is cleared.
-        final Map<Class<?>, ArrayList<Subscription>> local = this.varArgSuperClassSubscriptions;
+        final Map<Class<?>, ArrayList<Subscription>> local = this.varArgSuperSubscriptionsSingle;
 
         ArrayList<Subscription> varArgSuperSubs = local.get(messageClass);
 
@@ -119,6 +114,7 @@ public final class VarArgUtils {
             Subscription sub;
             ArrayList<Subscription> subs;
             int length;
+            MessageHandler handlerMetadata;
 
             for (int i = 0; i < typesLength; i++) {
                 type = types[i];
@@ -131,7 +127,8 @@ public final class VarArgUtils {
                     for (int j = 0; j < length; j++) {
                         sub = subs.get(j);
 
-                        if (sub.acceptsSubtypes() && sub.acceptsVarArgs()) {
+                        handlerMetadata = sub.getHandler();
+                        if (handlerMetadata.acceptsSubtypes() && handlerMetadata.acceptsVarArgs()) {
                             varArgSuperSubs.add(sub);
                         }
                     }
@@ -151,42 +148,24 @@ public final class VarArgUtils {
     // and then, returns the array'd version superclass subscriptions
     public Subscription[] getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2) {
         // whenever our subscriptions change, this map is cleared.
-        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.varArgSuperClassSubscriptionsMulti;
+        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.varArgSuperSubscriptionsMulti;
 
-        HashMapTree<Class<?>, ArrayList<Subscription>> subsPerTypeLeaf = local.getLeaf(messageClass1, messageClass2);
-        ArrayList<Subscription> subsPerType;
+        ArrayList<Subscription> subs = local.get(messageClass1, messageClass2);
 
-        if (subsPerTypeLeaf != null) {
-            // if the leaf exists, then the value exists.
-            subsPerType = subsPerTypeLeaf.getValue();
-        }
-        else {
+        if (subs == null) {
             // the message class types are not the same, so look for a common superClass varArg subscription.
             // this is to publish to object[] (or any class[]) handler that is common among all superTypes of the messages
             final ArrayList<Subscription> varargSuperSubscriptions1 = getVarArgSuperSubscriptions_List(messageClass1);
             final ArrayList<Subscription> varargSuperSubscriptions2 = getVarArgSuperSubscriptions_List(messageClass2);
 
-            final int size1 = varargSuperSubscriptions1.size();
-            final int size2 = varargSuperSubscriptions2.size();
+            subs = ClassUtils.findCommon(varargSuperSubscriptions1, varargSuperSubscriptions2);
 
-            subsPerType = new ArrayList<Subscription>(size1 + size2);
-
-            Subscription sub;
-            for (int i = 0; i < size1; i++) {
-                sub = varargSuperSubscriptions1.get(i);
-
-                if (varargSuperSubscriptions2.contains(sub)) {
-                    subsPerType.add(sub);
-                }
-            }
-
-            subsPerType.trimToSize();
-
-            local.put(subsPerType, messageClass1, messageClass2);
+            subs.trimToSize();
+            local.put(subs, messageClass1, messageClass2);
         }
 
-        final Subscription[] subscriptions = new Subscription[subsPerType.size()];
-        subsPerType.toArray(subscriptions);
+        final Subscription[] subscriptions = new Subscription[subs.size()];
+        subs.toArray(subscriptions);
         return subscriptions;
     }
 
@@ -197,43 +176,28 @@ public final class VarArgUtils {
     public Subscription[] getVarArgSuperSubscriptions(final Class<?> messageClass1, final Class<?> messageClass2,
                                                       final Class<?> messageClass3) {
         // whenever our subscriptions change, this map is cleared.
-        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.varArgSuperClassSubscriptionsMulti;
+        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.varArgSuperSubscriptionsMulti;
 
-        HashMapTree<Class<?>, ArrayList<Subscription>> subsPerTypeLeaf = local.getLeaf(messageClass1, messageClass2, messageClass3);
-        ArrayList<Subscription> subsPerType;
+        ArrayList<Subscription> subs = local.get(messageClass1, messageClass2, messageClass3);
 
-        if (subsPerTypeLeaf != null) {
-            // if the leaf exists, then the value exists.
-            subsPerType = subsPerTypeLeaf.getValue();
-        }
-        else {
+        if (subs == null) {
             // the message class types are not the same, so look for a common superClass varArg subscription.
             // this is to publish to object[] (or any class[]) handler that is common among all superTypes of the messages
             final ArrayList<Subscription> varargSuperSubscriptions1 = getVarArgSuperSubscriptions_List(messageClass1);
             final ArrayList<Subscription> varargSuperSubscriptions2 = getVarArgSuperSubscriptions_List(messageClass2);
             final ArrayList<Subscription> varargSuperSubscriptions3 = getVarArgSuperSubscriptions_List(messageClass3);
 
-            final int size1 = varargSuperSubscriptions1.size();
-            final int size2 = varargSuperSubscriptions2.size();
+            subs = ClassUtils.findCommon(varargSuperSubscriptions1, varargSuperSubscriptions2);
+            subs = ClassUtils.findCommon(subs, varargSuperSubscriptions3);
 
-            subsPerType = new ArrayList<Subscription>(size1 + size2);
-
-            Subscription sub;
-            for (int i = 0; i < size1; i++) {
-                sub = varargSuperSubscriptions1.get(i);
-
-                if (varargSuperSubscriptions2.contains(sub) && varargSuperSubscriptions3.contains(sub)) {
-                    subsPerType.add(sub);
-                }
-            }
-
-            subsPerType.trimToSize();
-
-            local.put(subsPerType, messageClass1, messageClass2, messageClass3);
+            subs.trimToSize();
+            local.put(subs, messageClass1, messageClass2, messageClass3);
         }
 
-        final Subscription[] subscriptions = new Subscription[subsPerType.size()];
-        subsPerType.toArray(subscriptions);
+        final Subscription[] subscriptions = new Subscription[subs.size()];
+        subs.toArray(subscriptions);
         return subscriptions;
     }
+
+
 }

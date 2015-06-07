@@ -1,12 +1,5 @@
 package dorkbox.util.messagebus;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Assert;
-import org.junit.Test;
-
-import dorkbox.util.messagebus.IMessageBus;
-import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
 import dorkbox.util.messagebus.common.MessageBusTest;
@@ -19,6 +12,10 @@ import dorkbox.util.messagebus.listeners.MessagesListener;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test synchronous and asynchronous dispatch in single and multi-threaded scenario.
@@ -32,6 +29,7 @@ public class SyncBusTest extends MessageBusTest {
     public void testSynchronousMessagePublication() throws Exception {
 
         final IMessageBus bus = new MultiMBassador();
+        bus.start();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
@@ -86,6 +84,7 @@ public class SyncBusTest extends MessageBusTest {
 
         final IMessageBus bus = new MultiMBassador();
         bus.addErrorHandler(ExceptionCounter);
+        bus.start();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);
 

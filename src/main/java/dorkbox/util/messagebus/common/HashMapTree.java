@@ -328,7 +328,7 @@ public class HashMapTree<KEY, VALUE> {
         return tree.value;
     }
 
-    public final VALUE getValue(KEY key1, KEY key2, KEY key3) {
+    public final VALUE get(KEY key1, KEY key2, KEY key3) {
         HashMapTree<KEY, VALUE> tree;
         // publish value from our children
         tree = getLeaf(key1);

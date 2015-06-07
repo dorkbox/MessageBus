@@ -1,14 +1,11 @@
 package dorkbox.util.messagebus;
 
-import java.util.LinkedList;
-import java.util.List;
-
-import org.junit.Test;
-
-import dorkbox.util.messagebus.IMessageBus;
-import dorkbox.util.messagebus.MultiMBassador;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.MessageBusTest;
+import org.junit.Test;
+
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  *
@@ -21,6 +18,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     public void testSingleThreadedSyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
         IMessageBus fifoBUs = new MultiMBassador();
+        fifoBUs.start();
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){

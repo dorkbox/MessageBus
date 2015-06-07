@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class Subscription {
+public final class Subscription {
     private static final AtomicInteger ID_COUNTER = new AtomicInteger();
     public final int ID = ID_COUNTER.getAndIncrement();
 
@@ -56,43 +56,31 @@ public class Subscription {
         this.invocation = invocation;
     }
 
-    public final MessageHandler getHandlerMetadata() {
+    public MessageHandler getHandler() {
         return handlerMetadata;
     }
 
-    public final Class<?>[] getHandledMessageTypes() {
-        return this.handlerMetadata.getHandledMessages();
-    }
-
-    public final boolean acceptsSubtypes() {
-        return this.handlerMetadata.acceptsSubtypes();
-    }
-
-    public final boolean acceptsVarArgs() {
-        return this.handlerMetadata.acceptsVarArgs();
-    }
-
-    public final boolean isEmpty() {
+    public boolean isEmpty() {
         return this.listeners.isEmpty();
     }
 
-    public final void subscribe(Object listener) {
+    public void subscribe(Object listener) {
         this.listeners.add(listener);
     }
 
     /**
      * @return TRUE if the element was removed
      */
-    public final boolean unsubscribe(Object existingListener) {
+    public boolean unsubscribe(Object existingListener) {
         return this.listeners.remove(existingListener);
     }
 
     // only used in unit-test
-    public final int size() {
+    public int size() {
         return this.listeners.size();
     }
 
-    public final void publish(final Object message) throws Throwable {
+    public void publish(final Object message) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -107,7 +95,7 @@ public class Subscription {
         }
     }
 
-    public final void publish(final Object message1, final Object message2) throws Throwable {
+    public void publish(final Object message1, final Object message2) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -122,7 +110,7 @@ public class Subscription {
         }
     }
 
-    public final void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
+    public void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -137,7 +125,7 @@ public class Subscription {
         }
     }
 
-    public final void publishToSubscription(final Object... messages) throws Throwable {
+    public void publishToSubscription(final Object... messages) throws Throwable {
         final MethodAccess handler = this.handlerMetadata.getHandler();
         final int handleIndex = this.handlerMetadata.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
@@ -154,12 +142,12 @@ public class Subscription {
 
 
     @Override
-    public final int hashCode() {
+    public int hashCode() {
         return this.ID;
     }
 
     @Override
-    public final boolean equals(Object obj) {
+    public boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -233,7 +221,6 @@ public class Subscription {
                 }
 
                 subs.add(this);
-                return;
             }
         }
     }

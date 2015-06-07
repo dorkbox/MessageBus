@@ -74,7 +74,7 @@ public class MessageHandler {
 
     private final Class<?>[] handledMessages;
     private final boolean acceptsSubtypes;
-    private final boolean acceptsVarArgs;
+    private final Class<?> varArgClass;
 
     private final boolean isSynchronized;
 
@@ -94,7 +94,12 @@ public class MessageHandler {
         this.isSynchronized  = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
         this.handledMessages = handledMessages;
 
-        this.acceptsVarArgs = handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs();
+        if (handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs()) {
+            this.varArgClass = handledMessages[0].getComponentType();
+        }
+        else {
+            this.varArgClass = null;
+        }
     }
 
     public final boolean isSynchronized() {
@@ -113,12 +118,16 @@ public class MessageHandler {
         return this.handledMessages;
     }
 
+    public final Class<?> getVarArgClass() {
+        return this.varArgClass;
+    }
+
     public final boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
     }
 
     public final boolean acceptsVarArgs() {
-        return this.acceptsVarArgs;
+        return this.varArgClass != null;
     }
 
     @Override

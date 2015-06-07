@@ -4,7 +4,11 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 
 /**
  * A message bus offers facilities for publishing messages to the message handlers of registered listeners.
- * A message publication starts when an object is send to the bus using one of the its publication methods.
+ * <p/>
+ *
+ * Because the message bus keeps track of classes that are subscribed and published, reloading the classloader means that you will need to
+ * SHUTDOWN the messagebus when you unload the classloader, and then re-subscribe relevant classes when you reload the classes.
+ * <p/>
  *
  * Messages can be published synchronously or asynchronously and may be of any type that is a valid sub type of the type parameter T.
  * Message handlers can be invoked synchronously or asynchronously depending on their configuration. Thus, there

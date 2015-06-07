@@ -15,10 +15,9 @@
  */
 package dorkbox.util.messagebus;
 
-import org.junit.Test;
-
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.HashMapTree;
+import org.junit.Test;
 
 public class ObjectTreeTest extends AssertSupport {
 
@@ -34,7 +33,7 @@ public class ObjectTreeTest extends AssertSupport {
 
     public void test(HashMapTree<Class<?>, String> tree, String string, Class<?> clazz1, Class<?> clazz2, Class<?> clazz3) {
         tree.put(string, clazz1, clazz2, clazz3);
-        assertEquals(string, tree.getValue(clazz1, clazz2, clazz3));
+        assertEquals(string, tree.get(clazz1, clazz2, clazz3));
     }
 
     public void test(HashMapTree<Class<?>, String> tree, String string, Class<?>... clazzes) {

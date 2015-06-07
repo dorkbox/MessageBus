@@ -20,6 +20,7 @@ public class MultiMessageTest extends MessageBusTest {
     @Test
     public void testMultiMessageSending(){
         IMessageBus bus = new MultiMBassador();
+        bus.start();
 
         Listener listener1 = new Listener();
         bus.subscribe(listener1);
@@ -39,11 +40,11 @@ public class MultiMessageTest extends MessageBusTest {
         bus.publish("s"); // 4
         bus.publish("s", "s"); // 3
         bus.publish("s", "s", "s"); // 3
-        bus.publish(1, "s");
-        bus.publish(1, 2, "s");
-        bus.publish(new Integer[] {1, 2, 3, 4, 5, 6});
+        bus.publish(1, "s"); // 1
+        bus.publish(1, 2, "s"); // 2
+        bus.publish(new Integer[] {1, 2, 3, 4, 5, 6}); // 2
 
-        assertEquals(13, count.get());
+        assertEquals(15, count.get());
         count.set(0);
 
 
@@ -58,9 +59,6 @@ public class MultiMessageTest extends MessageBusTest {
             try {
                 Thread.sleep(ConcurrentUnits);
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                // log.error(e);
             }
         }
 

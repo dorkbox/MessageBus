@@ -29,7 +29,6 @@ import java.util.concurrent.locks.StampedLock;
 public final class SubscriptionManager {
     private static final float LOAD_FACTOR = 0.8F;
 
-    private final SubscriptionUtils utils;
 
     // remember already processed classes that do not contain any message handlers
     private final Map<Class<?>, Boolean> nonListeners;
@@ -49,7 +48,8 @@ public final class SubscriptionManager {
     // once a collection of subscriptions is stored it does not change
     private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
-
+    private final ClassUtils classUtils;
+    private final SubscriptionUtils subUtils;
     private final VarArgUtils varArgUtils;
 
     private final StampedLock lock = new StampedLock();
@@ -69,14 +69,14 @@ public final class SubscriptionManager {
             this.subscriptionsPerListener = new ConcurrentHashMapV8<Class<?>, Subscription[]>(32, LOAD_FACTOR, 1);
         }
 
-        final SuperClassUtils superClass = new SuperClassUtils(LOAD_FACTOR, 1);
+        classUtils = new ClassUtils(LOAD_FACTOR);
 
-        this.utils = new SubscriptionUtils(superClass, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti, LOAD_FACTOR,
-                                           numberOfThreads);
+        this.subUtils = new SubscriptionUtils(classUtils, this.subscriptionsPerMessageSingle, this.subscriptionsPerMessageMulti,
+                                              LOAD_FACTOR, numberOfThreads);
 
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(this.utils, superClass, this.subscriptionsPerMessageSingle, LOAD_FACTOR, numberOfThreads);
+        this.varArgUtils = new VarArgUtils(classUtils, this.subscriptionsPerMessageSingle, LOAD_FACTOR, numberOfThreads);
     }
 
     public void shutdown() {
@@ -88,7 +88,7 @@ public final class SubscriptionManager {
 
         clearConcurrentCollections();
 
-        this.utils.shutdown();
+        this.classUtils.clear();
     }
 
     public void subscribe(final Object listener) {
@@ -144,7 +144,6 @@ public final class SubscriptionManager {
 
             final ConcurrentMap<Class<?>, Subscription[]> subsPerListenerMap = this.subscriptionsPerListener;
             final AtomicBoolean varArgPossibility = this.varArgPossibility;
-            final SubscriptionUtils utils = this.utils;
 
             // now write lock for the least expensive part. This is a deferred "double checked lock", but is necessary because
             // of the huge number of reads compared to writes.
@@ -211,7 +210,7 @@ public final class SubscriptionManager {
 
 
     private void clearConcurrentCollections() {
-        this.utils.clear();
+        this.subUtils.clear();
         this.varArgUtils.clear();
     }
 
@@ -326,7 +325,7 @@ public final class SubscriptionManager {
         ArrayList<Subscription> collection = this.subscriptionsPerMessageSingle.get(messageClass); // can return null
 
         // now publish superClasses
-        final ArrayList<Subscription> superSubscriptions = this.utils.getSuperSubscriptions(messageClass); // NOT return null
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass); // NOT return null
 
         if (collection != null) {
             collection = new ArrayList<Subscription>(collection);
@@ -355,7 +354,7 @@ public final class SubscriptionManager {
         ArrayList<Subscription> collection = this.subscriptionsPerMessageMulti.get(messageClass1, messageClass2); // can return null
 
         // now publish superClasses
-        final ArrayList<Subscription> superSubs = this.utils.getSuperSubscriptions(messageClass1, messageClass2); // NOT return null
+        final ArrayList<Subscription> superSubs = this.subUtils.getSuperSubscriptions(messageClass1, messageClass2); // NOT return null
 
         if (collection != null) {
             collection = new ArrayList<Subscription>(collection);
@@ -386,7 +385,7 @@ public final class SubscriptionManager {
                         .get(messageClass1, messageClass2, messageClass3); // can return null
 
         // now publish superClasses
-        final ArrayList<Subscription> superSubs = this.utils
+        final ArrayList<Subscription> superSubs = this.subUtils
                         .getSuperSubscriptions(messageClass1, messageClass2, messageClass3); // NOT return null
 
         if (collection != null) {
@@ -594,80 +593,79 @@ public final class SubscriptionManager {
 
         final StampedLock lock = this.lock;
         long stamp = lock.readLock();
-
         final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass); // can return null
-
         lock.unlockRead(stamp);
 
-
+        boolean hasSubs = false;
         // Run subscriptions
         if (subscriptions != null) {
+            hasSubs = true;
+
             Subscription sub;
             for (int i = 0; i < subscriptions.length; i++) {
                 sub = subscriptions[i];
                 sub.publish(message);
             }
-
-            // publish to var arg, only if not already an array
-            if (varArgPossibility.get() && !isArray) {
-                stamp = lock.readLock();
-                final Subscription[] varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass); // can return null
-                lock.unlockRead(stamp);
-
-                if (varArgSubscriptions != null) {
-                    final int length = varArgSubscriptions.length;
-                    Object[] asArray = (Object[]) Array.newInstance(messageClass, 1);
-                    asArray[0] = message;
+        }
 
 
-                    for (int i = 0; i < length; i++) {
-                        sub = varArgSubscriptions[i];
-                        sub.publish(asArray);
-                    }
+        // publish to var arg, only if not already an array (because that would be unnecessary)
+        if (varArgPossibility.get() && !isArray) {
+            stamp = lock.readLock();
+            final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass); // CAN NOT RETURN NULL
+            lock.unlockRead(stamp);
 
-                    stamp = lock.readLock();
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass);
-                    lock.unlockRead(stamp);
+            Subscription sub;
+            int length = varArgSubs.length;
+            Object[] asArray = null;
 
-                    if (varArgSuperSubscriptions != null) {
-                        for (int i = 0; i < length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
-                    }
-                }
-                else {
-                    stamp = lock.readLock();
+            if (length > 1) {
+                hasSubs = true;
 
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass);
-                    lock.unlockRead(stamp);
+                asArray = (Object[]) Array.newInstance(messageClass, 1);
+                asArray[0] = message;
 
-                    if (varArgSuperSubscriptions != null) {
-                        Object[] asArray = (Object[]) Array.newInstance(messageClass, 1);
-                        asArray[0] = message;
-
-                        for (int i = 0; i < varArgSuperSubscriptions.length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
-                    }
+                for (int i = 0; i < length; i++) {
+                    sub = varArgSubs[i];
+                    sub.publish(asArray);
                 }
             }
-            return;
+
+
+            // now publish array based superClasses (but only if those ALSO accept vararg)
+            stamp = lock.readLock();
+            final Subscription[] varArgSuperSubs = this.varArgUtils.getVarArgSuperSubscriptions(messageClass);// CAN NOT RETURN NULL
+            lock.unlockRead(stamp);
+
+            length = varArgSuperSubs.length;
+
+            if (length > 1) {
+                hasSubs = true;
+
+                if (asArray == null) {
+                    asArray = (Object[]) Array.newInstance(messageClass, 1);
+                    asArray[0] = message;
+                }
+
+                for (int i = 0; i < length; i++) {
+                    sub = varArgSuperSubs[i];
+                    sub.publish(asArray);
+                }
+            }
         }
 
         // only get here if there were no other subscriptions
         // Dead Event must EXACTLY MATCH (no subclasses)
-        final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class);
-        if (deadSubscriptions != null) {
-            final DeadMessage deadMessage = new DeadMessage(message);
+        if (!hasSubs) {
+            final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class);
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message);
 
-            Subscription sub;
-            for (int i = 0; i < deadSubscriptions.length; i++) {
-                sub = deadSubscriptions[i];
-                sub.publish(deadMessage);
+                Subscription sub;
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(deadMessage);
+                }
             }
         }
     }
@@ -676,67 +674,77 @@ public final class SubscriptionManager {
         final Class<?> messageClass1 = message1.getClass();
         final Class<?> messageClass2 = message2.getClass();
 
-        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2); // can return null
+        final StampedLock lock = this.lock;
+        long stamp = lock.readLock();
+        final Subscription[] subscriptions = getSubscriptionsExactAndSuper_NoLock(messageClass1, messageClass2); // can return null
+        lock.unlockRead(stamp);
 
+        boolean hasSubs = false;
         // Run subscriptions
         if (subscriptions != null) {
+            hasSubs = true;
+
             Subscription sub;
             for (int i = 0; i < subscriptions.length; i++) {
                 sub = subscriptions[i];
                 sub.publish(message1, message2);
             }
+        }
 
-            // publish to var arg, only if not already an array AND we are all of the same type
-            if (varArgPossibility.get() && messageClass1 == messageClass2 && !messageClass1.isArray()) {
-                long stamp = lock.readLock();
-                final Subscription[] varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass1); // can return null
+        // publish to var arg, only if not already an array AND we are all of the same type
+        if (varArgPossibility.get() && !messageClass1.isArray() && !messageClass2.isArray()) {
+
+            // vararg can ONLY work if all types are the same
+            if (messageClass1 == messageClass2) {
+                stamp = lock.readLock();
+                final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1); // can NOT return null
                 lock.unlockRead(stamp);
 
-                if (varArgSubscriptions != null) {
-                    final int length = varArgSubscriptions.length;
+                final int length = varArgSubs.length;
+                if (length > 0) {
+                    hasSubs = true;
+
                     Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
                     asArray[0] = message1;
                     asArray[1] = message2;
 
-
+                    Subscription sub;
                     for (int i = 0; i < length; i++) {
-                        sub = varArgSubscriptions[i];
+                        sub = varArgSubs[i];
                         sub.publish(asArray);
-                    }
-
-                    stamp = lock.readLock();
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
-                    lock.unlockRead(stamp);
-
-                    if (varArgSuperSubscriptions != null) {
-                        for (int i = 0; i < length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
-                    }
-                }
-                else {
-                    stamp = lock.readLock();
-
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
-                    lock.unlockRead(stamp);
-
-                    if (varArgSuperSubscriptions != null) {
-                        Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
-
-                        for (int i = 0; i < varArgSuperSubscriptions.length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
                     }
                 }
             }
+
+            // now publish array based superClasses (but only if those ALSO accept vararg)
+            stamp = lock.readLock();
+            final Subscription[] varArgSuperSubs = this.varArgUtils
+                            .getVarArgSuperSubscriptions(messageClass1, messageClass2); // CAN NOT RETURN NULL
+            lock.unlockRead(stamp);
+
+
+            final int length = varArgSuperSubs.length;
+            if (length > 0) {
+                hasSubs = true;
+
+                Class<?> arrayType;
+                Object[] asArray;
+
+                Subscription sub;
+                for (int i = 0; i < length; i++) {
+                    sub = varArgSuperSubs[i];
+                    arrayType = sub.getHandler().getVarArgClass();
+
+                    asArray = (Object[]) Array.newInstance(arrayType, 2);
+                    asArray[0] = message1;
+                    asArray[1] = message2;
+
+                    sub.publish(asArray);
+                }
+            }
         }
-        else {
+
+        if (!hasSubs) {
             // Dead Event must EXACTLY MATCH (no subclasses)
             final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
             if (deadSubscriptions != null) {
@@ -756,69 +764,81 @@ public final class SubscriptionManager {
         final Class<?> messageClass2 = message2.getClass();
         final Class<?> messageClass3 = message3.getClass();
 
-        final Subscription[] subscriptions = getSubscriptionsExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
+        final StampedLock lock = this.lock;
+        long stamp = lock.readLock();
+        final Subscription[] subs = getSubscriptionsExactAndSuper_NoLock(messageClass1, messageClass2, messageClass3); // can return null
+        lock.unlockRead(stamp);
 
+
+        boolean hasSubs = false;
         // Run subscriptions
-        if (subscriptions != null) {
+        if (subs != null) {
+            hasSubs = true;
+
             Subscription sub;
-            for (int i = 0; i < subscriptions.length; i++) {
-                sub = subscriptions[i];
+            for (int i = 0; i < subs.length; i++) {
+                sub = subs[i];
                 sub.publish(message1, message2, message3);
             }
+        }
 
-            // publish to var arg, only if not already an array AND we are all of the same type
-            if (varArgPossibility.get() && messageClass1 == messageClass2 && messageClass1 == messageClass3 && !messageClass1.isArray()) {
-                long stamp = lock.readLock();
-                final Subscription[] varArgSubscriptions = varArgUtils.getVarArgSubscriptions(messageClass1); // can return null
+        // publish to var arg, only if not already an array AND we are all of the same type
+        if (varArgPossibility.get() && !messageClass1.isArray() && !messageClass2.isArray() && !messageClass3.isArray()) {
+
+            // vararg can ONLY work if all types are the same
+            if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
+                stamp = lock.readLock();
+                final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1); // can NOT return null
                 lock.unlockRead(stamp);
 
-                if (varArgSubscriptions != null) {
-                    final int length = varArgSubscriptions.length;
+                final int length = varArgSubs.length;
+                if (length > 0) {
+                    hasSubs = true;
+
                     Object[] asArray = (Object[]) Array.newInstance(messageClass1, 3);
                     asArray[0] = message1;
                     asArray[1] = message2;
                     asArray[2] = message3;
 
-
+                    Subscription sub;
                     for (int i = 0; i < length; i++) {
-                        sub = varArgSubscriptions[i];
+                        sub = varArgSubs[i];
                         sub.publish(asArray);
-                    }
-
-                    stamp = lock.readLock();
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
-                    lock.unlockRead(stamp);
-
-                    if (varArgSuperSubscriptions != null) {
-                        for (int i = 0; i < length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
-                    }
-                }
-                else {
-                    stamp = lock.readLock();
-
-                    // now publish array based superClasses (but only if those ALSO accept vararg)
-                    final Subscription[] varArgSuperSubscriptions = this.varArgUtils.getVarArgSuperSubscriptions(messageClass1);
-                    lock.unlockRead(stamp);
-
-                    if (varArgSuperSubscriptions != null) {
-                        Object[] asArray = (Object[]) Array.newInstance(messageClass1, 2);
-                        asArray[0] = message1;
-                        asArray[1] = message2;
-                        asArray[2] = message3;
-
-                        for (int i = 0; i < varArgSuperSubscriptions.length; i++) {
-                            sub = varArgSuperSubscriptions[i];
-                            sub.publish(asArray);
-                        }
                     }
                 }
             }
+
+
+            // now publish array based superClasses (but only if those ALSO accept vararg)
+            stamp = lock.readLock();
+            final Subscription[] varArgSuperSubs = this.varArgUtils
+                            .getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3); // CAN NOT RETURN NULL
+            lock.unlockRead(stamp);
+
+
+            final int length = varArgSuperSubs.length;
+            if (length > 0) {
+                hasSubs = true;
+
+                Class<?> arrayType;
+                Object[] asArray;
+
+                Subscription sub;
+                for (int i = 0; i < length; i++) {
+                    sub = varArgSuperSubs[i];
+                    arrayType = sub.getHandler().getVarArgClass();
+
+                    asArray = (Object[]) Array.newInstance(arrayType, 3);
+                    asArray[0] = message1;
+                    asArray[1] = message2;
+                    asArray[2] = message3;
+
+                    sub.publish(asArray);
+                }
+            }
         }
-        else {
+
+        if (!hasSubs) {
             // Dead Event must EXACTLY MATCH (no subclasses)
             final Subscription[] deadSubscriptions = getSubscriptionsExact(DeadMessage.class); // can return null
             if (deadSubscriptions != null) {
