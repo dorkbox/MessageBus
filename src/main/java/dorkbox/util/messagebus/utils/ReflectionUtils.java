@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.utils;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.thread.ConcurrentSet;

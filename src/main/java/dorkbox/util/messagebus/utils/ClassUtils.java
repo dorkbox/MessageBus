@@ -1,4 +1,6 @@
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.utils;
+
+import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;

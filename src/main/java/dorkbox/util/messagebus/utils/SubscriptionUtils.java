@@ -1,10 +1,11 @@
-package dorkbox.util.messagebus.subscription;
+package dorkbox.util.messagebus.utils;
 
-import dorkbox.util.messagebus.common.ClassUtils;
 import dorkbox.util.messagebus.common.ConcurrentHashMapV8;
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.thread.ClassHolder;
 import dorkbox.util.messagebus.common.thread.SubscriptionHolder;
+import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.utils.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.Map;
