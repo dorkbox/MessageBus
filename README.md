@@ -1,7 +1,8 @@
-MultiMBassador
-==============
+MessageBus
+==========
 
-The "Multi" MBassador fork is a high-performance, low GC, Disruptor-based, method signature parameters > 1 & var-arg distribution.
+The MessageBus is a fork from MBassador, and it is a high-performance, very-low GC, custom distribution that supports method signature
+parameters > 1 & varity arguments.
 
 *Many* features from the original MBassador have been removed, specifically the ONLY things to remain for a handler are  
 - rejectSubtypes
