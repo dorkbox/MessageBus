@@ -55,7 +55,7 @@ public class MultiArgSubscriber implements Subscriber {
     }
 
     @Override
-    public void clearConcurrentCollections() {
+    public void clear() {
         this.subUtils.clear();
         this.varArgUtils.clear();
     }
@@ -72,7 +72,7 @@ public class MultiArgSubscriber implements Subscriber {
         final Class<?>[] messageHandlerTypes = handler.getHandledMessages();
         final int size = messageHandlerTypes.length;
 
-        Class<?> type0 = messageHandlerTypes[0];
+        final Class<?> type0 = messageHandlerTypes[0];
 
         switch (size) {
             case 0: {
@@ -153,7 +153,7 @@ public class MultiArgSubscriber implements Subscriber {
         this.subscriptionsPerMessageSingle.clear();
         this.subscriptionsPerMessageMulti.clear();
 
-        clearConcurrentCollections();
+        clear();
     }
 
     @Override

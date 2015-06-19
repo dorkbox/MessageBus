@@ -9,7 +9,10 @@ import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.publication.*;
-import dorkbox.util.messagebus.subscription.*;
+import dorkbox.util.messagebus.subscription.FirstArgSubscriber;
+import dorkbox.util.messagebus.subscription.MultiArgSubscriber;
+import dorkbox.util.messagebus.subscription.Subscriber;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.utils.ClassUtils;
 import org.jctools.util.Pow2;
 
@@ -71,7 +74,7 @@ public class MessageBus implements IMessageBus {
             subscriber = new MultiArgSubscriber(errorHandler, classUtils);
         }
         else {
-            subscriber = new FirstArgSubscriber(errorHandler, classUtils);
+            subscriber = new FirstArgSubscriber(errorHandler);
         }
 
         switch (publishMode) {

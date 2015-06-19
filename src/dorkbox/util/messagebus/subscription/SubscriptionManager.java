@@ -64,7 +64,7 @@ public final class SubscriptionManager {
         }
 
         // these are concurrent collections
-        subscriber.clearConcurrentCollections();
+        subscriber.clear();
 
         Subscription[] subscriptions = getListenerSubs(listenerClass);
 
@@ -145,7 +145,7 @@ public final class SubscriptionManager {
         }
 
         // these are concurrent collections
-        subscriber.clearConcurrentCollections();
+        subscriber.clear();
 
         final Subscription[] subscriptions = getListenerSubs(listenerClass);
         if (subscriptions != null) {

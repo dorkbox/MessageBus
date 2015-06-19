@@ -4,11 +4,8 @@ import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.adapter.StampedLock;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.subscription.Publisher;
 import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
-
-import java.util.Arrays;
 
 public class PublisherExact_FirstArg implements Publisher {
     private final ErrorHandlingSupport errorHandler;
@@ -33,10 +30,15 @@ public class PublisherExact_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == 1) {
+                        sub.publish(message1);
+                    }
                 }
             }
             else {
@@ -73,10 +75,15 @@ public class PublisherExact_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1, message2);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == 2) {
+                        sub.publish(message1, message2);
+                    }
                 }
             }
             else {
@@ -113,10 +120,15 @@ public class PublisherExact_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1, message2, message3);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == 3) {
+                        sub.publish(message1, message2, message3);
+                    }
                 }
             }
             else {
@@ -144,9 +156,8 @@ public class PublisherExact_FirstArg implements Publisher {
     @Override
     public void publish(final Object[] messages) {
         try {
-            final Object message1 = messages[0];
-            final Class<?> messageClass = message1.getClass();
-            final Object[] newMessages = Arrays.copyOfRange(messages, 1, messages.length);
+            final Class<?> messageClass = messages[0].getClass();
+            final int length = messages.length;
 
             final StampedLock lock = this.lock;
             long stamp = lock.readLock();
@@ -155,10 +166,15 @@ public class PublisherExact_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1, newMessages);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == length) {
+                        sub.publish(messages);
+                    }
                 }
             }
             else {
@@ -168,7 +184,7 @@ public class PublisherExact_FirstArg implements Publisher {
                 lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, newMessages);
+                    final DeadMessage deadMessage = new DeadMessage(messages);
 
                     Subscription sub;
                     for (int i = 0; i < deadSubscriptions.length; i++) {

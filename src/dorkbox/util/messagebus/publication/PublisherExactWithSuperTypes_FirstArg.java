@@ -4,7 +4,6 @@ import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.common.adapter.StampedLock;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.subscription.Publisher;
 import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
 
@@ -79,13 +78,15 @@ public class PublisherExactWithSuperTypes_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
 
-                    final Class<?>[] handledMessages = sub.getHandler().getHandledMessages();
-
-                    sub.publish(message1, message2);
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == 2) {
+                        sub.publish(message1, message2);
+                    }
                 }
             }
             else {
@@ -122,10 +123,15 @@ public class PublisherExactWithSuperTypes_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1, message2, message3);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == 3) {
+                        sub.publish(message1, message2, message3);
+                    }
                 }
             }
             else {
@@ -155,7 +161,8 @@ public class PublisherExactWithSuperTypes_FirstArg implements Publisher {
         try {
             final Object message1 = messages[0];
             final Class<?> messageClass = message1.getClass();
-            final Object[] newMessages = Arrays.copyOfRange(messages, 1, messages.length);
+            final int length = messages.length;
+            final Object[] newMessages = Arrays.copyOfRange(messages, 1, length);
 
             final StampedLock lock = this.lock;
             long stamp = lock.readLock();
@@ -164,10 +171,15 @@ public class PublisherExactWithSuperTypes_FirstArg implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                Class<?>[] handledMessages;
                 Subscription sub;
                 for (int i = 0; i < subscriptions.length; i++) {
                     sub = subscriptions[i];
-                    sub.publish(message1, newMessages);
+
+                    handledMessages = sub.getHandler().getHandledMessages();
+                    if (handledMessages.length == length) {
+                        sub.publish(message1, newMessages);
+                    }
                 }
             }
             else {

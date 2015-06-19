@@ -3,7 +3,6 @@ package dorkbox.util.messagebus.subscription;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.utils.ClassUtils;
 import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
@@ -14,6 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Permits subscriptions that only use the first parameters as the signature. The publisher MUST provide the correct additional parameters,
  * and they must be of the correct type, otherwise it will throw an error.
+ * </p>
+ * Parameter length checking during publication is performed, so that you can have multiple handlers with the same signature, but each
+ * with a different number of parameters
  */
 public class FirstArgSubscriber implements Subscriber {
 
@@ -24,82 +26,47 @@ public class FirstArgSubscriber implements Subscriber {
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
 
     // the following are used ONLY for FIRST ARG subscription/publication. (subscriptionsPerMessageMulti isn't used in this case)
-    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle_1;
-    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle_2;
-    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle_3;
+    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessage;
 
 
-    public FirstArgSubscriber(final ErrorHandlingSupport errorHandler, final ClassUtils classUtils) {
+    public FirstArgSubscriber(final ErrorHandlingSupport errorHandler) {
         this.errorHandler = errorHandler;
 
         // the following are used ONLY for FIRST ARG subscription/publication. (subscriptionsPerMessageMulti isn't used in this case)
-        this.subscriptionsPerMessageSingle_1 = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
-        this.subscriptionsPerMessageSingle_2 = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
-        this.subscriptionsPerMessageSingle_3 = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
+        this.subscriptionsPerMessage = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
     }
 
     // inside a write lock
     // add this subscription to each of the handled types
     // to activate this sub for publication
     private void registerFirst(final Subscription subscription, final Class<?> listenerClass,
-                               final Map<Class<?>, ArrayList<Subscription>> subs_1, final Map<Class<?>, ArrayList<Subscription>> subs_2,
-                               final Map<Class<?>, ArrayList<Subscription>> subs_3) {
+                               final Map<Class<?>, ArrayList<Subscription>> subscriptions) {
 
         final MessageHandler handler = subscription.getHandler();
         final Class<?>[] messageHandlerTypes = handler.getHandledMessages();
         final int size = messageHandlerTypes.length;
 
-        Class<?> type0 = messageHandlerTypes[0];
-
-        switch (size) {
-            case 1: {
-                ArrayList<Subscription> subs = subs_1.get(type0);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subs_1.put(type0, subs);
-                }
-
-                subs.add(subscription);
-                return;
-            }
-            case 2: {
-                ArrayList<Subscription> subs = subs_2.get(type0);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subs_2.put(type0, subs);
-                }
-
-                subs.add(subscription);
-                return;
-            }
-            case 3: {
-                ArrayList<Subscription> subs = subs_3.get(type0);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subs_3.put(type0, subs);
-                }
-
-                subs.add(subscription);
-                return;
-            }
-            case 0:
-            default: {
-                errorHandler.handleError("Error while trying to subscribe class", listenerClass);
-                return;
-            }
+        if (size == 0) {
+            errorHandler.handleError("Error while trying to subscribe class", listenerClass);
+            return;
         }
+
+        final Class<?> type0 = messageHandlerTypes[0];
+
+        ArrayList<Subscription> subs = subscriptions.get(type0);
+        if (subs == null) {
+            subs = new ArrayList<Subscription>();
+
+            subscriptions.put(type0, subs);
+        }
+
+        subs.add(subscription);
     }
 
     @Override
     public void register(final Class<?> listenerClass, final int handlersSize, final Subscription[] subsPerListener) {
 
-        final Map<Class<?>, ArrayList<Subscription>> sub_1 = this.subscriptionsPerMessageSingle_1;
-        final Map<Class<?>, ArrayList<Subscription>> sub_2 = this.subscriptionsPerMessageSingle_2;
-        final Map<Class<?>, ArrayList<Subscription>> sub_3 = this.subscriptionsPerMessageSingle_3;
-
+        final Map<Class<?>, ArrayList<Subscription>> subscriptions = this.subscriptionsPerMessage;
 
         Subscription subscription;
 
@@ -110,7 +77,7 @@ public class FirstArgSubscriber implements Subscriber {
             // now add this subscription to each of the handled types
 
             // only register based on the FIRST parameter
-            registerFirst(subscription, listenerClass, sub_1, sub_2, sub_3);
+            registerFirst(subscription, listenerClass, subscriptions);
         }
     }
 
@@ -126,30 +93,28 @@ public class FirstArgSubscriber implements Subscriber {
 
     @Override
     public void shutdown() {
-        this.subscriptionsPerMessageSingle_1.clear();
-        this.subscriptionsPerMessageSingle_2.clear();
-        this.subscriptionsPerMessageSingle_3.clear();
+        this.subscriptionsPerMessage.clear();
     }
 
     @Override
-    public void clearConcurrentCollections() {
+    public void clear() {
 
     }
 
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass) {
-        return subscriptionsPerMessageSingle_1.get(messageClass);
+        return subscriptionsPerMessage.get(messageClass);
     }
 
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2) {
-        return subscriptionsPerMessageSingle_2.get(messageClass1);
+        return subscriptionsPerMessage.get(messageClass1);
     }
 
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2,
                                                    final Class<?> messageClass3) {
-        return subscriptionsPerMessageSingle_3.get(messageClass1);
+        return subscriptionsPerMessage.get(messageClass1);
     }
 
     @Override

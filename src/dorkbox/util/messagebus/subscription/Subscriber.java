@@ -16,7 +16,7 @@ public interface Subscriber {
 
     void shutdown();
 
-    void clearConcurrentCollections();
+    void clear();
 
     ArrayList<Subscription> getExactAsArray(Class<?> superClass);
 

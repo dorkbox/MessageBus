@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.subscription;
+package dorkbox.util.messagebus.publication;
 
 public interface Publisher {
     void publish(Object message1);
