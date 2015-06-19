@@ -1,7 +1,8 @@
 package dorkbox.util.messagebus.utils;
 
 import dorkbox.util.messagebus.common.HashMapTree;
-import dorkbox.util.messagebus.common.adapter.ConcurrentHashMapV8;
+import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
+import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
 
 import java.util.ArrayList;
@@ -16,24 +17,14 @@ public final class SubscriptionUtils {
     private final Map<Class<?>, ArrayList<Subscription>> superClassSubscriptions;
     private final HashMapTree<Class<?>, ArrayList<Subscription>> superClassSubscriptionsMulti;
 
-    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
 
-
-    private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
-
-
-    public SubscriptionUtils(final ClassUtils superClass, Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle,
-                             final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti, final float loadFactor,
-                             final int stripeSize) {
+    public SubscriptionUtils(final ClassUtils superClass, final float loadFactor) {
         this.superClass = superClass;
-
-        this.subscriptionsPerMessageSingle = subscriptionsPerMessageSingle;
-        this.subscriptionsPerMessageMulti = subscriptionsPerMessageMulti;
 
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.superClassSubscriptions = new ConcurrentHashMapV8<Class<?>, ArrayList<Subscription>>();
+        this.superClassSubscriptions = JavaVersionAdapter.get.concurrentMap(8, loadFactor, 1);
         this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
     }
 
@@ -45,14 +36,14 @@ public final class SubscriptionUtils {
 
     /**
      * Returns an array COPY of the super subscriptions for the specified type.
-     * <p>
+     * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p>
+     * <p/>
      * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz) {
+    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
@@ -60,7 +51,6 @@ public final class SubscriptionUtils {
 
         if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
-            final Map<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageSingle;
 
             // save the subscriptions
             final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz);  // never returns null, cached response
@@ -75,7 +65,7 @@ public final class SubscriptionUtils {
 
             for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
-                superSubs = local2.get(superClass);
+                superSubs = subscriber.getExactAsArray(superClass);
 
                 if (superSubs != null) {
                     superSubLength = superSubs.size();
@@ -98,22 +88,21 @@ public final class SubscriptionUtils {
 
     /**
      * Returns an array COPY of the super subscriptions for the specified type.
-     * <p>
+     * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p>
+     * <p/>
      * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2) {
+    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
-        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
+        final HashMapTree<Class<?>, ArrayList<Subscription>> cached = this.superClassSubscriptionsMulti;
 
-        ArrayList<Subscription> subs = local.get(clazz1, clazz2);
+        ArrayList<Subscription> subs = cached.get(clazz1, clazz2);
 
         if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
-            final HashMapTree<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageMulti;
 
             // save the subscriptions
             final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
@@ -145,7 +134,7 @@ public final class SubscriptionUtils {
                         continue;
                     }
 
-                    superSubs = local2.get(superClass1, superClass2);
+                    superSubs = subscriber.getExactAsArray(superClass1, superClass2);
                     if (superSubs != null) {
                         for (int k = 0; k < superSubs.size(); k++) {
                             sub = superSubs.get(k);
@@ -158,7 +147,7 @@ public final class SubscriptionUtils {
                 }
             }
             subs.trimToSize();
-            local.put(subs, clazz1, clazz2);
+            cached.put(subs, clazz1, clazz2);
         }
 
         return subs;
@@ -166,14 +155,15 @@ public final class SubscriptionUtils {
 
     /**
      * Returns an array COPY of the super subscriptions for the specified type.
-     * <p>
+     * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p>
+     * <p/>
      * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3) {
+    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3,
+                                                         final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
         final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
 
@@ -181,7 +171,6 @@ public final class SubscriptionUtils {
 
         if (subs == null) {
             // types was not empty, so collect subscriptions for each type and collate them
-            final HashMapTree<Class<?>, ArrayList<Subscription>> local2 = this.subscriptionsPerMessageMulti;
 
             // save the subscriptions
             final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
@@ -224,7 +213,7 @@ public final class SubscriptionUtils {
                             continue;
                         }
 
-                        superSubs = local2.get(superClass1, superClass2);
+                        superSubs = subscriber.getExactAsArray(superClass1, superClass2, superClass3);
                         if (superSubs != null) {
                             for (int m = 0; m < superSubs.size(); m++) {
                                 sub = superSubs.get(m);

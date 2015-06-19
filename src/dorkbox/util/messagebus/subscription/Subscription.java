@@ -1,19 +1,14 @@
 package dorkbox.util.messagebus.subscription;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
-import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
-import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -160,108 +155,5 @@ public final class Subscription {
         }
         Subscription other = (Subscription) obj;
         return this.ID == other.ID;
-    }
-
-    // inside a write lock
-    // add this subscription to each of the handled types
-    // to activate this sub for publication
-    public void registerMulti(final ErrorHandlingSupport errorHandler, final Class<?> listenerClass, final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                              final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                              final AtomicBoolean varArgPossibility) {
-
-        final Class<?>[] messageHandlerTypes = handlerMetadata.getHandledMessages();
-        final int size = messageHandlerTypes.length;
-
-        Class<?> type0 = messageHandlerTypes[0];
-
-        switch (size) {
-            case 0: {
-                errorHandler.handleError("Error while trying to subscribe class", listenerClass);
-                return;
-            }
-            case 1: {
-                ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    // is this handler able to accept var args?
-                    if (handlerMetadata.getVarArgClass() != null) {
-                        varArgPossibility.lazySet(true);
-                    }
-
-                    subsPerMessageSingle.put(type0, subs);
-                }
-
-                subs.add(this);
-                return;
-            }
-            case 2: {
-                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1]);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1]);
-                }
-
-                subs.add(this);
-                return;
-            }
-            case 3: {
-                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1], messageHandlerTypes[2]);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1], messageHandlerTypes[2]);
-                }
-
-                subs.add(this);
-                return;
-            }
-            default: {
-                ArrayList<Subscription> subs = subsPerMessageMulti.get(messageHandlerTypes);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    subsPerMessageMulti.put(subs, messageHandlerTypes);
-                }
-
-                subs.add(this);
-            }
-        }
-    }
-
-    // inside a write lock
-    // add this subscription to each of the handled types
-    // to activate this sub for publication
-    public void registerFirst(final ErrorHandlingSupport errorHandler, final Class<?> listenerClass, final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                              final AtomicBoolean varArgPossibility) {
-
-        final Class<?>[] messageHandlerTypes = handlerMetadata.getHandledMessages();
-        final int size = messageHandlerTypes.length;
-
-        Class<?> type0 = messageHandlerTypes[0];
-
-        switch (size) {
-            case 0: {
-                errorHandler.handleError("Error while trying to subscribe class", listenerClass);
-                return;
-            }
-            default: {
-                ArrayList<Subscription> subs = subsPerMessageSingle.get(type0);
-                if (subs == null) {
-                    subs = new ArrayList<Subscription>();
-
-                    // is this handler able to accept var args?
-                    if (handlerMetadata.getVarArgClass() != null) {
-                        varArgPossibility.lazySet(true);
-                    }
-
-                    subsPerMessageSingle.put(type0, subs);
-                }
-
-                subs.add(this);
-                return;
-            }
-        }
     }
 }

@@ -1,7 +1,7 @@
 package dorkbox.util.messagebus.common;
 
+import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
-import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.util.*;
 
@@ -32,13 +32,13 @@ public class SubscriptionValidator extends AssertSupport {
 
     // match subscriptions with existing validation entries
     // for each tuple of subscriber and message type the specified number of listeners must exist
-    public void validate(SubscriptionManager manager) {
+    public void validate(Subscriber subscriber) {
         for (Class messageType : this.messageTypes) {
             Collection<ValidationEntry> validationEntries = getEntries(messageType);
 
             // we split subs + superSubs into TWO calls.
             Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
-            Subscription[] subscriptions = manager.getSubscriptionsExactAndSuper(messageType);
+            Subscription[] subscriptions = subscriber.getExactAndSuper(messageType);
             if (subscriptions != null) {
                 collection.addAll(Arrays.asList(subscriptions));
             }

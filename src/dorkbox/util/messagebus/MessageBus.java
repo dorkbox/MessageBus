@@ -1,5 +1,6 @@
 package dorkbox.util.messagebus;
 
+import dorkbox.util.messagebus.common.adapter.StampedLock;
 import dorkbox.util.messagebus.common.simpleq.MessageType;
 import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
 import dorkbox.util.messagebus.common.simpleq.MultiNode;
@@ -7,11 +8,9 @@ import dorkbox.util.messagebus.common.thread.NamedThreadFactory;
 import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.publication.PublisherAll;
-import dorkbox.util.messagebus.publication.PublisherExact;
-import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
-import dorkbox.util.messagebus.subscription.Publisher;
-import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.publication.*;
+import dorkbox.util.messagebus.subscription.*;
+import dorkbox.util.messagebus.utils.ClassUtils;
 import org.jctools.util.Pow2;
 
 import java.util.ArrayDeque;
@@ -26,7 +25,10 @@ import java.util.Collection;
 public class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
     private final MpmcMultiTransferArrayQueue dispatchQueue;
+
+    private final ClassUtils classUtils;
     private final SubscriptionManager subscriptionManager;
+
     private final Collection<Thread> threads;
     private final Publisher subscriptionPublisher;
 
@@ -46,32 +48,63 @@ public class MessageBus implements IMessageBus {
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public MessageBus(int numberOfThreads) {
-        this(PublishMode.ExactWithSuperTypes, numberOfThreads);
+        this(PublishMode.ExactWithSuperTypes, SubscribeMode.MultiArg, numberOfThreads);
     }
 
     /**
      * @param publishMode     Specifies which publishMode to operate the publication of messages.
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
-    public MessageBus(final PublishMode publishMode, int numberOfThreads) {
+    public MessageBus(final PublishMode publishMode, final SubscribeMode subscribeMode, int numberOfThreads) {
         numberOfThreads = Pow2.roundToPowerOfTwo(getMinNumberOfThreads(numberOfThreads));
 
         this.errorHandler = new DefaultErrorHandler();
         this.dispatchQueue = new MpmcMultiTransferArrayQueue(numberOfThreads);
-        this.subscriptionManager = new SubscriptionManager(numberOfThreads, errorHandler, true);
+        classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
+
+        final StampedLock lock = new StampedLock();
+
+        boolean isMultiArg = subscribeMode == SubscribeMode.MultiArg;
+
+        final Subscriber subscriber;
+        if (isMultiArg) {
+            subscriber = new MultiArgSubscriber(errorHandler, classUtils);
+        }
+        else {
+            subscriber = new FirstArgSubscriber(errorHandler, classUtils);
+        }
 
         switch (publishMode) {
             case Exact:
-                subscriptionPublisher = new PublisherExact(errorHandler);
+                if (isMultiArg) {
+                    subscriptionPublisher = new PublisherExact_MultiArg(errorHandler, subscriber, lock);
+                }
+                else {
+                    subscriptionPublisher = new PublisherExact_FirstArg(errorHandler, subscriber, lock);
+                }
                 break;
+
             case ExactWithSuperTypes:
-                subscriptionPublisher = new PublisherExactWithSuperTypes(errorHandler);
+                if (isMultiArg) {
+
+                    subscriptionPublisher = new PublisherExactWithSuperTypes_MultiArg(errorHandler, subscriber, lock);
+                }
+                else {
+                    subscriptionPublisher = new PublisherExactWithSuperTypes_FirstArg(errorHandler, subscriber, lock);
+                }
                 break;
+
             case ExactWithSuperTypesAndVarArgs:
             default:
-                subscriptionPublisher = new PublisherAll(errorHandler);
+                if (isMultiArg) {
+                    subscriptionPublisher = new PublisherAll_MultiArg(errorHandler, subscriber, lock);
+                }
+                else {
+                    throw new RuntimeException("Unable to run in expected configuration");
+                }
         }
 
+        this.subscriptionManager = new SubscriptionManager(numberOfThreads, subscriber, lock);
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
 
         NamedThreadFactory dispatchThreadFactory = new NamedThreadFactory("MessageBus");
@@ -157,7 +190,6 @@ public class MessageBus implements IMessageBus {
     @Override
     public void subscribe(final Object listener) {
         MessageBus.this.subscriptionManager.subscribe(listener);
-        MessageBus.this.subscriptionManager.subscribe(listener);
     }
 
     @Override
@@ -167,22 +199,22 @@ public class MessageBus implements IMessageBus {
 
     @Override
     public void publish(final Object message) {
-        subscriptionPublisher.publish(subscriptionManager, message);
+        subscriptionPublisher.publish(message);
     }
 
     @Override
     public void publish(final Object message1, final Object message2) {
-        subscriptionPublisher.publish(subscriptionManager, message1, message2);
+        subscriptionPublisher.publish(message1, message2);
     }
 
     @Override
     public void publish(final Object message1, final Object message2, final Object message3) {
-        subscriptionPublisher.publish(subscriptionManager, message1, message2, message3);
+        subscriptionPublisher.publish(message1, message2, message3);
     }
 
     @Override
     public void publish(final Object[] messages) {
-        subscriptionPublisher.publish(subscriptionManager, messages);
+        subscriptionPublisher.publish(messages);
     }
 
     @Override
@@ -271,5 +303,6 @@ public class MessageBus implements IMessageBus {
             t.interrupt();
         }
         this.subscriptionManager.shutdown();
+        this.classUtils.clear();
     }
 }

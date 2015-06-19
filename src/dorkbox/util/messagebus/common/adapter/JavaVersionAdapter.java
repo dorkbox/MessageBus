@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentMap;
 public abstract class JavaVersionAdapter {
 
 
+    public static final JavaVersionAdapter get;
 
     static {
 //        get = new Java7Adapter();
@@ -17,7 +18,6 @@ public abstract class JavaVersionAdapter {
 
     }
 
-    public static JavaVersionAdapter get;
 
     public abstract <K, V> ConcurrentMap<K, V> concurrentMap(final int size, final float loadFactor, final int stripeSize);
 

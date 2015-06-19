@@ -80,6 +80,17 @@ public interface IMessageBus extends PubSubSupport {
         ExactWithSuperTypesAndVarArgs,
     }
 
+    enum SubscribeMode {
+        /**
+         * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
+         */
+        MultiArg,
+        /**
+         * Will subscribe and publish using only the FIRST provided parameter in the method signature (for subscribe), and arguments (for publish)
+         */
+        FirstArg,
+    }
+
 
     /**
      * Check whether any asynchronous message publications are pending to be processed
