@@ -1,9 +1,6 @@
 package dorkbox.util.messagebus;
 
 import dorkbox.util.messagebus.common.adapter.StampedLock;
-import dorkbox.util.messagebus.common.simpleq.MessageType;
-import dorkbox.util.messagebus.common.simpleq.MpmcMultiTransferArrayQueue;
-import dorkbox.util.messagebus.common.simpleq.MultiNode;
 import dorkbox.util.messagebus.common.thread.NamedThreadFactory;
 import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
@@ -25,7 +22,8 @@ import java.util.Collection;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class MessageBus implements IMessageBus {
+public
+class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
     private final MpmcMultiTransferArrayQueue dispatchQueue;
 
@@ -43,14 +41,16 @@ public class MessageBus implements IMessageBus {
     /**
      * By default, will permit subTypes and VarArg matching, and will use half of CPUs available for dispatching async messages
      */
-    public MessageBus() {
+    public
+    MessageBus() {
         this(Runtime.getRuntime().availableProcessors() / 2);
     }
 
     /**
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
-    public MessageBus(int numberOfThreads) {
+    public
+    MessageBus(int numberOfThreads) {
         this(PublishMode.ExactWithSuperTypes, SubscribeMode.MultiArg, numberOfThreads);
     }
 
@@ -58,7 +58,8 @@ public class MessageBus implements IMessageBus {
      * @param publishMode     Specifies which publishMode to operate the publication of messages.
      * @param numberOfThreads how many threads to have for dispatching async messages
      */
-    public MessageBus(final PublishMode publishMode, final SubscribeMode subscribeMode, int numberOfThreads) {
+    public
+    MessageBus(final PublishMode publishMode, final SubscribeMode subscribeMode, int numberOfThreads) {
         numberOfThreads = Pow2.roundToPowerOfTwo(getMinNumberOfThreads(numberOfThreads));
 
         this.errorHandler = new DefaultErrorHandler();
@@ -115,7 +116,8 @@ public class MessageBus implements IMessageBus {
             // each thread will run forever and process incoming message publication requests
             Runnable runnable = new Runnable() {
                 @Override
-                public void run() {
+                public
+                void run() {
                     MpmcMultiTransferArrayQueue IN_QUEUE = MessageBus.this.dispatchQueue;
 
                     MultiNode node = new MultiNode();
@@ -124,49 +126,51 @@ public class MessageBus implements IMessageBus {
                             //noinspection InfiniteLoopStatement
                             while (true) {
                                 IN_QUEUE.take(node);
-                                switch (node.messageType) {
+                                Integer type = (Integer) MultiNode.lpMessageType(node);
+                                switch (type) {
                                     case 1: {
-                                        publish(node.item1);
+                                        publish(MultiNode.lpItem1(node));
                                         break;
                                     }
                                     case 2: {
-                                        publish(node.item1, node.item2);
+                                        publish(MultiNode.lpItem1(node), MultiNode.lpItem2(node));
                                         break;
                                     }
                                     case 3: {
-                                        publish(node.item1, node.item2, node.item3);
+                                        publish(MultiNode.lpItem1(node), MultiNode.lpItem2(node), MultiNode.lpItem3(node));
                                         break;
                                     }
                                     default: {
-                                        publish(node.item1);
+                                        publish(MultiNode.lpItem1(node));
                                     }
                                 }
                             }
                         } catch (InterruptedException e) {
                             if (!MessageBus.this.shuttingDown) {
-                                switch (node.messageType) {
+                                Integer type = (Integer) MultiNode.lpMessageType(node);
+                                switch (type) {
                                     case 1: {
                                         errorHandler.handlePublicationError(new PublicationError().setMessage(
                                                         "Thread interrupted while processing message").setCause(e).setPublishedObject(
-                                                        node.item1));
+                                                        MultiNode.lpItem1(node)));
                                         break;
                                     }
                                     case 2: {
                                         errorHandler.handlePublicationError(new PublicationError().setMessage(
                                                         "Thread interrupted while processing message").setCause(e).setPublishedObject(
-                                                        node.item1, node.item2));
+                                                        MultiNode.lpItem1(node), MultiNode.lpItem2(node)));
                                         break;
                                     }
                                     case 3: {
                                         errorHandler.handlePublicationError(new PublicationError().setMessage(
                                                         "Thread interrupted while processing message").setCause(e).setPublishedObject(
-                                                        node.item1, node.item2, node.item3));
+                                                        MultiNode.lpItem1(node), MultiNode.lpItem2(node), MultiNode.lpItem3(node)));
                                         break;
                                     }
                                     default: {
                                         errorHandler.handlePublicationError(new PublicationError().setMessage(
                                                         "Thread interrupted while processing message").setCause(e).setPublishedObject(
-                                                        node.item1));
+                                                        MultiNode.lpItem1(node)));
                                     }
                                 }
                             }
@@ -183,7 +187,8 @@ public class MessageBus implements IMessageBus {
     /**
      * Always return at least 2 threads
      */
-    private static int getMinNumberOfThreads(final int numberOfThreads) {
+    private static
+    int getMinNumberOfThreads(final int numberOfThreads) {
         if (numberOfThreads < 2) {
             return 2;
         }
@@ -191,43 +196,50 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public void subscribe(final Object listener) {
+    public
+    void subscribe(final Object listener) {
         MessageBus.this.subscriptionManager.subscribe(listener);
     }
 
     @Override
-    public void unsubscribe(final Object listener) {
+    public
+    void unsubscribe(final Object listener) {
         MessageBus.this.subscriptionManager.unsubscribe(listener);
     }
 
     @Override
-    public void publish(final Object message) {
+    public
+    void publish(final Object message) {
         subscriptionPublisher.publish(message);
     }
 
     @Override
-    public void publish(final Object message1, final Object message2) {
+    public
+    void publish(final Object message1, final Object message2) {
         subscriptionPublisher.publish(message1, message2);
     }
 
     @Override
-    public void publish(final Object message1, final Object message2, final Object message3) {
+    public
+    void publish(final Object message1, final Object message2, final Object message3) {
         subscriptionPublisher.publish(message1, message2, message3);
     }
 
     @Override
-    public void publish(final Object[] messages) {
+    public
+    void publish(final Object[] messages) {
         subscriptionPublisher.publish(messages);
     }
 
     @Override
-    public void publishAsync(final Object message) {
+    public
+    void publishAsync(final Object message) {
         if (message != null) {
             try {
                 this.dispatchQueue.transfer(message, MessageType.ONE);
             } catch (Exception e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error while adding an asynchronous message")
-                                                                          .setCause(e).setPublishedObject(message));
+                errorHandler.handlePublicationError(new PublicationError().setMessage(
+                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(message));
             }
         }
         else {
@@ -236,13 +248,14 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public void publishAsync(final Object message1, final Object message2) {
+    public
+    void publishAsync(final Object message1, final Object message2) {
         if (message1 != null && message2 != null) {
             try {
                 this.dispatchQueue.transfer(message1, message2);
             } catch (Exception e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error while adding an asynchronous message")
-                                                                          .setCause(e).setPublishedObject(message1, message2));
+                errorHandler.handlePublicationError(new PublicationError().setMessage(
+                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(message1, message2));
             }
         }
         else {
@@ -251,13 +264,14 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public void publishAsync(final Object message1, final Object message2, final Object message3) {
+    public
+    void publishAsync(final Object message1, final Object message2, final Object message3) {
         if (message1 != null || message2 != null | message3 != null) {
             try {
                 this.dispatchQueue.transfer(message1, message2, message3);
             } catch (Exception e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error while adding an asynchronous message")
-                                                                          .setCause(e).setPublishedObject(message1, message2, message3));
+                errorHandler.handlePublicationError(new PublicationError().setMessage(
+                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(message1, message2, message3));
             }
         }
         else {
@@ -266,13 +280,14 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public void publishAsync(final Object[] messages) {
+    public
+    void publishAsync(final Object[] messages) {
         if (messages != null) {
             try {
                 this.dispatchQueue.transfer(messages, MessageType.ARRAY);
             } catch (Exception e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error while adding an asynchronous message")
-                                                                          .setCause(e).setPublishedObject(messages));
+                errorHandler.handlePublicationError(new PublicationError().setMessage(
+                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(messages));
             }
         }
         else {
@@ -281,17 +296,20 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public final boolean hasPendingMessages() {
+    public final
+    boolean hasPendingMessages() {
         return this.dispatchQueue.hasPendingMessages();
     }
 
     @Override
-    public final ErrorHandlingSupport getErrorHandler() {
+    public final
+    ErrorHandlingSupport getErrorHandler() {
         return errorHandler;
     }
 
     @Override
-    public void start() {
+    public
+    void start() {
         for (Thread t : this.threads) {
             t.start();
         }
@@ -300,7 +318,8 @@ public class MessageBus implements IMessageBus {
     }
 
     @Override
-    public void shutdown() {
+    public
+    void shutdown() {
         this.shuttingDown = true;
         for (Thread t : this.threads) {
             t.interrupt();

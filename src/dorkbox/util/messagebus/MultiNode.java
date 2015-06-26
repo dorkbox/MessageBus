@@ -1,14 +1,14 @@
-package dorkbox.util.messagebus.common.simpleq;
+package dorkbox.util.messagebus;
 
 import org.jctools.util.UnsafeAccess;
 
 abstract class ColdItems {
-    public int type = 0;
+    private int type = 0;
 
-    public int messageType = MessageType.ONE;
-    public Object item1 = null;
-    public Object item2 = null;
-    public Object item3 = null;
+    private int messageType = MessageType.ONE;
+    private Object item1 = null;
+    private Object item2 = null;
+    private Object item3 = null;
 }
 
 abstract class Pad0 extends ColdItems {
@@ -17,7 +17,7 @@ abstract class Pad0 extends ColdItems {
 }
 
 abstract class HotItem1 extends Pad0 {
-    public Thread thread;
+    private Thread thread;
 }
 
 public class MultiNode extends HotItem1 {
@@ -32,13 +32,13 @@ public class MultiNode extends HotItem1 {
 
     static {
         try {
-            TYPE = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("type"));
+            TYPE = UnsafeAccess.UNSAFE.objectFieldOffset(ColdItems.class.getDeclaredField("type"));
 
-            MESSAGETYPE = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("messageType"));
-            ITEM1 = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("item1"));
-            ITEM2 = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("item2"));
-            ITEM3 = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("item3"));
-            THREAD = UnsafeAccess.UNSAFE.objectFieldOffset(MultiNode.class.getField("thread"));
+            MESSAGETYPE = UnsafeAccess.UNSAFE.objectFieldOffset(ColdItems.class.getDeclaredField("messageType"));
+            ITEM1 = UnsafeAccess.UNSAFE.objectFieldOffset(ColdItems.class.getDeclaredField("item1"));
+            ITEM2 = UnsafeAccess.UNSAFE.objectFieldOffset(ColdItems.class.getDeclaredField("item2"));
+            ITEM3 = UnsafeAccess.UNSAFE.objectFieldOffset(ColdItems.class.getDeclaredField("item3"));
+            THREAD = UnsafeAccess.UNSAFE.objectFieldOffset(HotItem1.class.getDeclaredField("thread"));
 
             // now make sure we can access UNSAFE
             MultiNode node = new MultiNode();
