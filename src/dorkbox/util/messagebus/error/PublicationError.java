@@ -14,7 +14,8 @@ import java.util.Arrays;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class PublicationError {
+public
+class PublicationError {
 
     // Internal state
     private Throwable cause;
@@ -25,14 +26,16 @@ public class PublicationError {
     /**
      * Default constructor.
      */
-    public PublicationError() {
+    public
+    PublicationError() {
         super();
     }
 
     /**
      * @return The Throwable giving rise to this PublicationError.
      */
-    public Throwable getCause() {
+    public
+    Throwable getCause() {
         return this.cause;
     }
 
@@ -42,32 +45,38 @@ public class PublicationError {
      * @param cause A Throwable which gave rise to this PublicationError.
      * @return This PublicationError.
      */
-    public PublicationError setCause(Throwable cause) {
+    public
+    PublicationError setCause(Throwable cause) {
         this.cause = cause;
         return this;
     }
 
-    public String getMessage() {
+    public
+    String getMessage() {
         return this.message;
     }
 
-    public PublicationError setMessage(String message) {
+    public
+    PublicationError setMessage(String message) {
         this.message = message;
         return this;
     }
 
-    public Object[] getPublishedObject() {
+    public
+    Object[] getPublishedObject() {
         return this.publishedObjects;
     }
 
-    public PublicationError setPublishedObject(Object publishedObject) {
+    public
+    PublicationError setPublishedObject(Object publishedObject) {
         this.publishedObjects = new Object[1];
         this.publishedObjects[0] = publishedObject;
 
         return this;
     }
 
-    public PublicationError setPublishedObject(Object publishedObject1, Object publishedObject2) {
+    public
+    PublicationError setPublishedObject(Object publishedObject1, Object publishedObject2) {
         this.publishedObjects = new Object[2];
         this.publishedObjects[0] = publishedObject1;
         this.publishedObjects[1] = publishedObject2;
@@ -75,7 +84,8 @@ public class PublicationError {
         return this;
     }
 
-    public PublicationError setPublishedObject(Object publishedObject1, Object publishedObject2, Object publishedObject3) {
+    public
+    PublicationError setPublishedObject(Object publishedObject1, Object publishedObject2, Object publishedObject3) {
         this.publishedObjects = new Object[3];
         this.publishedObjects[0] = publishedObject1;
         this.publishedObjects[1] = publishedObject2;
@@ -88,15 +98,16 @@ public class PublicationError {
      * {@inheritDoc}
      */
     @Override
-    public String toString() {
+    public
+    String toString() {
         String newLine = System.getProperty("line.separator");
         return "PublicationError{" +
-                newLine +
-                "\tcause=" + this.cause +
-                newLine +
-                "\tmessage='" + this.message + '\'' +
-                newLine +
-                "\tpublishedObject=" + Arrays.deepToString(this.publishedObjects) +
-                '}';
+               newLine +
+               "\tcause=" + this.cause +
+               newLine +
+               "\tmessage='" + this.message + '\'' +
+               newLine +
+               "\tpublishedObject=" + Arrays.deepToString(this.publishedObjects) +
+               '}';
     }
 }

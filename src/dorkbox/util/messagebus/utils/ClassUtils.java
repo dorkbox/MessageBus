@@ -7,25 +7,28 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
 
-public final class ClassUtils {
+public final
+class ClassUtils {
 
     private final Map<Class<?>, Class<?>> arrayCache;
     private final Map<Class<?>, Class<?>[]> superClassesCache;
 
-    public ClassUtils(final float loadFactor) {
-        this.arrayCache = JavaVersionAdapter.get.concurrentMap(32, loadFactor, 1);
-        this.superClassesCache = JavaVersionAdapter.get.concurrentMap(32, loadFactor, 1);
+    public
+    ClassUtils(final float loadFactor) {
+        this.arrayCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
+        this.superClassesCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
     }
 
     /**
      * never returns null
      * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
-     * <p>
+     * <p/>
      * if parameter clazz is of type array, then the super classes are of array type as well
-     * <p>
+     * <p/>
      * protected by read lock by caller. The cache version is called first, by write lock
      */
-    public Class<?>[] getSuperClasses(final Class<?> clazz) {
+    public
+    Class<?>[] getSuperClasses(final Class<?> clazz) {
         // this is never reset, since it never needs to be.
         final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
 
@@ -75,7 +78,8 @@ public final class ClassUtils {
      * never returns null
      * never reset
      */
-    public Class<?> getArrayClass(final Class<?> c) {
+    public
+    Class<?> getArrayClass(final Class<?> c) {
         final Map<Class<?>, Class<?>> arrayCache = this.arrayCache;
         Class<?> clazz = arrayCache.get(c);
 
@@ -93,12 +97,14 @@ public final class ClassUtils {
     /**
      * Clears the caches
      */
-    public void clear() {
+    public
+    void clear() {
         this.arrayCache.clear();
         this.superClassesCache.clear();
     }
 
-    public static <T> ArrayList<T> findCommon(final T[] arrayOne, final T[] arrayTwo) {
+    public static
+    <T> ArrayList<T> findCommon(final T[] arrayOne, final T[] arrayTwo) {
 
         T[] arrayToHash;
         T[] arrayToSearch;
@@ -141,7 +147,8 @@ public final class ClassUtils {
         return intersection;
     }
 
-    public static <T> ArrayList<T> findCommon(final ArrayList<T> arrayOne, final ArrayList<T> arrayTwo) {
+    public static
+    <T> ArrayList<T> findCommon(final ArrayList<T> arrayOne, final ArrayList<T> arrayTwo) {
 
         ArrayList<T> arrayToHash;
         ArrayList<T> arrayToSearch;

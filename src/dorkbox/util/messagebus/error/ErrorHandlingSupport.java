@@ -5,7 +5,8 @@ package dorkbox.util.messagebus.error;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public interface ErrorHandlingSupport {
+public
+interface ErrorHandlingSupport {
 
     /**
      * Publication errors may occur at various points of time during message delivery. A handler may throw an exception,

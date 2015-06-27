@@ -32,7 +32,7 @@ public class HashMapTree<KEY, VALUE> {
      * can be overridden to provide a custom backing map
      */
     protected Map<KEY, HashMapTree<KEY, VALUE>> createChildren(int defaultSize, float loadFactor) {
-        return JavaVersionAdapter.get.concurrentMap(defaultSize, loadFactor, 1);
+        return JavaVersionAdapter.concurrentMap(defaultSize, loadFactor, 1);
     }
 
     public final VALUE getValue() {

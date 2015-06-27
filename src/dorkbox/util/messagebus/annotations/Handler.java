@@ -1,10 +1,6 @@
 package dorkbox.util.messagebus.annotations;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * Mark any method of any class(=listener) as a message handler and configure the handler
@@ -17,8 +13,9 @@ import java.lang.annotation.Target;
  */
 @Retention(value = RetentionPolicy.RUNTIME)
 @Inherited
-@Target(value = {ElementType.METHOD,ElementType.ANNOTATION_TYPE})
-public @interface Handler {
+@Target(value = {ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+public
+@interface Handler {
 
     /**
      * Define whether or not the handler accepts variable arguments it declares in its signature.

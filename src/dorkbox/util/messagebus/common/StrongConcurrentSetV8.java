@@ -13,11 +13,11 @@ public class StrongConcurrentSetV8<T> extends StrongConcurrentSet<T> {
 
     public StrongConcurrentSetV8(int size, float loadFactor) {
         // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
-        super(JavaVersionAdapter.get.<T, ISetEntry<T>>concurrentMap(size, loadFactor, 16));
+        super(JavaVersionAdapter.<T, ISetEntry<T>>concurrentMap(size, loadFactor, 16));
     }
 
     public StrongConcurrentSetV8(int size, float loadFactor, int stripeSize) {
         // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
-        super(JavaVersionAdapter.get.<T, ISetEntry<T>>concurrentMap(size, loadFactor, stripeSize));
+        super(JavaVersionAdapter.<T, ISetEntry<T>>concurrentMap(size, loadFactor, stripeSize));
     }
 }

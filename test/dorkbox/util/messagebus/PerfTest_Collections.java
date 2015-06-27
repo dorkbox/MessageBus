@@ -15,7 +15,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedTransferQueue;
 
 
-public class PerfTest_Collections {
+public
+class PerfTest_Collections {
     public static final int REPETITIONS = 10 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
@@ -24,7 +25,8 @@ public class PerfTest_Collections {
 
     private static final MessageHandler[] allHandlers = MessageHandler.get(Listener.class);
 
-    public static void main(final String[] args) throws Exception {
+    public static
+    void main(final String[] args) throws Exception {
         final int size = 16;
 
 
@@ -33,52 +35,56 @@ public class PerfTest_Collections {
         // have to warm-up the JVM.
         System.err.print("\nWarming up JVM.");
 //        for (int i=0;i<2;i++) {
-            bench(size, new ConcurrentLinkedQueue<Subscription>(), false);
-            System.err.print(".");
-            bench(size, new ArrayList<Subscription>(size*2), false);
-            System.err.print(".");
-            bench(size, new ArrayDeque<Subscription>(size*2), false);
-            System.err.print(".");
-            bench(size, new ConcurrentLinkedQueue<Subscription>(), false);
-            System.err.print(".");
-            bench(size, new LinkedList<Subscription>(), false);
-            System.err.print(".");
+        bench(size, new ConcurrentLinkedQueue<Subscription>(), false);
+        System.err.print(".");
+        bench(size, new ArrayList<Subscription>(size * 2), false);
+        System.err.print(".");
+        bench(size, new ArrayDeque<Subscription>(size * 2), false);
+        System.err.print(".");
+        bench(size, new ConcurrentLinkedQueue<Subscription>(), false);
+        System.err.print(".");
+        bench(size, new LinkedList<Subscription>(), false);
+        System.err.print(".");
 //        }
         System.err.println("Done");
 
-        bench(size, new ArrayList<Subscription>(size*2));
-        bench(size, new ConcurrentSet<Subscription>(size*2, LOAD_FACTOR, 5));
+        bench(size, new ArrayList<Subscription>(size * 2));
+        bench(size, new ConcurrentSet<Subscription>(size * 2, LOAD_FACTOR, 5));
         bench(size, new ConcurrentLinkedQueue2<Subscription>());
         bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedTransferQueue<Subscription>());
-        bench(size, new ArrayDeque<Subscription>(size*2));
+        bench(size, new ArrayDeque<Subscription>(size * 2));
         bench(size, new LinkedList<Subscription>());
-        bench(size, new StrongConcurrentSetV8<Subscription>(size*2, LOAD_FACTOR));
-        bench(size, new StrongConcurrentSet<Subscription>(size*2, LOAD_FACTOR));
-        bench(size, Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(size*2, LOAD_FACTOR, 1)));
+        bench(size, new StrongConcurrentSetV8<Subscription>(size * 2, LOAD_FACTOR));
+        bench(size, new StrongConcurrentSet<Subscription>(size * 2, LOAD_FACTOR));
+        bench(size, Collections.newSetFromMap(new ConcurrentHashMap<Subscription, Boolean>(size * 2, LOAD_FACTOR, 1)));
         bench(size, new HashSet<Subscription>());
 //        bench(size, new ConcurrentSkipListSet<Subscription>()); // needs comparable
     }
 
-    public static void bench(final int size, Collection<Subscription> set) throws Exception {
+    public static
+    void bench(final int size, Collection<Subscription> set) throws Exception {
         bench(size, set, true);
     }
-    public static void bench(final int size, Collection<Subscription> set, boolean showOutput) throws Exception {
+
+    public static
+    void bench(final int size, Collection<Subscription> set, boolean showOutput) throws Exception {
         final int warmupRuns = 2;
         final int runs = 3;
 
-        for (int i=0;i<size;i++) {
+        for (int i = 0; i < size; i++) {
             for (MessageHandler x : allHandlers) {
                 set.add(new Subscription(x, .85F, 1));
             }
         }
 
         if (!showOutput) {
-            for (int i=2;i<6;i++) {
+            for (int i = 2; i < 6; i++) {
                 averageRun(warmupRuns, runs, set, false, i, REPETITIONS);
             }
-        } else {
-            for (int i=1;i<10;i++) {
+        }
+        else {
+            for (int i = 1; i < 10; i++) {
                 long average = averageRun(warmupRuns, runs, set, false, i, REPETITIONS);
                 System.out.format("summary,IteratorPerfTest,%s - %,d  (%d)\n", set.getClass().getSimpleName(), average, i);
             }
@@ -87,11 +93,13 @@ public class PerfTest_Collections {
         set.clear();
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, Collection<Subscription> set, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static
+    long averageRun(int warmUpRuns, int sumCount, Collection<Subscription> set, boolean showStats, int concurrency, int repetitions)
+                    throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
-            WeakReference<Object> weakReference = new WeakReference<>(new Object());
+            WeakReference<Object> weakReference = new WeakReference<Object>(new Object());
             while (weakReference.get() != null) {
                 System.gc();
                 Thread.sleep(100L);
@@ -104,24 +112,25 @@ public class PerfTest_Collections {
             sum += results[i];
         }
 
-        return sum/sumCount;
+        return sum / sumCount;
     }
 
-    private static long performanceRun(int runNumber, Collection<Subscription> set, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static
+    long performanceRun(int runNumber, Collection<Subscription> set, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
-        Thread[] threads = new Thread[concurrency*2];
+        Thread[] threads = new Thread[concurrency * 2];
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             producers[i] = new Producer(set, repetitions);
             threads[i] = new Thread(producers[i], "Producer " + i);
         }
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             threads[i].start();
         }
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             threads[i].join();
         }
 
@@ -129,7 +138,7 @@ public class PerfTest_Collections {
         long end = -1;
         long count = 0;
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             if (producers[i].start < start) {
                 start = producers[i].start;
             }
@@ -143,7 +152,7 @@ public class PerfTest_Collections {
 
 
         long duration = end - start;
-        long ops = repetitions * 1_000_000_000L / duration;
+        long ops = repetitions * 1000000000L / duration;
 
         if (showStats) {
             System.out.format("%d (%d) - ops/sec=%,d\n", runNumber, count, ops);
@@ -151,21 +160,24 @@ public class PerfTest_Collections {
         return ops;
     }
 
-    public static class Producer implements Runnable {
+    public static
+    class Producer implements Runnable {
         private final Collection<Subscription> set;
         volatile long start;
         volatile long end;
         private int repetitions;
         volatile int count;
 
-        public Producer(Collection<Subscription> set, int repetitions) {
+        public
+        Producer(Collection<Subscription> set, int repetitions) {
             this.set = set;
             this.repetitions = repetitions;
         }
 
         @SuppressWarnings("unused")
         @Override
-        public void run() {
+        public
+        void run() {
             Collection<Subscription> set = this.set;
             int i = this.repetitions;
             this.start = System.nanoTime();
@@ -178,7 +190,7 @@ public class PerfTest_Collections {
             int count = 0;
 
             do {
-                for (iterator = set.iterator(); iterator.hasNext();) {
+                for (iterator = set.iterator(); iterator.hasNext(); ) {
                     sub = iterator.next();
                     //                    if (sub.acceptsSubtypes()) {
 //                        count--;
@@ -201,14 +213,18 @@ public class PerfTest_Collections {
         }
     }
 
+
     @SuppressWarnings("unused")
-    public static class Listener {
+    public static
+    class Listener {
         @Handler
-        public void handleSync(Integer o1) {
+        public
+        void handleSync(Integer o1) {
         }
 
-        @Handler(acceptVarargs=true)
-        public void handleSync(Object... o) {
+        @Handler(acceptVarargs = true)
+        public
+        void handleSync(Object... o) {
         }
     }
 }

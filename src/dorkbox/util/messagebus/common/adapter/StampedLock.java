@@ -6,7 +6,7 @@
 
 package dorkbox.util.messagebus.common.adapter;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -282,6 +282,14 @@ public class StampedLock implements java.io.Serializable {
     private static final int RMODE = 0;
     private static final int WMODE = 1;
 
+    private static final ThreadLocal<Random> randomThreadLocal = new ThreadLocal<Random>() {
+        @Override
+        protected
+        Random initialValue() {
+            return new Random();
+        }
+    };
+
     /** Wait nodes */
     static final class WNode {
         volatile WNode prev;
@@ -307,6 +315,7 @@ public class StampedLock implements java.io.Serializable {
     private transient volatile long state;
     /** extra reader count when state read count saturated */
     private transient int readerOverflow;
+
 
     /**
      * Creates a new lock, initially in unlocked state.
@@ -1004,7 +1013,7 @@ public class StampedLock implements java.io.Serializable {
                 return s;
             }
         }
-        else if ((ThreadLocalRandom.current().nextInt() &
+        else if ((randomThreadLocal.get().nextInt() &
                   OVERFLOW_YIELD_RATE) == 0) {
             Thread.yield();
         }
@@ -1032,7 +1041,7 @@ public class StampedLock implements java.io.Serializable {
                  return next;
             }
         }
-        else if ((ThreadLocalRandom.current().nextInt() &
+        else if ((randomThreadLocal.get().nextInt() &
                   OVERFLOW_YIELD_RATE) == 0) {
             Thread.yield();
         }
@@ -1084,7 +1093,7 @@ public class StampedLock implements java.io.Serializable {
             else if (spins < 0) {
                 spins = m == WBIT && this.wtail == this.whead ? SPINS : 0;
             } else if (spins > 0) {
-                if (ThreadLocalRandom.current().nextInt() >= 0) {
+                if (randomThreadLocal.get().nextInt() >= 0) {
                     --spins;
                 }
             }
@@ -1122,7 +1131,7 @@ public class StampedLock implements java.io.Serializable {
                             return ns;
                         }
                     }
-                    else if (ThreadLocalRandom.current().nextInt() >= 0 &&
+                    else if (randomThreadLocal.get().nextInt() >= 0 &&
                              --k <= 0) {
                         break;
                     }
@@ -1198,7 +1207,7 @@ public class StampedLock implements java.io.Serializable {
                         return ns;
                     } else if (m >= WBIT) {
                         if (spins > 0) {
-                            if (ThreadLocalRandom.current().nextInt() >= 0) {
+                            if (randomThreadLocal.get().nextInt() >= 0) {
                                 --spins;
                             }
                         }
@@ -1307,7 +1316,7 @@ public class StampedLock implements java.io.Serializable {
                         return ns;
                     }
                     else if (m >= WBIT &&
-                             ThreadLocalRandom.current().nextInt() >= 0 && --k <= 0) {
+                             randomThreadLocal.get().nextInt() >= 0 && --k <= 0) {
                         break;
                     }
                 }

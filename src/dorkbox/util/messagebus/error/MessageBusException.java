@@ -6,21 +6,26 @@ package dorkbox.util.messagebus.error;
  * @author bennidi
  *         Date: 3/29/13
  */
-public class MessageBusException extends Exception {
+public
+class MessageBusException extends Exception {
     private static final long serialVersionUID = 1L;
 
-    public MessageBusException() {
+    public
+    MessageBusException() {
     }
 
-    public MessageBusException(String message) {
+    public
+    MessageBusException(String message) {
         super(message);
     }
 
-    public MessageBusException(String message, Throwable cause) {
+    public
+    MessageBusException(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public MessageBusException(Throwable cause) {
+    public
+    MessageBusException(Throwable cause) {
         super(cause);
     }
 }

@@ -13,26 +13,28 @@ import java.util.Arrays;
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
  * the handler is called a  message listener and more generally, any class containing a message handler in its class hierarchy
  * defines such a message listener.
- * <p>
- * <p>
+ * <p/>
+ * <p/>
  * Note: When sending messages to a handler that is of type ARRAY (either an object of type array, or a vararg), the JVM cannot
- *       tell the difference (the message that is being sent), if it is a vararg or array.
- *       <p>
- *       <p>
- *       BECAUSE OF THIS, we always treat the two the same
- *       <p>
- *       <p>
+ * tell the difference (the message that is being sent), if it is a vararg or array.
+ * <p/>
+ * <p/>
+ * BECAUSE OF THIS, we always treat the two the same
+ * <p/>
+ * <p/>
  *
  * @author bennidi
  *         Date: 11/14/12
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class MessageHandler {
+public
+class MessageHandler {
 
     // publish all listeners defined by the given class (includes
     // listeners defined in super classes)
-    public static MessageHandler[] get(final Class<?> target) {
+    public static
+    MessageHandler[] get(final Class<?> target) {
 
         // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)
         final Method[] allMethods = ReflectionUtils.getMethods(target);
@@ -41,7 +43,7 @@ public class MessageHandler {
         final ArrayList<MessageHandler> finalMethods = new ArrayList<MessageHandler>(length);
         Method method;
 
-        for (int i=0;i<length;i++) {
+        for (int i = 0; i < length; i++) {
             method = allMethods[i];
 
             // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
@@ -79,7 +81,8 @@ public class MessageHandler {
 
     private final boolean isSynchronized;
 
-    public MessageHandler(Method handler, Handler handlerConfig) {
+    public
+    MessageHandler(Method handler, Handler handlerConfig) {
         super();
 
         if (handler == null) {
@@ -92,7 +95,7 @@ public class MessageHandler {
         this.methodIndex = this.handler.getIndex(handler.getName(), handledMessages);
 
         this.acceptsSubtypes = handlerConfig.acceptSubtypes();
-        this.isSynchronized  = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
+        this.isSynchronized = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
         this.handledMessages = handledMessages;
 
         if (handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs()) {
@@ -103,36 +106,44 @@ public class MessageHandler {
         }
     }
 
-    public final boolean isSynchronized() {
+    public final
+    boolean isSynchronized() {
         return this.isSynchronized;
     }
 
-    public final MethodAccess getHandler() {
+    public final
+    MethodAccess getHandler() {
         return this.handler;
     }
 
-    public final int getMethodIndex() {
+    public final
+    int getMethodIndex() {
         return this.methodIndex;
     }
 
-    public final Class<?>[] getHandledMessages() {
+    public final
+    Class<?>[] getHandledMessages() {
         return this.handledMessages;
     }
 
-    public final Class<?> getVarArgClass() {
+    public final
+    Class<?> getVarArgClass() {
         return this.varArgClass;
     }
 
-    public final boolean acceptsSubtypes() {
+    public final
+    boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
     }
 
-    public final boolean acceptsVarArgs() {
+    public final
+    boolean acceptsVarArgs() {
         return this.varArgClass != null;
     }
 
     @Override
-    public final int hashCode() {
+    public final
+    int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + (this.acceptsSubtypes ? 1231 : 1237);
@@ -143,7 +154,8 @@ public class MessageHandler {
     }
 
     @Override
-    public final boolean equals(Object obj) {
+    public final
+    boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -164,7 +176,8 @@ public class MessageHandler {
             if (other.handler != null) {
                 return false;
             }
-        } else if (!this.handler.equals(other.handler)) {
+        }
+        else if (!this.handler.equals(other.handler)) {
             return false;
         }
         if (this.isSynchronized != other.isSynchronized) {

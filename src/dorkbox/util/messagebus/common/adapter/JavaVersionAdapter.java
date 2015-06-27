@@ -1,29 +1,29 @@
 package dorkbox.util.messagebus.common.adapter;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 
 
-public abstract class JavaVersionAdapter {
+public
+class JavaVersionAdapter {
 
 
-    public static final JavaVersionAdapter get;
+    private static final MapAdapter get;
 
     static {
-//        get = new Java7Adapter();
-        get = new Java8Adapter();
+        MapAdapter adapter;
+        try {
+            Class.forName("java.util.concurrent.locks.StampedLock");
+            adapter = new Java8Adapter();
+        } catch (Exception e) {
+            adapter = new Java6Adapter();
+        }
 
-
+        get = adapter;
     }
 
-
-    public abstract <K, V> ConcurrentMap<K, V> concurrentMap(final int size, final float loadFactor, final int stripeSize);
-
-    public <K, V> Map<K, V> hashMap(final int size, final float loadFactor) {
-        return new ConcurrentHashMap<K, V>(size, loadFactor, 1);
+    public static
+    <K, V> ConcurrentMap<K, V> concurrentMap(final int size, final float loadFactor, final int stripeSize) {
+        return get.concurrentMap(size, loadFactor, stripeSize);
     }
-
-
 }

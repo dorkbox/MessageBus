@@ -8,7 +8,8 @@ import dorkbox.util.messagebus.subscription.Subscription;
 import java.util.ArrayList;
 import java.util.Map;
 
-public final class SubscriptionUtils {
+public final
+class SubscriptionUtils {
     private final ClassUtils superClass;
 
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
@@ -18,17 +19,19 @@ public final class SubscriptionUtils {
     private final HashMapTree<Class<?>, ArrayList<Subscription>> superClassSubscriptionsMulti;
 
 
-    public SubscriptionUtils(final ClassUtils superClass, final float loadFactor) {
+    public
+    SubscriptionUtils(final ClassUtils superClass, final float loadFactor) {
         this.superClass = superClass;
 
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.superClassSubscriptions = JavaVersionAdapter.get.concurrentMap(8, loadFactor, 1);
+        this.superClassSubscriptions = JavaVersionAdapter.concurrentMap(8, loadFactor, 1);
         this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
     }
 
-    public void clear() {
+    public
+    void clear() {
         this.superClassSubscriptions.clear();
         this.superClassSubscriptionsMulti.clear();
     }
@@ -43,7 +46,8 @@ public final class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final Subscriber subscriber) {
+    public
+    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
@@ -95,7 +99,8 @@ public final class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Subscriber subscriber) {
+    public
+    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
         final HashMapTree<Class<?>, ArrayList<Subscription>> cached = this.superClassSubscriptionsMulti;
 
@@ -162,8 +167,9 @@ public final class SubscriptionUtils {
      *
      * @return CAN NOT RETURN NULL
      */
-    public ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3,
-                                                         final Subscriber subscriber) {
+    public
+    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3,
+                                                  final Subscriber subscriber) {
         // whenever our subscriptions change, this map is cleared.
         final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
 

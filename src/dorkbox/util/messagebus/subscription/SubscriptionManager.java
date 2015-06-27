@@ -15,7 +15,8 @@ import java.util.Map;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public final class SubscriptionManager {
+public final
+class SubscriptionManager {
     // remember already processed classes that do not contain any message handlers
     private final Map<Class<?>, Boolean> nonListeners;
 
@@ -31,27 +32,30 @@ public final class SubscriptionManager {
     private final Subscriber subscriber;
 
 
-    public SubscriptionManager(final int numberOfThreads, final Subscriber subscriber, final StampedLock lock) {
+    public
+    SubscriptionManager(final int numberOfThreads, final Subscriber subscriber, final StampedLock lock) {
         this.numberOfThreads = numberOfThreads;
         this.subscriber = subscriber;
         this.lock = lock;
 
 
         // modified ONLY during SUB/UNSUB
-        this.nonListeners = JavaVersionAdapter.get.concurrentMap(4, Subscriber.LOAD_FACTOR, numberOfThreads);
+        this.nonListeners = JavaVersionAdapter.concurrentMap(4, Subscriber.LOAD_FACTOR, numberOfThreads);
 
         // only used during SUB/UNSUB, in a rw lock
-        this.subscriptionsPerListener = JavaVersionAdapter.get.concurrentMap(32, Subscriber.LOAD_FACTOR, 1);
+        this.subscriptionsPerListener = JavaVersionAdapter.concurrentMap(32, Subscriber.LOAD_FACTOR, 1);
     }
 
-    public void shutdown() {
+    public
+    void shutdown() {
         this.nonListeners.clear();
 
         subscriber.shutdown();
         this.subscriptionsPerListener.clear();
     }
 
-    public void subscribe(final Object listener) {
+    public
+    void subscribe(final Object listener) {
         if (listener == null) {
             return;
         }
@@ -133,7 +137,8 @@ public final class SubscriptionManager {
         }
     }
 
-    public void unsubscribe(final Object listener) {
+    public
+    void unsubscribe(final Object listener) {
         if (listener == null) {
             return;
         }
@@ -158,7 +163,8 @@ public final class SubscriptionManager {
         }
     }
 
-    private Subscription[] getListenerSubs(final Class<?> listenerClass) {
+    private
+    Subscription[] getListenerSubs(final Class<?> listenerClass) {
 
         final StampedLock lock = this.lock;
         final long stamp = lock.readLock();

@@ -15,7 +15,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * structure. Remove operations can affect any running iterator such that a removed element that has not yet
  * been reached by the iterator will not appear in that iterator anymore.
  */
-public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
+public
+class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     private static final long serialVersionUID = -2729855178402529784L;
 
     private static final AtomicLong id = new AtomicLong();
@@ -25,17 +26,20 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     private final Node<T> IN_PROGRESS_MARKER = new Node<T>(null);
     private ConcurrentMap<T, Node<T>> entries;
 
-    public ConcurrentSet() {
+    public
+    ConcurrentSet() {
         this(16, 0.75f, Runtime.getRuntime().availableProcessors());
     }
 
-    public ConcurrentSet(int size, float loadFactor, int stripeSize) {
+    public
+    ConcurrentSet(int size, float loadFactor, int stripeSize) {
         super();
-        this.entries = JavaVersionAdapter.get.concurrentMap(size, loadFactor, 32);
+        this.entries = JavaVersionAdapter.concurrentMap(size, loadFactor, 32);
     }
 
     @Override
-    public boolean add(T element) {
+    public
+    boolean add(T element) {
         if (element == null) {
             return false;
         }
@@ -54,7 +58,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     }
 
     @Override
-    public boolean contains(Object element) {
+    public
+    boolean contains(Object element) {
         if (element == null) {
             return false;
         }
@@ -72,12 +77,14 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     }
 
     @Override
-    public int size() {
+    public
+    int size() {
         return this.entries.size();
     }
 
     @Override
-    public boolean isEmpty() {
+    public
+    boolean isEmpty() {
         return super.isEmpty();
     }
 
@@ -85,7 +92,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
      * @return TRUE if the element was successfully removed
      */
     @Override
-    public boolean remove(Object element) {
+    public
+    boolean remove(Object element) {
         while (this.entries.get(element) == this.IN_PROGRESS_MARKER) {
             ; // data race
         }
@@ -113,11 +121,13 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     }
 
     @Override
-    public Iterator<T> iterator() {
+    public
+    Iterator<T> iterator() {
         return new Itr2();
     }
 
-    private class Itr2 implements Iterator<T> {
+    private
+    class Itr2 implements Iterator<T> {
         /**
          * Next node to return item for.
          */
@@ -144,7 +154,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
          * Moves to next valid node and returns item to return for
          * next(), or null if no such.
          */
-        private T advance() {
+        private
+        T advance() {
             this.lastRet = this.nextNode; // for removing items via iterator
             T nextItem = this.nextItem;
 
@@ -152,12 +163,13 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
             if (this.nextNode == null) {
                 p = first();
                 pred = null;
-            } else {
+            }
+            else {
                 pred = this.nextNode;
                 p = succ(this.nextNode);
             }
 
-            for (;;) {
+            for (; ; ) {
                 if (p == null) {
                     this.nextNode = null;
                     this.nextItem = null;
@@ -169,7 +181,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
                     this.nextNode = p;
                     this.nextItem = item;
                     return nextItem;
-                } else {
+                }
+                else {
                     // skip over nulls
                     Node<T> next = succ(p);
                     if (pred != null && next != null) {
@@ -183,12 +196,14 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
 
 
         @Override
-        public boolean hasNext() {
+        public
+        boolean hasNext() {
             return this.nextNode != null;
         }
 
         @Override
-        public T next() {
+        public
+        T next() {
             if (this.nextNode == null) {
                 throw new NoSuchElementException();
             }
@@ -196,7 +211,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
         }
 
         @Override
-        public void remove() {
+        public
+        void remove() {
             Node<T> l = this.lastRet;
             if (l == null) {
                 throw new IllegalStateException();
@@ -220,37 +236,44 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     }
 
     @Override
-    public Object[] toArray() {
+    public
+    Object[] toArray() {
         return this.entries.keySet().toArray();
     }
 
     @Override
-    public <T> T[] toArray(T[] a) {
+    public
+    <T> T[] toArray(T[] a) {
         return this.entries.keySet().toArray(a);
     }
 
     @Override
-    public boolean containsAll(Collection<?> c) {
+    public
+    boolean containsAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public boolean removeAll(Collection<?> c) {
+    public
+    boolean removeAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public boolean retainAll(Collection<?> c) {
+    public
+    boolean retainAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public void clear() {
+    public
+    void clear() {
         super.clear();
     }
 
     @Override
-    public int hashCode() {
+    public
+    int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + (int) (this.ID ^ this.ID >>> 32);
@@ -258,7 +281,8 @@ public class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public
+    boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }

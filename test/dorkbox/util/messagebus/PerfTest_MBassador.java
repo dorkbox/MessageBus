@@ -3,13 +3,15 @@ package dorkbox.util.messagebus;
 import dorkbox.util.messagebus.annotations.Handler;
 
 
-public class PerfTest_MBassador {
+public
+class PerfTest_MBassador {
     public static final int REPETITIONS = 50 * 1000 * 100;
     public static final Integer TEST_VALUE = Integer.valueOf(777);
 
     private static final int concurrency = 1;
 
-    public static void main(final String[] args) throws Exception {
+    public static
+    void main(final String[] args) throws Exception {
         System.out.println("reps:" + REPETITIONS + "  Concurrency " + concurrency);
 
         final int warmupRuns = 4;
@@ -24,8 +26,8 @@ public class PerfTest_MBassador {
         System.out.format("summary,PublishPerfTest, %,d\n", average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, MessageBus bus, boolean showStats, int concurrency, int repetitions)
-                    throws Exception {
+    public static
+    long averageRun(int warmUpRuns, int sumCount, MessageBus bus, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -38,32 +40,32 @@ public class PerfTest_MBassador {
             sum += results[i];
         }
 
-        return sum/sumCount;
+        return sum / sumCount;
     }
 
-    private static long performanceRun(int runNumber, MessageBus bus, boolean showStats, int concurrency, int repetitions)
-                    throws Exception {
+    private static
+    long performanceRun(int runNumber, MessageBus bus, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
-        Thread[] threads = new Thread[concurrency*2];
+        Thread[] threads = new Thread[concurrency * 2];
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             producers[i] = new Producer(bus, repetitions);
             threads[i] = new Thread(producers[i], "Producer " + i);
         }
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             threads[i].start();
         }
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             threads[i].join();
         }
 
         long start = Long.MAX_VALUE;
         long end = -1;
 
-        for (int i=0;i<concurrency;i++) {
+        for (int i = 0; i < concurrency; i++) {
             if (producers[i].start < start) {
                 start = producers[i].start;
             }
@@ -75,7 +77,7 @@ public class PerfTest_MBassador {
 
 
         long duration = end - start;
-        long ops = repetitions * 1_000_000_000L / duration;
+        long ops = repetitions * 1000000000L / duration;
 
         if (showStats) {
             System.out.format("%d - ops/sec=%,d\n", runNumber, ops);
@@ -83,19 +85,22 @@ public class PerfTest_MBassador {
         return ops;
     }
 
-    public static class Producer implements Runnable {
+    public static
+    class Producer implements Runnable {
         private final MessageBus bus;
         volatile long start;
         volatile long end;
         private int repetitions;
 
-        public Producer(MessageBus bus, int repetitions) {
+        public
+        Producer(MessageBus bus, int repetitions) {
             this.bus = bus;
             this.repetitions = repetitions;
         }
 
         @Override
-        public void run() {
+        public
+        void run() {
             MessageBus bus = this.bus;
             int i = this.repetitions;
             this.start = System.nanoTime();
@@ -108,14 +113,18 @@ public class PerfTest_MBassador {
         }
     }
 
+
     @SuppressWarnings("unused")
-    public static class Listener {
+    public static
+    class Listener {
         @Handler
-        public void handleSync(Integer o1) {
+        public
+        void handleSync(Integer o1) {
         }
 
-        @Handler(acceptVarargs=true)
-        public void handleSync(Object... o) {
+        @Handler(acceptVarargs = true)
+        public
+        void handleSync(Object... o) {
         }
     }
 }

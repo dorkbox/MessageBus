@@ -15,7 +15,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
  */
-public class MultiArgSubscriber implements Subscriber {
+public
+class MultiArgSubscriber implements Subscriber {
 
     private final ErrorHandlingSupport errorHandler;
 
@@ -31,10 +32,11 @@ public class MultiArgSubscriber implements Subscriber {
     // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
     private final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
 
-    public MultiArgSubscriber(final ErrorHandlingSupport errorHandler, final ClassUtils classUtils) {
+    public
+    MultiArgSubscriber(final ErrorHandlingSupport errorHandler, final ClassUtils classUtils) {
         this.errorHandler = errorHandler;
 
-        this.subscriptionsPerMessageSingle = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
+        this.subscriptionsPerMessageSingle = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, 1);
         this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, LOAD_FACTOR);
 
         this.subUtils = new SubscriptionUtils(classUtils, Subscriber.LOAD_FACTOR);
@@ -45,17 +47,20 @@ public class MultiArgSubscriber implements Subscriber {
     }
 
     @Override
-    public AtomicBoolean getVarArgPossibility() {
+    public
+    AtomicBoolean getVarArgPossibility() {
         return varArgPossibility;
     }
 
     @Override
-    public VarArgUtils getVarArgUtils() {
+    public
+    VarArgUtils getVarArgUtils() {
         return varArgUtils;
     }
 
     @Override
-    public void clear() {
+    public
+    void clear() {
         this.subUtils.clear();
         this.varArgUtils.clear();
     }
@@ -63,10 +68,10 @@ public class MultiArgSubscriber implements Subscriber {
     // inside a write lock
     // add this subscription to each of the handled types
     // to activate this sub for publication
-    private void registerMulti(final Subscription subscription, final Class<?> listenerClass,
-                               final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
-                               final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti,
-                               final AtomicBoolean varArgPossibility) {
+    private
+    void registerMulti(final Subscription subscription, final Class<?> listenerClass,
+                       final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle,
+                       final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti, final AtomicBoolean varArgPossibility) {
 
         final MessageHandler handler = subscription.getHandler();
         final Class<?>[] messageHandlerTypes = handler.getHandledMessages();
@@ -131,7 +136,8 @@ public class MultiArgSubscriber implements Subscriber {
     }
 
     @Override
-    public void register(final Class<?> listenerClass, final int handlersSize, final Subscription[] subsPerListener) {
+    public
+    void register(final Class<?> listenerClass, final int handlersSize, final Subscription[] subsPerListener) {
 
         final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
         final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
@@ -149,7 +155,8 @@ public class MultiArgSubscriber implements Subscriber {
     }
 
     @Override
-    public void shutdown() {
+    public
+    void shutdown() {
         this.subscriptionsPerMessageSingle.clear();
         this.subscriptionsPerMessageMulti.clear();
 
@@ -157,24 +164,27 @@ public class MultiArgSubscriber implements Subscriber {
     }
 
     @Override
-    public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass) {
+    public
+    ArrayList<Subscription> getExactAsArray(final Class<?> messageClass) {
         return subscriptionsPerMessageSingle.get(messageClass);
     }
 
     @Override
-    public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2) {
+    public
+    ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2) {
         return subscriptionsPerMessageMulti.get(messageClass1, messageClass2);
     }
 
     @Override
-    public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2,
-                                                   final Class<?> messageClass3) {
+    public
+    ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
         return subscriptionsPerMessageMulti.get(messageClass1, messageClass2, messageClass3);
     }
 
     // can return null
     @Override
-    public Subscription[] getExactAndSuper(final Class<?> messageClass) {
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass) {
         ArrayList<Subscription> collection = getExactAsArray(messageClass); // can return null
 
         // now publish superClasses
@@ -203,7 +213,8 @@ public class MultiArgSubscriber implements Subscriber {
 
     // can return null
     @Override
-    public Subscription[] getExact(final Class<?> messageClass) {
+    public
+    Subscription[] getExact(final Class<?> messageClass) {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass);
 
         if (collection != null) {
@@ -218,7 +229,8 @@ public class MultiArgSubscriber implements Subscriber {
 
     // can return null
     @Override
-    public Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2) {
+    public
+    Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2) {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2);
 
         if (collection != null) {
@@ -233,7 +245,8 @@ public class MultiArgSubscriber implements Subscriber {
 
     // can return null
     @Override
-    public Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+    public
+    Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
 
         final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3);
 
@@ -251,7 +264,8 @@ public class MultiArgSubscriber implements Subscriber {
 
     // can return null
     @Override
-    public Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
         ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2); // can return null
 
         // now publish superClasses
@@ -281,7 +295,8 @@ public class MultiArgSubscriber implements Subscriber {
 
     // can return null
     @Override
-    public Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
 
         ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3); // can return null
 

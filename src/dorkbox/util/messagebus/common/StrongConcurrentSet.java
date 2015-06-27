@@ -1,4 +1,5 @@
 package dorkbox.util.messagebus.common;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -10,33 +11,40 @@ import java.util.Map;
  * @author bennidi
  *         Date: 2/12/12
  */
-public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
+public
+class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
-    public StrongConcurrentSet() {
+    public
+    StrongConcurrentSet() {
         this(16, 0.75f);
     }
 
-    public StrongConcurrentSet(int size, float loadFactor) {
+    public
+    StrongConcurrentSet(int size, float loadFactor) {
         this(new HashMap<T, ISetEntry<T>>(size, loadFactor));
     }
 
-    public StrongConcurrentSet(Map<T, ISetEntry<T>> entries) {
+    public
+    StrongConcurrentSet(Map<T, ISetEntry<T>> entries) {
         super(entries);
     }
 
     @Override
-    public Iterator<T> iterator() {
+    public
+    Iterator<T> iterator() {
         return new Iterator<T>() {
             private ISetEntry<T> current = StrongConcurrentSet.this.head;
 
             @Override
-            public boolean hasNext() {
+            public
+            boolean hasNext() {
                 return this.current != null;
             }
 
             @Override
-            public T next() {
+            public
+            T next() {
                 if (this.current == null) {
                     return null;
                 }
@@ -48,7 +56,8 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
             }
 
             @Override
-            public void remove() {
+            public
+            void remove() {
                 if (this.current == null) {
                     return;
                 }
@@ -60,27 +69,32 @@ public class StrongConcurrentSet<T> extends AbstractConcurrentSet<T> {
     }
 
     @Override
-    protected Entry<T> createEntry(T value, Entry<T> next) {
+    protected
+    Entry<T> createEntry(T value, Entry<T> next) {
         return next != null ? new StrongEntry<T>(value, next) : new StrongEntry<T>(value);
     }
 
 
-    public static class StrongEntry<T> extends Entry<T> {
+    public static
+    class StrongEntry<T> extends Entry<T> {
 
         private T value;
 
-        private StrongEntry(T value, Entry<T> next) {
+        private
+        StrongEntry(T value, Entry<T> next) {
             super(next);
             this.value = value;
         }
 
-        private StrongEntry(T value) {
+        private
+        StrongEntry(T value) {
             super();
             this.value = value;
         }
 
         @Override
-        public T getValue() {
+        public
+        T getValue() {
             return this.value;
         }
     }

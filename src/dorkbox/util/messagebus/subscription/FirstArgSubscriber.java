@@ -33,7 +33,7 @@ public class FirstArgSubscriber implements Subscriber {
         this.errorHandler = errorHandler;
 
         // the following are used ONLY for FIRST ARG subscription/publication. (subscriptionsPerMessageMulti isn't used in this case)
-        this.subscriptionsPerMessage = JavaVersionAdapter.get.concurrentMap(32, LOAD_FACTOR, 1);
+        this.subscriptionsPerMessage = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, 1);
     }
 
     // inside a write lock

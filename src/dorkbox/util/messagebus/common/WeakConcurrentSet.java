@@ -13,15 +13,18 @@ import java.util.WeakHashMap;
  * @author bennidi
  *         Date: 2/12/12
  */
-public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
+public
+class WeakConcurrentSet<T> extends AbstractConcurrentSet<T> {
 
 
-    public WeakConcurrentSet() {
+    public
+    WeakConcurrentSet() {
         super(new WeakHashMap<T, ISetEntry<T>>());
     }
 
     @Override
-    public Iterator<T> iterator() {
+    public
+    Iterator<T> iterator() {
         return new Iterator<T>() {
 
             // the current list element of this iterator
@@ -31,20 +34,20 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
             // this method will remove all orphaned entries
             // until it finds the first entry whose value has not yet been garbage collected
             // the method assumes that the current element is already orphaned and will remove it
-            private void removeOrphans(){
+            private
+            void removeOrphans() {
 
                 StampedLock lock = WeakConcurrentSet.this.lock;
                 long stamp = lock.writeLock();
 //                final Lock writeLock = WeakConcurrentSet.this.lock.writeLock();
 //                writeLock.lock();
-                try{
+                try {
                     do {
                         ISetEntry<T> orphaned = this.current;
                         this.current = this.current.next();
                         orphaned.remove();
-                    } while(this.current != null && this.current.getValue() == null);
-                }
-                finally {
+                    } while (this.current != null && this.current.getValue() == null);
+                } finally {
                     lock.unlockWrite(stamp);
 //                    writeLock.unlock();
                 }
@@ -52,7 +55,8 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
 
 
             @Override
-            public boolean hasNext() {
+            public
+            boolean hasNext() {
                 if (this.current == null) {
                     return false;
                 }
@@ -61,13 +65,15 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
                     // because a null value indicates that the value has been garbage collected
                     removeOrphans();
                     return this.current != null; // if any entry is left then it will have a value
-                } else {
+                }
+                else {
                     return true;
                 }
             }
 
             @Override
-            public T next() {
+            public
+            T next() {
                 if (this.current == null) {
                     return null;
                 }
@@ -75,14 +81,16 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
                 if (value == null) {    // auto-removal of orphan references
                     removeOrphans();
                     return next();
-                } else {
+                }
+                else {
                     this.current = this.current.next();
                     return value;
                 }
             }
 
             @Override
-            public void remove() {
+            public
+            void remove() {
                 //throw new UnsupportedOperationException("Explicit removal of set elements is only allowed via the controlling set. Sorry!");
                 if (this.current == null) {
                     return;
@@ -95,27 +103,32 @@ public class WeakConcurrentSet<T> extends AbstractConcurrentSet<T>{
     }
 
     @Override
-    protected Entry<T> createEntry(T value, Entry<T> next) {
+    protected
+    Entry<T> createEntry(T value, Entry<T> next) {
         return next != null ? new WeakEntry<T>(value, next) : new WeakEntry<T>(value);
     }
 
 
-    public static class WeakEntry<T> extends Entry<T> {
+    public static
+    class WeakEntry<T> extends Entry<T> {
 
         private WeakReference<T> value;
 
-        private WeakEntry(T value, Entry<T> next) {
+        private
+        WeakEntry(T value, Entry<T> next) {
             super(next);
             this.value = new WeakReference<T>(value);
         }
 
-        private WeakEntry(T value) {
+        private
+        WeakEntry(T value) {
             super();
             this.value = new WeakReference<T>(value);
         }
 
         @Override
-        public T getValue() {
+        public
+        T getValue() {
             return this.value.get();
         }
     }

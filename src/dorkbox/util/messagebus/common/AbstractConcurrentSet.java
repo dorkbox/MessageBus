@@ -16,7 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author bennidi
  *         Date: 2/12/12
  */
-public abstract class AbstractConcurrentSet<T> implements Set<T> {
+public abstract
+class AbstractConcurrentSet<T> implements Set<T> {
     private static final AtomicLong id = new AtomicLong();
     private final transient long ID = id.getAndIncrement();
 
@@ -28,14 +29,17 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     volatile long z0, z1, z2, z4, z5, z6 = 7L;
 
 
-    protected AbstractConcurrentSet(Map<T, ISetEntry<T>> entries) {
+    protected
+    AbstractConcurrentSet(Map<T, ISetEntry<T>> entries) {
         this.entries = entries;
     }
 
-    protected abstract Entry<T> createEntry(T value, Entry<T> next);
+    protected abstract
+    Entry<T> createEntry(T value, Entry<T> next);
 
     @Override
-    public boolean add(T element) {
+    public
+    boolean add(T element) {
         if (element == null) {
             return false;
         }
@@ -62,7 +66,8 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
     @Override
-    public boolean contains(Object element) {
+    public
+    boolean contains(Object element) {
         final StampedLock lock = this.lock;
         long stamp = lock.readLock();
 
@@ -73,7 +78,8 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
         return entry != null && entry.getValue() != null;
     }
 
-    private boolean insert(T element) {
+    private
+    boolean insert(T element) {
         if (!this.entries.containsKey(element)) {
             this.head = createEntry(element, this.head);
             this.entries.put(element, this.head);
@@ -83,17 +89,20 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
     @Override
-    public int size() {
+    public
+    int size() {
         return this.entries.size();
     }
 
     @Override
-    public boolean isEmpty() {
+    public
+    boolean isEmpty() {
         return this.head == null;
     }
 
     @Override
-    public boolean addAll(Collection<? extends T> elements) {
+    public
+    boolean addAll(Collection<? extends T> elements) {
         StampedLock lock = this.lock;
 
         boolean changed = false;
@@ -116,7 +125,8 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
      * @return TRUE if the element was successfully removed
      */
     @Override
-    public boolean remove(Object element) {
+    public
+    boolean remove(Object element) {
         StampedLock lock = this.lock;
         long stamp = lock.readLock();
 
@@ -126,13 +136,15 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
 
         if (entry == null || entry.getValue() == null) {
             return false; // fast exit
-        } else {
+        }
+        else {
             stamp = lock.writeLock();
 
             try {
                 if (entry != this.head) {
                     entry.remove();
-                } else {
+                }
+                else {
                     // if it was second, now it's first
                     this.head = this.head.next();
                     //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
@@ -146,32 +158,38 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
     @Override
-    public Object[] toArray() {
+    public
+    Object[] toArray() {
         return this.entries.entrySet().toArray();
     }
 
     @Override
-    public <T2> T2[] toArray(T2[] a) {
+    public
+    <T2> T2[] toArray(T2[] a) {
         return this.entries.entrySet().toArray(a);
     }
 
     @Override
-    public boolean containsAll(Collection<?> c) {
+    public
+    boolean containsAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public boolean removeAll(Collection<?> c) {
+    public
+    boolean removeAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public boolean retainAll(Collection<?> c) {
+    public
+    boolean retainAll(Collection<?> c) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public void clear() {
+    public
+    void clear() {
         StampedLock lock = this.lock;
 
         long stamp = lock.writeLock();
@@ -181,7 +199,8 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
     @Override
-    public int hashCode() {
+    public
+    int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + (int) (this.ID ^ this.ID >>> 32);
@@ -189,7 +208,8 @@ public abstract class AbstractConcurrentSet<T> implements Set<T> {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public
+    boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }

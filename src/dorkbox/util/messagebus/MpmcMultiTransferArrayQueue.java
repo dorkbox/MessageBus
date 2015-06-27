@@ -3,7 +3,7 @@ package dorkbox.util.messagebus;
 import org.jctools.queues.MpmcArrayQueue;
 import org.jctools.util.UnsafeAccess;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
 
 final
@@ -38,14 +38,6 @@ class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
      */
     private static final int PARK_UNTIMED_SPINS = PARK_TIMED_SPINS * 16;
 
-    private final int consumerCount;
-
-    public
-    MpmcMultiTransferArrayQueue(final int consumerCount) {
-        super(1024); // must be power of 2
-        this.consumerCount = consumerCount;
-    }
-
     private static final ThreadLocal<Object> nodeThreadLocal = new ThreadLocal<Object>() {
         @Override
         protected
@@ -53,6 +45,22 @@ class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
             return new MultiNode();
         }
     };
+
+    private static final ThreadLocal<Random> randomThreadLocal = new ThreadLocal<Random>() {
+        @Override
+        protected
+        Random initialValue() {
+            return new Random();
+        }
+    };
+
+    private final int consumerCount;
+
+    public
+    MpmcMultiTransferArrayQueue(final int consumerCount) {
+        super(1024); // must be power of 2
+        this.consumerCount = consumerCount;
+    }
 
 
     /**
@@ -714,7 +722,7 @@ class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
     private
     void park(final Object node, final Thread myThread) throws InterruptedException {
         int spins = -1; // initialized after first item and cancel checks
-        ThreadLocalRandom randomYields = null; // bound if needed
+        Random randomYields = null; // bound if needed
 
         for (; ; ) {
             if (MultiNode.lvThread(node) == null) {
@@ -725,7 +733,7 @@ class MpmcMultiTransferArrayQueue extends MpmcArrayQueue<Object> {
             }
             else if (spins < 0) {
                 spins = PARK_UNTIMED_SPINS;
-                randomYields = ThreadLocalRandom.current();
+                randomYields = randomThreadLocal.get();
             }
             else if (spins > 0) {
                 if (randomYields.nextInt(1024) == 0) {

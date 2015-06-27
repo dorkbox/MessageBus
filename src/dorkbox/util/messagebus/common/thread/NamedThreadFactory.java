@@ -10,14 +10,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public class NamedThreadFactory implements ThreadFactory {
+public
+class NamedThreadFactory implements ThreadFactory {
     /**
      * The stack size is arbitrary based on JVM implementation. Default is 0
      * 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
-     * <p>
+     * <p/>
      * To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)
      * Setting the size MAY or MAY NOT have any effect!!!
-     * <p>
+     * <p/>
      * Stack size must be specified in bytes. Default is 8k
      */
     private static final long stackSizeForThreads;
@@ -67,13 +68,15 @@ public class NamedThreadFactory implements ThreadFactory {
     private final ThreadGroup group;
     private final String groupName;
 
-    public NamedThreadFactory(String groupName) {
+    public
+    NamedThreadFactory(String groupName) {
         this.groupName = groupName;
         this.group = new ThreadGroup(groupName);
     }
 
     @Override
-    public Thread newThread(Runnable r) {
+    public
+    Thread newThread(Runnable r) {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append(this.groupName);
         stringBuilder.append('-');
@@ -83,7 +86,8 @@ public class NamedThreadFactory implements ThreadFactory {
         return newThread(stringBuilder.toString(), r);
     }
 
-    public Thread newThread(String name, Runnable r) {
+    public
+    Thread newThread(String name, Runnable r) {
         // stack size is arbitrary based on JVM implementation. Default is 0
         // 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k
         // To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)

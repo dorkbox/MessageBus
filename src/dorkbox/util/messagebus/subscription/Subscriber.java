@@ -5,7 +5,8 @@ import dorkbox.util.messagebus.utils.VarArgUtils;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public interface Subscriber {
+public
+interface Subscriber {
     float LOAD_FACTOR = 0.8F;
 
     AtomicBoolean getVarArgPossibility();

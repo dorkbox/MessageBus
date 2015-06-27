@@ -11,7 +11,8 @@ import dorkbox.util.messagebus.utils.VarArgUtils;
 import java.lang.reflect.Array;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class PublisherAll_MultiArg implements Publisher {
+public
+class PublisherAll_MultiArg implements Publisher {
     private final ErrorHandlingSupport errorHandler;
 
     private final Subscriber subscriber;
@@ -20,7 +21,8 @@ public class PublisherAll_MultiArg implements Publisher {
     private final AtomicBoolean varArgPossibility;
     final VarArgUtils varArgUtils;
 
-    public PublisherAll_MultiArg(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
+    public
+    PublisherAll_MultiArg(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
         this.errorHandler = errorHandler;
         this.subscriber = subscriber;
         this.lock = lock;
@@ -30,7 +32,8 @@ public class PublisherAll_MultiArg implements Publisher {
     }
 
     @Override
-    public void publish(final Object message1) {
+    public
+    void publish(final Object message1) {
         try {
             final Class<?> messageClass = message1.getClass();
             final boolean isArray = messageClass.isArray();
@@ -117,13 +120,14 @@ public class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
-                                                                      .setPublishedObject(message1));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
+                            e).setPublishedObject(message1));
         }
     }
 
     @Override
-    public void publish(final Object message1, final Object message2) {
+    public
+    void publish(final Object message1, final Object message2) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
@@ -215,13 +219,14 @@ public class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
-                                                                      .setPublishedObject(message1, message2));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
+                            e).setPublishedObject(message1, message2));
         }
     }
 
     @Override
-    public void publish(final Object message1, final Object message2, final Object message3) {
+    public
+    void publish(final Object message1, final Object message2, final Object message3) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
@@ -319,13 +324,14 @@ public class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(e)
-                                                                      .setPublishedObject(message1, message2, message3));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
+                            e).setPublishedObject(message1, message2, message3));
         }
     }
 
     @Override
-    public void publish(final Object[] messages) {
+    public
+    void publish(final Object[] messages) {
         publish((Object) messages);
     }
 }

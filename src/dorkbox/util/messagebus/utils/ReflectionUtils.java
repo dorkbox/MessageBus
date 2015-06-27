@@ -16,12 +16,15 @@ import java.util.HashSet;
  * @author dorkbox
  *         Date: 2/2/15
  */
-public final class ReflectionUtils {
+public final
+class ReflectionUtils {
 
-    private ReflectionUtils() {
+    private
+    ReflectionUtils() {
     }
 
-    public static Method[] getMethods(Class<?> target) {
+    public static
+    Method[] getMethods(Class<?> target) {
         ArrayList<Method> methods = new ArrayList<Method>();
 
         getMethods(target, methods);
@@ -30,7 +33,8 @@ public final class ReflectionUtils {
         return array;
     }
 
-    private static void getMethods(Class<?> target, ArrayList<Method> methods) {
+    private static
+    void getMethods(Class<?> target, ArrayList<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
                 if (getAnnotation(method, Handler.class) != null) {
@@ -51,7 +55,8 @@ public final class ReflectionUtils {
      * for an override of the given methods -> finds the bottom most override of the given
      * method if any exists
      */
-    public static Method getOverridingMethod(final Method overridingMethod, final Class<?> subclass) {
+    public static
+    Method getOverridingMethod(final Method overridingMethod, final Class<?> subclass) {
         Class<?> current = subclass;
         while (!current.equals(overridingMethod.getDeclaringClass())) {
             try {
@@ -70,7 +75,8 @@ public final class ReflectionUtils {
      * @param from The root class to start with
      * @return A set of classes, each representing a super type of the root class
      */
-    public static Class<?>[] getSuperTypes(Class<?> from) {
+    public static
+    Class<?>[] getSuperTypes(Class<?> from) {
         ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
 
         collectInterfaces(from, superclasses);
@@ -86,14 +92,16 @@ public final class ReflectionUtils {
         return classes;
     }
 
-    public static void collectInterfaces(Class<?> from, Collection<Class<?>> accumulator) {
+    public static
+    void collectInterfaces(Class<?> from, Collection<Class<?>> accumulator) {
         for (Class<?> intface : from.getInterfaces()) {
             accumulator.add(intface);
             collectInterfaces(intface, accumulator);
         }
     }
 
-    public static boolean containsOverridingMethod(final Method[] allMethods, final Method methodToCheck) {
+    public static
+    boolean containsOverridingMethod(final Method[] allMethods, final Method methodToCheck) {
         final int length = allMethods.length;
         Method method;
 
@@ -117,8 +125,8 @@ public final class ReflectionUtils {
      * @param <A>            Class of annotation type
      * @return Annotation instance or null
      */
-    private static <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType,
-                                                          Collection<AnnotatedElement> visited) {
+    private static
+    <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType, Collection<AnnotatedElement> visited) {
         if (visited.contains(from)) {
             return null;
         }
@@ -136,13 +144,15 @@ public final class ReflectionUtils {
         return null;
     }
 
-    public static <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType) {
+    public static
+    <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType) {
         A annotation = getAnnotation(from, annotationType, new HashSet<AnnotatedElement>(16));
         return annotation;
     }
 
     //
-    private static boolean isOverriddenBy(final Method superclassMethod, final Method subclassMethod) {
+    private static
+    boolean isOverriddenBy(final Method superclassMethod, final Method subclassMethod) {
         // if the declaring classes are the same or the subclass method is not defined in the subclass
         // hierarchy of the given superclass method or the method names are not the same then
         // subclassMethod does not override superclassMethod
