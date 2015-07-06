@@ -18,13 +18,13 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
 
         long average = 0;
 
-        final LinkedBlockingQueue queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
+        final LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
         average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
     }
 
-    public static long averageRun(int warmUpRuns, int sumCount, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    public static long averageRun(int warmUpRuns, int sumCount, LinkedBlockingQueue<Integer> queue, boolean showStats, int concurrency, int repetitions) throws Exception {
         int runs = warmUpRuns + sumCount;
         final long[] results = new long[runs];
         for (int i = 0; i < runs; i++) {
@@ -40,7 +40,7 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
         return sum/sumCount;
     }
 
-    private static long performanceRun(int runNumber, LinkedBlockingQueue queue, boolean showStats, int concurrency, int repetitions) throws Exception {
+    private static long performanceRun(int runNumber, LinkedBlockingQueue<Integer> queue, boolean showStats, int concurrency, int repetitions) throws Exception {
 
         Producer[] producers = new Producer[concurrency];
         Consumer[] consumers = new Consumer[concurrency];
@@ -91,18 +91,18 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
     }
 
     public static class Producer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final LinkedBlockingQueue<Integer> queue;
         volatile long start;
         private int repetitions;
 
-        public Producer(LinkedBlockingQueue queue, int repetitions) {
+        public Producer(LinkedBlockingQueue<Integer> queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue producer = this.queue;
+            LinkedBlockingQueue<Integer> producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
 
@@ -115,19 +115,19 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
     }
 
     public static class Consumer implements Runnable {
-        private final LinkedBlockingQueue queue;
+        private final LinkedBlockingQueue<Integer> queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(LinkedBlockingQueue queue, int repetitions) {
+        public Consumer(LinkedBlockingQueue<Integer> queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         @Override
         public void run() {
-            LinkedBlockingQueue consumer = this.queue;
+            LinkedBlockingQueue<Integer> consumer = this.queue;
             Object result = null;
             int i = this.repetitions;
 

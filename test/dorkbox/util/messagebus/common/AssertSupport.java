@@ -63,7 +63,8 @@ public class AssertSupport {
         Assert.fail(message);
     }
 
-    public void fail() {
+    public static
+    void fail() {
         Assert.fail();
     }
 

@@ -1,23 +1,13 @@
 package dorkbox.util.messagebus;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.Assert;
-
+import dorkbox.util.messagebus.common.AssertSupport;
+import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import org.junit.Before;
 import org.junit.Test;
 
-import dorkbox.util.messagebus.common.AssertSupport;
-import dorkbox.util.messagebus.common.ConcurrentExecutor;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This test ensures the correct behaviour of the set implementation that is the building
@@ -171,7 +161,7 @@ public abstract class ConcurrentSetTest extends AssertSupport {
 
         // ensure that the test set does not contain any of the elements that have been removed from it
         for (Object tar : testSet) {
-            Assert.assertTrue(!toRemove.contains(tar));
+            assertTrue(!toRemove.contains(tar));
         }
         // ensure that the test set still contains all objects from the source set that have not been marked
         // for removal
@@ -214,7 +204,7 @@ public abstract class ConcurrentSetTest extends AssertSupport {
 
         // ensure that the test set does not contain any of the elements that have been removed from it
         for (Object tar : testSet) {
-            Assert.assertTrue(!toRemove.contains(tar));
+            assertTrue(!toRemove.contains(tar));
         }
         // ensure that the test set still contains all objects from the source set that have not been marked
         // for removal

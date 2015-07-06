@@ -4,7 +4,6 @@ import dorkbox.util.messagebus.MessageBus;
 import dorkbox.util.messagebus.error.IPublicationErrorHandler;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.messages.MessageTypes;
-import junit.framework.Assert;
 import org.junit.Before;
 
 /**
@@ -14,7 +13,8 @@ import org.junit.Before;
  * @author bennidi
  *         Date: 3/2/13
  */
-public abstract class MessageBusTest extends AssertSupport {
+public abstract
+class MessageBusTest extends AssertSupport {
 
     // this value probably needs to be adjusted depending on the performance of the underlying plattform
     // otherwise the tests will fail since asynchronous processing might not have finished when
@@ -25,35 +25,43 @@ public abstract class MessageBusTest extends AssertSupport {
 
     protected static final IPublicationErrorHandler TestFailingHandler = new IPublicationErrorHandler() {
         @Override
-        public void handleError(PublicationError error) {
-            error.getCause().printStackTrace();
-            Assert.fail();
+        public
+        void handleError(PublicationError error) {
+            error.getCause()
+                 .printStackTrace();
+            fail();
         }
 
         @Override
-        public void handleError(final String error, final Class<?> listenerClass) {
+        public
+        void handleError(final String error, final Class<?> listenerClass) {
             System.err.println(error + " " + listenerClass);
         }
     };
 
     @Before
-    public void setUp() {
+    public
+    void setUp() {
         for (MessageTypes mes : MessageTypes.values()) {
             mes.reset();
         }
     }
 
 
-    public MessageBus createBus() {
+    public
+    MessageBus createBus() {
         MessageBus bus = new MessageBus();
-        bus.getErrorHandler().addErrorHandler(TestFailingHandler);
+        bus.getErrorHandler()
+           .addErrorHandler(TestFailingHandler);
         bus.start();
         return bus;
     }
 
-    public MessageBus createBus(ListenerFactory listeners) {
+    public
+    MessageBus createBus(ListenerFactory listeners) {
         MessageBus bus = new MessageBus();
-        bus.getErrorHandler().addErrorHandler(TestFailingHandler);
+        bus.getErrorHandler()
+           .addErrorHandler(TestFailingHandler);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
         bus.start();
         return bus;
