@@ -18,7 +18,7 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
 
         long average = 0;
 
-        final LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue(Integer.MAX_VALUE);
+        final LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue<Integer>(Integer.MAX_VALUE);
         average = averageRun(warmupRuns, runs, queue, true, concurrency, REPETITIONS);
 
         System.out.format("summary,QueuePerfTest,%s %,d\n", queue.getClass().getSimpleName(), average);
@@ -88,6 +88,10 @@ public class PerfTest_LinkedBlockingQueue_NonBlock {
             System.out.format("%d - ops/sec=%,d - %s\n", runNumber, ops, qName);
         }
         return ops;
+    }
+
+    private
+    PerfTest_LinkedBlockingQueue_NonBlock() {
     }
 
     public static class Producer implements Runnable {
