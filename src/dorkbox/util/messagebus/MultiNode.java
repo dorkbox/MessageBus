@@ -35,6 +35,7 @@ abstract class HotItem1 extends Pad0 {
     private Thread thread;
 }
 
+public
 class MultiNode extends HotItem1 {
     private static final long TYPE;
 
