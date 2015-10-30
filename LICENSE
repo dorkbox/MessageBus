@@ -3,7 +3,7 @@
       Copyright 2012, Benjamin Diedrichsen
 
 
-    - ASM - BSD License
+    - ASM - BSD 3-clause License
       http://asm.ow2.org
       Copyright 2012, France Télécom
         Bytecode manipulation framework and utilities
@@ -14,7 +14,7 @@
        Copyright 2013, JCTools, Nitsan Wakart
 
 
-    - ReflectASM - BSD License
+    - ReflectASM - BSD 3-clause License
       https://github.com/EsotericSoftware/reflectasm
       Copyright 2008, Nathan Sweet
 
