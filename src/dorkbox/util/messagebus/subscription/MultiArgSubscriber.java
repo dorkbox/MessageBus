@@ -199,36 +199,6 @@ class MultiArgSubscriber implements Subscriber {
     // can return null
     @Override
     public
-    Subscription[] getExactAndSuper(final Class<?> messageClass) {
-        ArrayList<Subscription> collection = getExactAsArray(messageClass); // can return null
-
-        // now publish superClasses
-        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
-
-        if (collection != null) {
-            collection = new ArrayList<Subscription>(collection);
-
-            if (!superSubscriptions.isEmpty()) {
-                collection.addAll(superSubscriptions);
-            }
-        }
-        else if (!superSubscriptions.isEmpty()) {
-            collection = superSubscriptions;
-        }
-
-        if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-            return subscriptions;
-        }
-        else {
-            return null;
-        }
-    }
-
-    // can return null
-    @Override
-    public
     Subscription[] getExact(final Class<?> messageClass) {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass);
 
@@ -275,7 +245,35 @@ class MultiArgSubscriber implements Subscriber {
         return null;
     }
 
+    // can return null
+    @Override
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass) {
+        ArrayList<Subscription> collection = getExactAsArray(messageClass); // can return null
 
+        // now publish superClasses
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
+        }
+        else if (!superSubscriptions.isEmpty()) {
+            collection = superSubscriptions;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
+    }
 
     // can return null
     @Override

@@ -86,7 +86,8 @@ class MessageBus implements IMessageBus {
      */
     public
     MessageBus(int numberOfThreads) {
-        this(PublishMode.ExactWithSuperTypes, SubscribeMode.MultiArg, numberOfThreads);
+        this(PublishMode.ExactWithSuperTypes, SubscribeMode.FirstArg, numberOfThreads);
+//        this(PublishMode.ExactWithSuperTypes, SubscribeMode.MultiArg, numberOfThreads);
     }
 
     /**
@@ -112,7 +113,7 @@ class MessageBus implements IMessageBus {
             subscriber = new MultiArgSubscriber(errorHandler, classUtils);
         }
         else {
-            subscriber = new FirstArgSubscriber(errorHandler);
+            subscriber = new FirstArgSubscriber(errorHandler, classUtils);
         }
 
         switch (publishMode) {
@@ -127,7 +128,6 @@ class MessageBus implements IMessageBus {
 
             case ExactWithSuperTypes:
                 if (isMultiArg) {
-
                     subscriptionPublisher = new PublisherExactWithSuperTypes_MultiArg(errorHandler, subscriber, lock);
                 }
                 else {

@@ -18,6 +18,8 @@ package dorkbox.util.messagebus.subscription;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import dorkbox.util.messagebus.utils.ClassUtils;
+import dorkbox.util.messagebus.utils.SubscriptionUtils;
 import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
@@ -36,6 +38,8 @@ public class FirstArgSubscriber implements Subscriber {
 
     private final ErrorHandlingSupport errorHandler;
 
+    private final SubscriptionUtils subUtils;
+
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
@@ -44,11 +48,13 @@ public class FirstArgSubscriber implements Subscriber {
     private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessage;
 
 
-    public FirstArgSubscriber(final ErrorHandlingSupport errorHandler) {
+    public FirstArgSubscriber(final ErrorHandlingSupport errorHandler, final ClassUtils classUtils) {
         this.errorHandler = errorHandler;
 
         // the following are used ONLY for FIRST ARG subscription/publication. (subscriptionsPerMessageMulti isn't used in this case)
         this.subscriptionsPerMessage = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, 1);
+
+        this.subUtils = new SubscriptionUtils(classUtils, Subscriber.LOAD_FACTOR);
     }
 
     // inside a write lock
@@ -79,7 +85,7 @@ public class FirstArgSubscriber implements Subscriber {
             size = messageHandlerTypes.length;
 
             if (size == 0) {
-                errorHandler.handleError("Error while trying to subscribe class", listenerClass);
+                errorHandler.handleError("Error while trying to subscribe class: " + messageHandlerTypes.getClass(), listenerClass);
                 continue;
             }
 
@@ -115,50 +121,135 @@ public class FirstArgSubscriber implements Subscriber {
 
     }
 
+    // can return null
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass) {
         return subscriptionsPerMessage.get(messageClass);
     }
 
+    // can return null
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2) {
         return subscriptionsPerMessage.get(messageClass1);
     }
 
+    // can return null
     @Override
     public ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2,
                                                    final Class<?> messageClass3) {
         return subscriptionsPerMessage.get(messageClass1);
     }
 
+    // can return null
     @Override
-    public Subscription[] getExact(final Class<?> deadMessageClass) {
-        return new Subscription[0];
+    public
+    Subscription[] getExact(final Class<?> messageClass) {
+        final ArrayList<Subscription> collection = getExactAsArray(messageClass);
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            return subscriptions;
+        }
+
+        return null;
     }
 
+    // can return null
     @Override
     public Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2) {
-        return new Subscription[0];
+        return null;
     }
 
+    // can return null
     @Override
     public Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
-        return new Subscription[0];
+        return null;
     }
 
-
+    // can return null
     @Override
     public Subscription[] getExactAndSuper(final Class<?> messageClass) {
-        return new Subscription[0];
+        ArrayList<Subscription> collection = getExactAsArray(messageClass); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
+        }
+        else if (!superSubscriptions.isEmpty()) {
+            collection = superSubscriptions;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
     }
 
     @Override
     public Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
-        return new Subscription[0];
+        ArrayList<Subscription> collection = getExactAsArray(messageClass1); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass1, this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
+        }
+        else if (!superSubscriptions.isEmpty()) {
+            collection = superSubscriptions;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
     }
 
     @Override
     public Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
-        return new Subscription[0];
+        ArrayList<Subscription> collection = getExactAsArray(messageClass1); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass1, this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
+        }
+        else if (!superSubscriptions.isEmpty()) {
+            collection = superSubscriptions;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
     }
 }
