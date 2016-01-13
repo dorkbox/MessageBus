@@ -64,7 +64,7 @@ class DefaultErrorHandler implements ErrorHandlingSupport {
 
     @Override
     public
-    void start() {
+    void init() {
         synchronized (this.errorHandlers) {
             if (this.errorHandlers.isEmpty()) {
                 this.errorHandlers.add(new IPublicationErrorHandler.ConsoleLogger());

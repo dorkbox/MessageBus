@@ -107,7 +107,6 @@ public class PerfTest_MpmcArrayQueue_Concurrent {
 
             do {
                 while (!producer.offer(TEST_VALUE)) {
-                    Thread.yield();
                 }
             } while (0 != --i);
         }
@@ -130,7 +129,6 @@ public class PerfTest_MpmcArrayQueue_Concurrent {
 
             do {
                 while (null == (result = consumer.poll())) {
-                    Thread.yield();
                 }
             } while (0 != --i);
 

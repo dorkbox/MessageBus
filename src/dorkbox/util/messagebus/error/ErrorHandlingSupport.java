@@ -57,5 +57,5 @@ interface ErrorHandlingSupport {
 
     void handleError(String error, Class<?> listenerClass);
 
-    void start();
+    void init();
 }
