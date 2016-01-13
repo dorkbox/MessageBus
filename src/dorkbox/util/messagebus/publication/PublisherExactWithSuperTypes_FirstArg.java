@@ -24,6 +24,7 @@ import dorkbox.util.messagebus.subscription.Subscription;
 
 import java.util.Arrays;
 
+@SuppressWarnings("Duplicates")
 public
 class PublisherExactWithSuperTypes_FirstArg implements Publisher {
     private final ErrorHandlingSupport errorHandler;
@@ -78,8 +79,9 @@ class PublisherExactWithSuperTypes_FirstArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1));
         }
     }
 
@@ -124,8 +126,9 @@ class PublisherExactWithSuperTypes_FirstArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1, message2));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2));
         }
     }
 
@@ -170,8 +173,9 @@ class PublisherExactWithSuperTypes_FirstArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1, message2, message3));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2, message3));
         }
     }
 
@@ -219,8 +223,9 @@ class PublisherExactWithSuperTypes_FirstArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(messages));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(messages));
         }
     }
 }

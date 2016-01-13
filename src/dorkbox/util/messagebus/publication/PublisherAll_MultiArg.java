@@ -26,6 +26,7 @@ import dorkbox.util.messagebus.utils.VarArgUtils;
 import java.lang.reflect.Array;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@SuppressWarnings("Duplicates")
 public
 class PublisherAll_MultiArg implements Publisher {
     private final ErrorHandlingSupport errorHandler;
@@ -135,8 +136,9 @@ class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1));
         }
     }
 
@@ -234,8 +236,9 @@ class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1, message2));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2));
         }
     }
 
@@ -339,8 +342,9 @@ class PublisherAll_MultiArg implements Publisher {
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.").setCause(
-                            e).setPublishedObject(message1, message2, message3));
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2, message3));
         }
     }
 
