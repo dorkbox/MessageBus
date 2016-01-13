@@ -54,36 +54,18 @@ public class FirstArgSubscriber implements Subscriber {
     // inside a write lock
     // add this subscription to each of the handled types
     // to activate this sub for publication
-    private void registerFirst(final Subscription subscription, final Class<?> listenerClass,
-                               final Map<Class<?>, ArrayList<Subscription>> subscriptions) {
-
-        final MessageHandler handler = subscription.getHandler();
-        final Class<?>[] messageHandlerTypes = handler.getHandledMessages();
-        final int size = messageHandlerTypes.length;
-
-        if (size == 0) {
-            errorHandler.handleError("Error while trying to subscribe class", listenerClass);
-            return;
-        }
-
-        final Class<?> type0 = messageHandlerTypes[0];
-
-        ArrayList<Subscription> subs = subscriptions.get(type0);
-        if (subs == null) {
-            subs = new ArrayList<Subscription>();
-
-            subscriptions.put(type0, subs);
-        }
-
-        subs.add(subscription);
-    }
-
     @Override
     public void register(final Class<?> listenerClass, final int handlersSize, final Subscription[] subsPerListener) {
 
         final Map<Class<?>, ArrayList<Subscription>> subscriptions = this.subscriptionsPerMessage;
 
         Subscription subscription;
+        MessageHandler handler;
+        Class<?>[] messageHandlerTypes;
+        int size;
+
+        Class<?> type0;
+        ArrayList<Subscription> subs;
 
         for (int i = 0; i < handlersSize; i++) {
             subscription = subsPerListener[i];
@@ -92,7 +74,24 @@ public class FirstArgSubscriber implements Subscriber {
             // now add this subscription to each of the handled types
 
             // only register based on the FIRST parameter
-            registerFirst(subscription, listenerClass, subscriptions);
+            handler = subscription.getHandler();
+            messageHandlerTypes = handler.getHandledMessages();
+            size = messageHandlerTypes.length;
+
+            if (size == 0) {
+                errorHandler.handleError("Error while trying to subscribe class", listenerClass);
+                continue;
+            }
+
+            type0 = messageHandlerTypes[0];
+            subs = subscriptions.get(type0);
+            if (subs == null) {
+                subs = new ArrayList<Subscription>();
+
+                subscriptions.put(type0, subs);
+            }
+
+            subs.add(subscription);
         }
     }
 
