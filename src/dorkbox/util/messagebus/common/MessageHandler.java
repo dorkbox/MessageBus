@@ -67,10 +67,10 @@ import java.util.Arrays;
  */
 public
 class MessageHandler {
-
     // publish all listeners defined by the given class (includes
     // listeners defined in super classes)
     public static
+//cache this?
     MessageHandler[] get(final Class<?> target) {
 
         // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)

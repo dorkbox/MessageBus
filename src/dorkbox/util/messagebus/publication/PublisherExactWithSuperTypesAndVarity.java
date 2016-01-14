@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @SuppressWarnings("Duplicates")
 public
-class PublisherAll_MultiArg implements Publisher {
+class PublisherExactWithSuperTypesAndVarity implements Publisher {
     private final ErrorHandlingSupport errorHandler;
 
     private final Subscriber subscriber;
@@ -38,7 +38,7 @@ class PublisherAll_MultiArg implements Publisher {
     final VarArgUtils varArgUtils;
 
     public
-    PublisherAll_MultiArg(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
+    PublisherExactWithSuperTypesAndVarity(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
         this.errorHandler = errorHandler;
         this.subscriber = subscriber;
         this.lock = lock;
@@ -82,7 +82,7 @@ class PublisherAll_MultiArg implements Publisher {
                 int length = varArgSubs.length;
                 Object[] asArray = null;
 
-                if (length > 1) {
+                if (length > 0) {
                     hasSubs = true;
 
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
@@ -103,7 +103,7 @@ class PublisherAll_MultiArg implements Publisher {
 
                 length = varArgSuperSubs.length;
 
-                if (length > 1) {
+                if (length > 0) {
                     hasSubs = true;
 
                     if (asArray == null) {

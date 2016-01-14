@@ -30,13 +30,9 @@ import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.publication.Publisher;
-import dorkbox.util.messagebus.publication.PublisherAll_MultiArg;
-import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes_FirstArg;
-import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes_MultiArg;
-import dorkbox.util.messagebus.publication.PublisherExact_FirstArg;
-import dorkbox.util.messagebus.publication.PublisherExact_MultiArg;
-import dorkbox.util.messagebus.subscription.FirstArgSubscriber;
-import dorkbox.util.messagebus.subscription.MultiArgSubscriber;
+import dorkbox.util.messagebus.publication.PublisherExact;
+import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
+import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypesAndVarity;
 import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.utils.ClassUtils;
@@ -62,7 +58,7 @@ class MessageBus implements IMessageBus {
     private final ClassUtils classUtils;
     private final SubscriptionManager subscriptionManager;
 
-    private final Publisher subscriptionPublisher;
+    private final Publisher publisher;
 
     /**
      * Notifies the consumers during shutdown, that it's on purpose.
@@ -74,30 +70,40 @@ class MessageBus implements IMessageBus {
     private Sequence workSequence;
 
     /**
-     * By default, will permit subTypes and VarArg matching, and will use half of CPUs available for dispatching async messages
+     * By default, will permit subTypes and Varity Argument matching, and will use half of CPUs available for dispatching async messages
      */
     public
     MessageBus() {
-        this(Runtime.getRuntime().availableProcessors());
+        this(Runtime.getRuntime().availableProcessors()/2);
     }
 
     /**
-     * @param numberOfThreads how many threads to have for dispatching async messages
+     * By default, will permit subTypes and Varity Argument matching
+     *
+     * @param numberOfThreads how many threads to use for dispatching async messages
      */
     public
     MessageBus(int numberOfThreads) {
-        this(PublishMode.ExactWithSuperTypes, SubscribeMode.FirstArg, numberOfThreads);
-//        this(PublishMode.ExactWithSuperTypes, SubscribeMode.MultiArg, numberOfThreads);
+        this(PublishMode.ExactWithSuperTypesAndVarity, numberOfThreads);
     }
 
     /**
+     * By default, will use half of CPUs available for dispatching async messages
+     *
      * @param publishMode     Specifies which publishMode to operate the publication of messages.
-     * @param numberOfThreads how many threads to have for dispatching async messages
      */
     public
-    MessageBus(final PublishMode publishMode, final SubscribeMode subscribeMode, int numberOfThreads) {
+    MessageBus(final PublishMode publishMode) {
+        this(publishMode, Runtime.getRuntime().availableProcessors()/2);
+    }
+    /**
+     * @param publishMode     Specifies which publishMode to operate the publication of messages.
+     * @param numberOfThreads how many threads to use for dispatching async messages
+     */
+    public
+    MessageBus(final PublishMode publishMode, int numberOfThreads) {
         // round to the nearest power of 2
-        numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads) - 1));
+        numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads)));
 
         this.errorHandler = new DefaultErrorHandler();
 //        this.dispatchQueue = new ArrayBlockingQueue<Object>(6);
@@ -106,43 +112,25 @@ class MessageBus implements IMessageBus {
 
         final StampedLock lock = new StampedLock();
 
-        boolean isMultiArg = subscribeMode == SubscribeMode.MultiArg;
 
         final Subscriber subscriber;
-        if (isMultiArg) {
-            subscriber = new MultiArgSubscriber(errorHandler, classUtils);
-        }
-        else {
-            subscriber = new FirstArgSubscriber(errorHandler, classUtils);
-        }
+            /**
+             * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
+             */
+            subscriber = new Subscriber(errorHandler, classUtils);
 
         switch (publishMode) {
             case Exact:
-                if (isMultiArg) {
-                    subscriptionPublisher = new PublisherExact_MultiArg(errorHandler, subscriber, lock);
-                }
-                else {
-                    subscriptionPublisher = new PublisherExact_FirstArg(errorHandler, subscriber, lock);
-                }
+                publisher = new PublisherExact(errorHandler, subscriber, lock);
                 break;
 
             case ExactWithSuperTypes:
-                if (isMultiArg) {
-                    subscriptionPublisher = new PublisherExactWithSuperTypes_MultiArg(errorHandler, subscriber, lock);
-                }
-                else {
-                    subscriptionPublisher = new PublisherExactWithSuperTypes_FirstArg(errorHandler, subscriber, lock);
-                }
+                publisher = new PublisherExactWithSuperTypes(errorHandler, subscriber, lock);
                 break;
 
-            case ExactWithSuperTypesAndVarArgs:
+            case ExactWithSuperTypesAndVarity:
             default:
-                if (isMultiArg) {
-                    subscriptionPublisher = new PublisherAll_MultiArg(errorHandler, subscriber, lock);
-                }
-                else {
-                    throw new RuntimeException("Unable to run in expected configuration");
-                }
+                publisher = new PublisherExactWithSuperTypesAndVarity(errorHandler, subscriber, lock);
         }
 
         this.subscriptionManager = new SubscriptionManager(numberOfThreads, subscriber, lock);
@@ -161,7 +149,7 @@ class MessageBus implements IMessageBus {
         // setup the work handlers
         handlers = new MessageHandler[numberOfThreads];
         for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new MessageHandler(subscriptionPublisher);  // exactly one per thread is used
+            handlers[i] = new MessageHandler(publisher);  // exactly one per thread is used
         }
 
 
@@ -336,25 +324,25 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publish(final Object message) {
-        subscriptionPublisher.publish(message);
+        publisher.publish(message);
     }
 
     @Override
     public
     void publish(final Object message1, final Object message2) {
-        subscriptionPublisher.publish(message1, message2);
+        publisher.publish(message1, message2);
     }
 
     @Override
     public
     void publish(final Object message1, final Object message2, final Object message3) {
-        subscriptionPublisher.publish(message1, message2, message3);
+        publisher.publish(message1, message2, message3);
     }
 
     @Override
     public
     void publish(final Object[] messages) {
-        subscriptionPublisher.publish(messages);
+        publisher.publish(messages);
     }
 
     @Override

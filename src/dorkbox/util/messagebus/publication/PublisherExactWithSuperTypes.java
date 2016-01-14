@@ -24,13 +24,13 @@ import dorkbox.util.messagebus.subscription.Subscription;
 
 @SuppressWarnings("Duplicates")
 public
-class PublisherExactWithSuperTypes_MultiArg implements Publisher {
+class PublisherExactWithSuperTypes implements Publisher {
     private final ErrorHandlingSupport errorHandler;
     private final Subscriber subscriber;
     private final StampedLock lock;
 
     public
-    PublisherExactWithSuperTypes_MultiArg(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
+    PublisherExactWithSuperTypes(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
         this.errorHandler = errorHandler;
         this.subscriber = subscriber;
         this.lock = lock;

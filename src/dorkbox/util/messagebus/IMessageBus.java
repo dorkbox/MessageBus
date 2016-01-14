@@ -112,22 +112,10 @@ public interface IMessageBus extends PubSubSupport {
 
         /**
          * Will publish to listeners with this exact message signature, as well as listeners that match the super class types signatures.
-         * and to listeners that have matching varity arguments. (ie: a listener that matches Obeject[], will accept messages of type Object)
+         * and to listeners that have matching varity arguments. (ie: a listener that matches Object[], will accept messages of type Object)
          */
-        ExactWithSuperTypesAndVarArgs,
+        ExactWithSuperTypesAndVarity,
     }
-
-    enum SubscribeMode {
-        /**
-         * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
-         */
-        MultiArg,
-        /**
-         * Will subscribe and publish using only the FIRST provided parameter in the method signature (for subscribe), and arguments (for publish)
-         */
-        FirstArg,
-    }
-
 
     /**
      * Check whether any asynchronous message publications are pending to be processed

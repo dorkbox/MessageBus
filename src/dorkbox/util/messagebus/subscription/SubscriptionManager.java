@@ -130,7 +130,7 @@ class SubscriptionManager {
 
             // it was still null, so we actually have to create the rest of the subs
             if (subscriptions == null) {
-                subscriber.register(listenerClass, handlersSize, subsPerListener);
+                subscriber.register(listenerClass, handlersSize, subsPerListener); // this adds to subscriptionsPerMessage
 
                 subsPerListenerMap.put(listenerClass, subsPerListener);
                 lock.unlockWrite(stamp);

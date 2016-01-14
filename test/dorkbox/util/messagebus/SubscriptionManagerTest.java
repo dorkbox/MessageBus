@@ -28,7 +28,6 @@ import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.listeners.*;
 import dorkbox.util.messagebus.messages.*;
-import dorkbox.util.messagebus.subscription.MultiArgSubscriber;
 import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.utils.ClassUtils;
@@ -160,7 +159,7 @@ public class SubscriptionManagerTest extends AssertSupport {
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
         final StampedLock lock = new StampedLock();
         final ClassUtils classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
-        final Subscriber subscriber = new MultiArgSubscriber(errorHandler, classUtils);
+        final Subscriber subscriber = new Subscriber(errorHandler, classUtils);
 
         SubscriptionManager subscriptionManager = new SubscriptionManager(1, subscriber, lock);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
@@ -184,7 +183,7 @@ public class SubscriptionManagerTest extends AssertSupport {
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
         final StampedLock lock = new StampedLock();
         final ClassUtils classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
-        final Subscriber subscriber = new MultiArgSubscriber(errorHandler, classUtils);
+        final Subscriber subscriber = new Subscriber(errorHandler, classUtils);
 
         final SubscriptionManager subscriptionManager = new SubscriptionManager(1, subscriber, lock);
 

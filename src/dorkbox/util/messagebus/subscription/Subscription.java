@@ -39,13 +39,14 @@ package dorkbox.util.messagebus.subscription;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
 import dorkbox.util.messagebus.common.MessageHandler;
-import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -78,10 +79,20 @@ class Subscription {
     public
     Subscription(final MessageHandler handler, final float loadFactor, final int stripeSize) {
         this.handlerMetadata = handler;
-        this.listeners = new StrongConcurrentSetV8<Object>(16, loadFactor, stripeSize);
+//        this.listeners = new StrongConcurrentSetV8<Object>(16, loadFactor, stripeSize);
+
+        ///this is by far, the fastest
+        this.listeners = new ConcurrentSkipListSet<>(new Comparator() {
+            @Override
+            public
+            int compare(final Object o1, final Object o2) {
+                return Integer.compare(o1.hashCode(), o2.hashCode());
+            }
+        });
 //        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
 //        this.listeners = new ConcurrentLinkedQueue2<Object>();
 //        this.listeners = new CopyOnWriteArrayList<Object>();
+//        this.listeners = new CopyOnWriteArraySet<Object>();  // not very good
 
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
