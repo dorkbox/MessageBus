@@ -41,10 +41,10 @@ class VarArgUtils {
         this.superClassUtils = superClassUtils;
 
         this.varArgSubscriptionsSingle = JavaVersionAdapter.concurrentMap(16, loadFactor, 1);
-        this.varArgSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
+        this.varArgSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
 
         this.varArgSuperSubscriptionsSingle = JavaVersionAdapter.concurrentMap(16, loadFactor, 1);
-        this.varArgSuperSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
+        this.varArgSuperSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 
 

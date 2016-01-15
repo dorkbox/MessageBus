@@ -43,7 +43,7 @@ public class ObjectTreeTest extends AssertSupport {
 
     @Test
     public void testObjectTree() {
-        HashMapTree<Class<?>, String> tree = new HashMapTree<Class<?>, String>(8, 0.8F);
+        HashMapTree<Class<?>, String> tree = new HashMapTree<Class<?>, String>();
 
         test(tree, "s", String.class);
         test(tree, "x", String.class);

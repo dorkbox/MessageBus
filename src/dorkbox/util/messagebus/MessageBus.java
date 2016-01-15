@@ -24,7 +24,6 @@ import com.lmax.disruptor.SequenceBarrier;
 import com.lmax.disruptor.Sequencer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
-import dorkbox.util.messagebus.common.adapter.StampedLock;
 import dorkbox.util.messagebus.common.thread.NamedThreadFactory;
 import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
@@ -51,6 +50,7 @@ import java.util.concurrent.locks.LockSupport;
 public
 class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
+//    private final LinkedBlockingQueue<Object> dispatchQueue;
 //    private final ArrayBlockingQueue<Object> dispatchQueue;
 //    private final LinkedTransferQueue<Object> dispatchQueue;
 //    private final Collection<Thread> threads;
@@ -94,7 +94,7 @@ class MessageBus implements IMessageBus {
      */
     public
     MessageBus(final PublishMode publishMode) {
-        this(publishMode, Runtime.getRuntime().availableProcessors()/2);
+        this(publishMode, Runtime.getRuntime().availableProcessors());
     }
     /**
      * @param publishMode     Specifies which publishMode to operate the publication of messages.
@@ -103,15 +103,13 @@ class MessageBus implements IMessageBus {
     public
     MessageBus(final PublishMode publishMode, int numberOfThreads) {
         // round to the nearest power of 2
-        numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads)));
+        numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads) - 1));
 
         this.errorHandler = new DefaultErrorHandler();
-//        this.dispatchQueue = new ArrayBlockingQueue<Object>(6);
+//        this.dispatchQueue = new LinkedBlockingQueue<Object>(1024);
+//        this.dispatchQueue = new ArrayBlockingQueue<Object>(1024);
 //        this.dispatchQueue = new LinkedTransferQueue<Object>();
         classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
-
-        final StampedLock lock = new StampedLock();
-
 
         final Subscriber subscriber;
             /**
@@ -121,19 +119,19 @@ class MessageBus implements IMessageBus {
 
         switch (publishMode) {
             case Exact:
-                publisher = new PublisherExact(errorHandler, subscriber, lock);
+                publisher = new PublisherExact(errorHandler, subscriber);
                 break;
 
             case ExactWithSuperTypes:
-                publisher = new PublisherExactWithSuperTypes(errorHandler, subscriber, lock);
+                publisher = new PublisherExactWithSuperTypes(errorHandler, subscriber);
                 break;
 
             case ExactWithSuperTypesAndVarity:
             default:
-                publisher = new PublisherExactWithSuperTypesAndVarity(errorHandler, subscriber, lock);
+                publisher = new PublisherExactWithSuperTypesAndVarity(errorHandler, subscriber);
         }
 
-        this.subscriptionManager = new SubscriptionManager(numberOfThreads, subscriber, lock);
+        this.subscriptionManager = new SubscriptionManager(numberOfThreads, subscriber);
 
 
         // Now we setup the disruptor and work handlers
@@ -156,6 +154,7 @@ class MessageBus implements IMessageBus {
 //        final int BUFFER_SIZE = ringBufferSize * 64;
 //        final int BUFFER_SIZE = 1024 * 64;
 //        final int BUFFER_SIZE = 1024;
+//        final int BUFFER_SIZE = 16;
         final int BUFFER_SIZE = 8;
 
 
@@ -212,8 +211,9 @@ class MessageBus implements IMessageBus {
 //                @Override
 //                public
 //                void run() {
-//                    ArrayBlockingQueue<?> IN_QUEUE = MessageBus.this.dispatchQueue;
-////                    LinkedTransferQueue<?> IN_QUEUE = MessageBus.this.dispatchQueue;
+////                    LinkedBlockingQueue<?> IN_QUEUE = MessageBus.this.dispatchQueue;
+////                    ArrayBlockingQueue<?> IN_QUEUE = MessageBus.this.dispatchQueue;
+//                    LinkedTransferQueue<?> IN_QUEUE = MessageBus.this.dispatchQueue;
 //
 //                    MultiNode node = new MultiNode();
 //                    while (!MessageBus.this.shuttingDown) {
@@ -369,7 +369,8 @@ class MessageBus implements IMessageBus {
         }
 
 //        try {
-//            this.dispatchQueue.put(message);
+//            this.dispatchQueue.transfer(message);
+////            this.dispatchQueue.put(message);
 //        } catch (Exception e) {
 //            errorHandler.handlePublicationError(new PublicationError().setMessage(
 //                            "Error while adding an asynchronous message").setCause(e).setPublishedObject(message));
@@ -458,7 +459,6 @@ class MessageBus implements IMessageBus {
 //        for (Thread t : this.threads) {
 //            t.start();
 //        }
-
     }
 
     @Override
@@ -483,6 +483,4 @@ class MessageBus implements IMessageBus {
         this.subscriptionManager.shutdown();
         this.classUtils.clear();
     }
-
-
 }

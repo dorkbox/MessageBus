@@ -17,9 +17,11 @@ package dorkbox.util.messagebus.subscription;
 
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
-import dorkbox.util.messagebus.common.adapter.StampedLock;
 
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
@@ -39,19 +41,15 @@ class SubscriptionManager {
     // this map provides fast access for subscribing and unsubscribing
     // write access is synchronized and happens very infrequently
     // once a collection of subscriptions is stored it does not change
-    private final Map<Class<?>, Subscription[]> subscriptionsPerListener;
+    private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
 
-    private final StampedLock lock;
-    private final int numberOfThreads;
     private final Subscriber subscriber;
 
 
     public
-    SubscriptionManager(final int numberOfThreads, final Subscriber subscriber, final StampedLock lock) {
-        this.numberOfThreads = numberOfThreads;
+    SubscriptionManager(final int numberOfThreads, final Subscriber subscriber) {
         this.subscriber = subscriber;
-        this.lock = lock;
 
 
         // modified ONLY during SUB/UNSUB
@@ -85,11 +83,13 @@ class SubscriptionManager {
         // these are concurrent collections
         subscriber.clear();
 
-        Subscription[] subscriptions = getListenerSubs(listenerClass);
+        // this is an array, because subscriptions for a specific listener CANNOT change, either they exist or do not exist.
+        // ONCE subscriptions are in THIS map, they are considered AVAILABLE.
+        Subscription[] subscriptions = this.subscriptionsPerListener.get(listenerClass);
 
         // the subscriptions from the map were null, so create them
         if (subscriptions == null) {
-            // it is important to note that this section CAN be repeated, however the write lock is gained before
+            // it is important to note that this section CAN be repeated.
             // anything 'permanent' is saved. This is so the time spent inside the writelock is minimized.
 
             final MessageHandler[] messageHandlers = MessageHandler.get(listenerClass);
@@ -101,50 +101,80 @@ class SubscriptionManager {
                 return;
             }
 
-            final Subscription[] subsPerListener = new Subscription[handlersSize];
 
 
-            // create the subscription
-            MessageHandler messageHandler;
+            final AtomicBoolean varArgPossibility = subscriber.varArgPossibility;
             Subscription subscription;
 
+            MessageHandler messageHandler;
+            Class<?>[] messageHandlerTypes;
+            Class<?> handlerType;
+
+            // create the subscriptions
+            final ConcurrentMap<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = subscriber.subscriptionsPerMessageSingle;
+            subscriptions = new Subscription[handlersSize];
+
             for (int i = 0; i < handlersSize; i++) {
+                // THE HANDLER IS THE SAME FOR ALL SUBSCRIPTIONS OF THE SAME TYPE!
                 messageHandler = messageHandlers[i];
 
-                // create the subscription
-                subscription = new Subscription(messageHandler, Subscriber.LOAD_FACTOR, numberOfThreads);
-                subscription.subscribe(listener);
+                // is this handler able to accept var args?
+                if (messageHandler.getVarArgClass() != null) {
+                    varArgPossibility.lazySet(true);
+                }
 
-                subsPerListener[i] = subscription; // activates this sub for sub/unsub
+                // now create a list of subscriptions for this specific handlerType (but don't add anything yet).
+                // we only store things based on the FIRST type (for lookup) then parse the rest of the types during publication
+                messageHandlerTypes = messageHandler.getHandledMessages();
+                handlerType = messageHandlerTypes[0];
+
+                // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
+                final ArrayList<Subscription> cachedSubs = subscriber.listCache.get();
+                ArrayList<Subscription> subs = subsPerMessageSingle.putIfAbsent(handlerType, cachedSubs);
+                if (subs == null) {
+                    subscriber.listCache.set(new ArrayList<Subscription>(8));
+                }
+
+                // create the subscription. This can be thrown away if the subscription succeeds in another thread
+                subscription = new Subscription(messageHandler);
+                subscriptions[i] = subscription;
+
+                // now add this subscription to each of the handled types
             }
 
-            final Map<Class<?>, Subscription[]> subsPerListenerMap = this.subscriptionsPerListener;
+            // now subsPerMessageSingle has a unique list of subscriptions for a specific handlerType, and MAY already have subscriptions
 
-            // now write lock for the least expensive part. This is a deferred "double checked lock", but is necessary because
-            // of the huge number of reads compared to writes.
+            // putIfAbsent
+            final Subscription[] previousSubs = subscriptionsPerListener.putIfAbsent(listenerClass, subscriptions); // activates this sub for sub/unsub
+            if (previousSubs != null) {
+                // another thread beat us to creating subs (for this exact listenerClass). Since another thread won, we have to make sure
+                // all of the subscriptions are correct for a specific handler type, so we have to RECONSTRUT the correct list again.
+                // This is to make sure that "invalid" subscriptions don't exist in subsPerMessageSingle.
 
-            final StampedLock lock = this.lock;
-            final long stamp = lock.writeLock();
+                // since nothing is yet "subscribed" we can assign the correct values for everything now
+                subscriptions = previousSubs;
+            } else {
+                // we can now safely add for publication AND subscribe since the data structures are consistent
+                for (int i = 0; i < handlersSize; i++) {
+                    subscription = subscriptions[i];
+                    subscription.subscribe(listener);  // register this callback listener to this subscription
 
-            subscriptions = subsPerListenerMap.get(listenerClass);
+                    // THE HANDLER IS THE SAME FOR ALL SUBSCRIPTIONS OF THE SAME TYPE!
+                    messageHandler = messageHandlers[i];
 
-            // it was still null, so we actually have to create the rest of the subs
-            if (subscriptions == null) {
-                subscriber.register(listenerClass, handlersSize, subsPerListener); // this adds to subscriptionsPerMessage
+                    // register for publication
+                    messageHandlerTypes = messageHandler.getHandledMessages();
+                    handlerType = messageHandlerTypes[0];
 
-                subsPerListenerMap.put(listenerClass, subsPerListener);
-                lock.unlockWrite(stamp);
+                    // makes this subscription visible for publication
+                    subsPerMessageSingle.get(handlerType).add(subscription);
+                }
 
                 return;
-            }
-            else {
-                // continue to subscription
-                lock.unlockWrite(stamp);
             }
         }
 
         // subscriptions already exist and must only be updated
-        // only publish here if our single-check was OK, or our double-check was OK
         Subscription subscription;
         for (int i = 0; i < subscriptions.length; i++) {
             subscription = subscriptions[i];
@@ -167,7 +197,7 @@ class SubscriptionManager {
         // these are concurrent collections
         subscriber.clear();
 
-        final Subscription[] subscriptions = getListenerSubs(listenerClass);
+        final Subscription[] subscriptions = this.subscriptionsPerListener.get(listenerClass);
         if (subscriptions != null) {
             Subscription subscription;
 
@@ -176,17 +206,5 @@ class SubscriptionManager {
                 subscription.unsubscribe(listener);
             }
         }
-    }
-
-    private
-    Subscription[] getListenerSubs(final Class<?> listenerClass) {
-
-        final StampedLock lock = this.lock;
-        final long stamp = lock.readLock();
-
-        final Subscription[] subscriptions = this.subscriptionsPerListener.get(listenerClass);
-
-        lock.unlockRead(stamp);
-        return subscriptions;
     }
 }

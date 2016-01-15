@@ -25,11 +25,13 @@ import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
  */
+@SuppressWarnings("Duplicates")
 public
 class Subscriber {
     public static final float LOAD_FACTOR = 0.8F;
@@ -42,13 +44,13 @@ class Subscriber {
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    private final Map<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
+    final ConcurrentMap<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageSingle;
     private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
     // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
-    private final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
+    final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
 
-    private ThreadLocal<ArrayList<Subscription>> listCache = new ThreadLocal<ArrayList<Subscription>>() {
+    ThreadLocal<ArrayList<Subscription>> listCache = new ThreadLocal<ArrayList<Subscription>>() {
         @Override
         protected
         ArrayList<Subscription> initialValue() {
@@ -63,7 +65,7 @@ class Subscriber {
         this.errorHandler = errorHandler;
 
         this.subscriptionsPerMessageSingle = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, 1);
-        this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, LOAD_FACTOR);
+        this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
 
         this.subUtils = new SubscriptionUtils(classUtils, LOAD_FACTOR);
 
@@ -160,23 +162,6 @@ class Subscriber {
         }
     }
 
-    public
-    void register(final Class<?> listenerClass, final int handlersSize, final Subscription[] subsPerListener) {
-
-        final Map<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
-        final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti = this.subscriptionsPerMessageMulti;
-        final AtomicBoolean varArgPossibility = this.varArgPossibility;
-
-        Subscription subscription;
-
-        for (int i = 0; i < handlersSize; i++) {
-            subscription = subsPerListener[i];
-
-            // activate this subscription for publication
-            // now add this subscription to each of the handled types
-            registerMulti(subscription, listenerClass, subsPerMessageSingle, subsPerMessageMulti, varArgPossibility);
-        }
-    }
 
     public
     void shutdown() {
@@ -207,6 +192,7 @@ class Subscriber {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass);
 
         if (collection != null) {
+            // convert to Array because the subscriptions can change and we want safe iteration over the list
             final Subscription[] subscriptions = new Subscription[collection.size()];
             collection.toArray(subscriptions);
 

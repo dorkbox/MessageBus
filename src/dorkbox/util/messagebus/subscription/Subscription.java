@@ -71,15 +71,17 @@ class Subscription {
 
 
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
-    private final MessageHandler handlerMetadata;
+    private final MessageHandler handler;
 
     private final IHandlerInvocation invocation;
     private final Collection<Object> listeners;
 
     public
-    Subscription(final MessageHandler handler, final float loadFactor, final int stripeSize) {
-        this.handlerMetadata = handler;
-//        this.listeners = new StrongConcurrentSetV8<Object>(16, loadFactor, stripeSize);
+    Subscription(final MessageHandler handler) {
+        this.handler = handler;
+
+//        this.listeners = Collections.newSetFromMap(new ConcurrentHashMap<Object, Boolean>(8));  // really bad performance
+//        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.7F, 8);
 
         ///this is by far, the fastest
         this.listeners = new ConcurrentSkipListSet<>(new Comparator() {
@@ -87,6 +89,7 @@ class Subscription {
             public
             int compare(final Object o1, final Object o2) {
                 return Integer.compare(o1.hashCode(), o2.hashCode());
+//                return 0;
             }
         });
 //        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
@@ -104,7 +107,7 @@ class Subscription {
 
     public
     MessageHandler getHandler() {
-        return handlerMetadata;
+        return handler;
     }
 
     public
@@ -133,8 +136,8 @@ class Subscription {
 
     public
     void publish(final Object message) throws Throwable {
-        final MethodAccess handler = this.handlerMetadata.getHandler();
-        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;
@@ -149,8 +152,8 @@ class Subscription {
 
     public
     void publish(final Object message1, final Object message2) throws Throwable {
-        final MethodAccess handler = this.handlerMetadata.getHandler();
-        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;
@@ -165,8 +168,8 @@ class Subscription {
 
     public
     void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-        final MethodAccess handler = this.handlerMetadata.getHandler();
-        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;
@@ -181,8 +184,8 @@ class Subscription {
 
     public
     void publishToSubscription(final Object... messages) throws Throwable {
-        final MethodAccess handler = this.handlerMetadata.getHandler();
-        final int handleIndex = this.handlerMetadata.getMethodIndex();
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
         Iterator<Object> iterator;

@@ -89,7 +89,7 @@ class PerfTest_Collections {
 
         for (int i = 0; i < size; i++) {
             for (MessageHandler x : allHandlers) {
-                set.add(new Subscription(x, .85F, 1));
+                set.add(new Subscription(x));
             }
         }
 

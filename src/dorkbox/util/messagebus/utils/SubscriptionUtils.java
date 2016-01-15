@@ -42,7 +42,7 @@ class SubscriptionUtils {
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
         this.superClassSubscriptions = JavaVersionAdapter.concurrentMap(8, loadFactor, 1);
-        this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>(4, loadFactor);
+        this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 
     public

@@ -16,7 +16,6 @@
 package dorkbox.util.messagebus.publication;
 
 import dorkbox.util.messagebus.common.DeadMessage;
-import dorkbox.util.messagebus.common.adapter.StampedLock;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscriber;
@@ -32,16 +31,14 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
     private final ErrorHandlingSupport errorHandler;
 
     private final Subscriber subscriber;
-    private final StampedLock lock;
 
     private final AtomicBoolean varArgPossibility;
     final VarArgUtils varArgUtils;
 
     public
-    PublisherExactWithSuperTypesAndVarity(final ErrorHandlingSupport errorHandler, final Subscriber subscriber, final StampedLock lock) {
+    PublisherExactWithSuperTypesAndVarity(final ErrorHandlingSupport errorHandler, final Subscriber subscriber) {
         this.errorHandler = errorHandler;
         this.subscriber = subscriber;
-        this.lock = lock;
 
         varArgPossibility = subscriber.getVarArgPossibility();
         varArgUtils = subscriber.getVarArgUtils();
@@ -54,10 +51,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             final Class<?> messageClass = message1.getClass();
             final boolean isArray = messageClass.isArray();
 
-            final StampedLock lock = this.lock;
-            long stamp = lock.readLock();
             final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass); // can return null
-            lock.unlockRead(stamp);
 
             boolean hasSubs = false;
             // Run subscriptions
@@ -74,9 +68,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
             // publish to var arg, only if not already an array (because that would be unnecessary)
             if (varArgPossibility.get() && !isArray) {
-                stamp = lock.readLock();
                 final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass, subscriber); // CAN NOT RETURN NULL
-                lock.unlockRead(stamp);
 
                 Subscription sub;
                 int length = varArgSubs.length;
@@ -96,10 +88,8 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
 
                 // now publish array based superClasses (but only if those ALSO accept vararg)
-                stamp = lock.readLock();
                 final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass,
                                                                                                subscriber); // CAN NOT RETURN NULL
-                lock.unlockRead(stamp);
 
                 length = varArgSuperSubs.length;
 
@@ -121,9 +111,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             // only get here if there were no other subscriptions
             // Dead Event must EXACTLY MATCH (no subclasses)
             if (!hasSubs) {
-                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class);
-                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1);
@@ -149,10 +137,10 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
 
-            final StampedLock lock = this.lock;
-            long stamp = lock.readLock();
+//            final StampedLock lock = this.lock;
+//            long stamp = lock.readLock();
             final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass1, messageClass2); // can return null
-            lock.unlockRead(stamp);
+//            lock.unlockRead(stamp);
 
             boolean hasSubs = false;
             // Run subscriptions
@@ -171,9 +159,9 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
                 // vararg can ONLY work if all types are the same
                 if (messageClass1 == messageClass2) {
-                    stamp = lock.readLock();
+//                    stamp = lock.readLock();
                     final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subscriber); // can NOT return null
-                    lock.unlockRead(stamp);
+//                    lock.unlockRead(stamp);
 
                     final int length = varArgSubs.length;
                     if (length > 0) {
@@ -192,10 +180,10 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
                 }
 
                 // now publish array based superClasses (but only if those ALSO accept vararg)
-                stamp = lock.readLock();
+//                stamp = lock.readLock();
                 final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2,
                                                                                                subscriber); // CAN NOT RETURN NULL
-                lock.unlockRead(stamp);
+//                lock.unlockRead(stamp);
 
 
                 final int length = varArgSuperSubs.length;
@@ -221,9 +209,9 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                lock.unlockRead(stamp);
+//                lock.unlockRead(stamp);
                 final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
-                lock.unlockRead(stamp);
+//                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1, message2);
@@ -250,10 +238,10 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             final Class<?> messageClass2 = message2.getClass();
             final Class<?> messageClass3 = message3.getClass();
 
-            final StampedLock lock = this.lock;
-            long stamp = lock.readLock();
+//            final StampedLock lock = this.lock;
+//            long stamp = lock.readLock();
             final Subscription[] subs = subscriber.getExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
-            lock.unlockRead(stamp);
+//            lock.unlockRead(stamp);
 
 
             boolean hasSubs = false;
@@ -274,9 +262,9 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
                 // vararg can ONLY work if all types are the same
                 if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
-                    stamp = lock.readLock();
+//                    stamp = lock.readLock();
                     final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subscriber); // can NOT return null
-                    lock.unlockRead(stamp);
+//                    lock.unlockRead(stamp);
 
                     final int length = varArgSubs.length;
                     if (length > 0) {
@@ -297,10 +285,10 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
 
                 // now publish array based superClasses (but only if those ALSO accept vararg)
-                stamp = lock.readLock();
+//                stamp = lock.readLock();
                 final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3,
                                                                                                subscriber); // CAN NOT RETURN NULL
-                lock.unlockRead(stamp);
+//                lock.unlockRead(stamp);
 
 
                 final int length = varArgSuperSubs.length;
@@ -327,9 +315,9 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                stamp = lock.readLock();
+//                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
-                lock.unlockRead(stamp);
+//                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
