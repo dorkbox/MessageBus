@@ -22,15 +22,29 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.common.*;
-import dorkbox.util.messagebus.common.adapter.StampedLock;
+import dorkbox.util.messagebus.common.AssertSupport;
+import dorkbox.util.messagebus.common.ConcurrentExecutor;
+import dorkbox.util.messagebus.common.ListenerFactory;
+import dorkbox.util.messagebus.common.SubscriptionValidator;
+import dorkbox.util.messagebus.common.TestUtil;
 import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.listeners.*;
-import dorkbox.util.messagebus.messages.*;
-import dorkbox.util.messagebus.subscription.Subscriber;
+import dorkbox.util.messagebus.listeners.AbstractMessageListener;
+import dorkbox.util.messagebus.listeners.ICountableListener;
+import dorkbox.util.messagebus.listeners.IMessageListener;
+import dorkbox.util.messagebus.listeners.IMultipartMessageListener;
+import dorkbox.util.messagebus.listeners.MessagesListener;
+import dorkbox.util.messagebus.listeners.MultipartMessageListener;
+import dorkbox.util.messagebus.listeners.Overloading;
+import dorkbox.util.messagebus.listeners.StandardMessageListener;
+import dorkbox.util.messagebus.messages.AbstractMessage;
+import dorkbox.util.messagebus.messages.ICountable;
+import dorkbox.util.messagebus.messages.IMessage;
+import dorkbox.util.messagebus.messages.IMultipartMessage;
+import dorkbox.util.messagebus.messages.MessageTypes;
+import dorkbox.util.messagebus.messages.MultipartMessage;
+import dorkbox.util.messagebus.messages.StandardMessage;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
-import dorkbox.util.messagebus.utils.ClassUtils;
 import org.junit.Test;
 
 /**
@@ -157,11 +171,8 @@ public class SubscriptionManagerTest extends AssertSupport {
         ListenerFactory listeners = listeners(Overloading.ListenerBase.class, Overloading.ListenerSub.class);
 
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final StampedLock lock = new StampedLock();
-        final ClassUtils classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
-        final Subscriber subscriber = new Subscriber(errorHandler, classUtils);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(1, errorHandler);
 
-        SubscriptionManager subscriptionManager = new SubscriptionManager(1, subscriber);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(Overloading.ListenerBase.class).handles(
@@ -181,21 +192,17 @@ public class SubscriptionManagerTest extends AssertSupport {
 
     private void runTestWith(final ListenerFactory listeners, final SubscriptionValidator validator) {
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final StampedLock lock = new StampedLock();
-        final ClassUtils classUtils = new ClassUtils(Subscriber.LOAD_FACTOR);
-        final Subscriber subscriber = new Subscriber(errorHandler, classUtils);
-
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(1, subscriber);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(1, errorHandler);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
-        validator.validate(subscriber);
+        validator.validate(subscriptionManager);
 
         ConcurrentExecutor.runConcurrent(TestUtil.unsubscriber(subscriptionManager, listeners), 1);
 
         listeners.clear();
 
-        validator.validate(subscriber);
+        validator.validate(subscriptionManager);
     }
 }
 

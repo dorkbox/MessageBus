@@ -17,38 +17,56 @@ package dorkbox.util.messagebus.common;
 
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
  * Simple tree structure that is a map that contains a chain of keys to publish to a value.
- * <p>
- * NOT THREAD SAFE, each call must be protected by a read/write lock of some sort
  *
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
 public class HashMapTree<KEY, VALUE> {
-    private Map<KEY, HashMapTree<KEY, VALUE>> children;
+    public static int INITIAL_SIZE = 4;
+    public static float LOAD_FACTOR = 0.8F;
+
+
+    private static
+    final ThreadLocal<Object> keyCache = new ThreadLocal<Object>() {
+        @Override
+        protected
+        Object initialValue() {
+            return JavaVersionAdapter.concurrentMap(INITIAL_SIZE, LOAD_FACTOR, 1);
+        }
+    };
+
+    private static
+    final ThreadLocal<Object> valueCache = new ThreadLocal<Object>() {
+        @Override
+        protected
+        Object initialValue() {
+            return new HashMapTree();
+        }
+    };
+
+//      Map<KEY, HashMapTree<KEY, VALUE>>
+    private AtomicReference<Object> children = new AtomicReference<Object>();
     private VALUE value;
 
-    private final int defaultSize;
-    private final float loadFactor;
 
-    public HashMapTree(final int defaultSize, final float loadFactor) {
-        this.defaultSize = defaultSize;
-        this.loadFactor = loadFactor;
+
+    @SuppressWarnings("unchecked")
+    public static <KEY, VALUE> ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> cast(Object o) {
+        return (ConcurrentMap<KEY, HashMapTree<KEY, VALUE>>) o;
     }
 
 
-    /**
-     * can be overridden to provide a custom backing map
-     */
-    protected Map<KEY, HashMapTree<KEY, VALUE>> createChildren(int defaultSize, float loadFactor) {
-        return JavaVersionAdapter.concurrentMap(defaultSize, loadFactor, 1);
+
+
+    public HashMapTree() {
     }
+
 
     public final VALUE getValue() {
         return this.value;
@@ -66,143 +84,19 @@ public class HashMapTree<KEY, VALUE> {
 
 
     public final void clear() {
-        if (this.children != null) {
-            Set<Entry<KEY, HashMapTree<KEY, VALUE>>> entrySet = this.children.entrySet();
-            for (Entry<KEY, HashMapTree<KEY, VALUE>> entry : entrySet) {
-                entry.getValue().clear();
-            }
-
-            this.children.clear();
-            this.value = null;
-        }
+//        if (this.children != null) {
+//            Set<Entry<KEY, HashMapTree<KEY, VALUE>>> entrySet = this.children.entrySet();
+//            for (Entry<KEY, HashMapTree<KEY, VALUE>> entry : entrySet) {
+//                entry.getValue().clear();
+//            }
+//
+//            this.children.clear();
+//            this.value = null;
+//        }
     }
 
 
-    /**
-     * This <b>IS NOT</b> safe to call outside of root.remove(...)
-     * <p>
-     * Removes a branch from the tree, and cleans up, if necessary
-     */
-    public final void remove(KEY key) {
-        if (key != null) {
-            removeLeaf(key);
-        }
-    }
-
-
-    /**
-     * This <b>IS NOT</b> safe to call outside of root.remove(...)
-     * <p>
-     * Removes a branch from the tree, and cleans up, if necessary
-     */
-    public final void remove(KEY key1, KEY key2) {
-        if (key1 == null || key2 == null) {
-            return;
-        }
-
-        HashMapTree<KEY, VALUE> leaf;
-        if (this.children != null) {
-            leaf = this.children.get(key1);
-
-            if (leaf != null) {
-                leaf.removeLeaf(key2);
-                this.children.remove(key1);
-
-                if (this.children.isEmpty()) {
-                    this.children = null;
-                }
-            }
-        }
-    }
-
-    /**
-     * This <b>IS NOT</b> safe to call outside of root.remove(...)
-     * <p>
-     * Removes a branch from the tree, and cleans up, if necessary
-     */
-    public final void remove(KEY key1, KEY key2, KEY key3) {
-        if (key1 == null || key2 == null) {
-            return;
-        }
-
-        HashMapTree<KEY, VALUE> leaf;
-        if (this.children != null) {
-            leaf = this.children.get(key1);
-
-            if (leaf != null) {
-                leaf.remove(key2, key3);
-                this.children.remove(key1);
-
-                if (this.children.isEmpty()) {
-                    this.children = null;
-                }
-            }
-        }
-    }
-
-
-    /**
-     * This <b>IS NOT</b> safe to call outside of root.remove(...)
-     * <p>
-     * Removes a branch from the tree, and cleans up, if necessary
-     */
-    @SuppressWarnings("unchecked")
-    public final void remove(KEY... keys) {
-        if (keys == null) {
-            return;
-        }
-
-        removeLeaf(0, keys);
-    }
-
-
-    /**
-     * Removes a branch from the tree, and cleans up, if necessary
-     */
-    private void removeLeaf(KEY key) {
-        if (key != null) {
-            if (this.children != null) {
-                HashMapTree<KEY, VALUE> leaf = this.children.get(key);
-
-                if (leaf != null) {
-                    leaf = this.children.get(key);
-                    if (leaf != null) {
-                        if (leaf.children == null && leaf.value == null) {
-                            this.children.remove(key);
-                        }
-
-                        if (this.children.isEmpty()) {
-                            this.children = null;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // keys CANNOT be null here!
-    private void removeLeaf(int index, KEY[] keys) {
-        if (index == keys.length) {
-            // we have reached the leaf to remove!
-            this.value = null;
-            this.children = null;
-        } else if (this.children != null) {
-            HashMapTree<KEY, VALUE> leaf = this.children.get(keys[index]);
-
-            if (leaf != null) {
-                leaf.removeLeaf(index+1, keys);
-                if (leaf.children == null && leaf.value == null) {
-                    this.children.remove(keys[index]);
-                }
-
-                if (this.children.isEmpty()) {
-                    this.children = null;
-                }
-            }
-        }
-    }
-
-    public final VALUE put(VALUE value, KEY key) {
+    public final VALUE put(KEY key, VALUE value) {
         if (key == null) {
             throw new NullPointerException("keys");
         }
@@ -282,33 +176,61 @@ public class HashMapTree<KEY, VALUE> {
     }
 
 
-    private HashMapTree<KEY, VALUE> createLeaf(KEY key) {
+
+    /**
+     * creates a child (if necessary) in an atomic way. The tree returned will either be the current one, or a new one.
+     *
+     * @param key the key for the new child
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    private
+    HashMapTree<KEY, VALUE> createLeaf(KEY key) {
         if (key == null) {
             return null;
         }
 
-        HashMapTree<KEY, VALUE> objectTree;
+        final Object cached = keyCache.get();
+        final Object checked = children.get();
+        ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> kids;
 
-        if (this.children == null) {
-            this.children = createChildren(this.defaultSize, this.loadFactor);
+        if (checked == null) {
+            final boolean success = children.compareAndSet(null, cached);
+            if (success) {
+                keyCache.set(JavaVersionAdapter.concurrentMap(INITIAL_SIZE, LOAD_FACTOR, 1));
+                kids = cast(cached);
+            }
+            else {
+                kids = cast(children.get());
+            }
+        }
+        else {
+            kids = cast(checked);
         }
 
-        objectTree = this.children.get(key);
 
-        // make sure we have a tree for the specified node
-        if (objectTree == null) {
-            objectTree = new HashMapTree<KEY, VALUE>(this.defaultSize, this.loadFactor);
-            this.children.put(key, objectTree);
+        final Object cached2 = valueCache.get();
+        final HashMapTree<KEY, VALUE> tree = kids.putIfAbsent(key, (HashMapTree<KEY, VALUE>) cached2);
+        if (tree == null) {
+            // was absent
+            valueCache.set(new HashMapTree());
+            return (HashMapTree<KEY, VALUE>) cached2;
         }
-
-        return objectTree;
+        else {
+            return tree;
+        }
     }
 
 
+
+
+
+
     /////////////////////////////////////////
     /////////////////////////////////////////
     /////////////////////////////////////////
     /////////////////////////////////////////
+
 
     public final VALUE get(KEY key) {
         if (key == null) {
@@ -317,7 +239,7 @@ public class HashMapTree<KEY, VALUE> {
 
         HashMapTree<KEY, VALUE> objectTree;
         // publish value from our children
-        objectTree = getLeaf(key); // protected by lock
+        objectTree = getLeaf(key);
 
         if (objectTree == null) {
             return null;
@@ -331,7 +253,7 @@ public class HashMapTree<KEY, VALUE> {
         // publish value from our children
         tree = getLeaf(key1); // protected by lock
         if (tree != null) {
-            tree = tree.getLeaf(key2); // protected by lock
+            tree = tree.getLeaf(key2);
         }
 
         if (tree == null) {
@@ -392,11 +314,13 @@ public class HashMapTree<KEY, VALUE> {
         if (this.children == null) {
             tree = null;
         } else {
-            tree = this.children.get(key);
+            final ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> o = cast(this.children.get());
+            tree = o.get(key);
         }
 
         return tree;
     }
+
 
     public final HashMapTree<KEY, VALUE> getLeaf(KEY key1, KEY key2) {
         HashMapTree<KEY, VALUE> tree;
@@ -446,5 +370,136 @@ public class HashMapTree<KEY, VALUE> {
         }
 
         return tree;
+    }
+
+
+
+    /////////////////////////////////////////
+    /////////////////////////////////////////
+    /////////////////////////////////////////
+    /////////////////////////////////////////
+
+
+
+    /**
+     * This <b>IS NOT</b> safe to call outside of root.remove(...)
+     * <p>
+     * Removes a branch from the tree, and cleans up, if necessary
+     */
+    public final void remove(KEY key) {
+        if (key != null) {
+            removeLeaf(key);
+        }
+    }
+
+
+    /**
+     * This <b>IS NOT</b> safe to call outside of root.remove(...)
+     * <p>
+     * Removes a branch from the tree, and cleans up, if necessary
+     */
+    public final void remove(KEY key1, KEY key2) {
+        if (key1 == null || key2 == null) {
+            return;
+        }
+
+        HashMapTree<KEY, VALUE> leaf;
+        if (this.children != null) {
+            leaf = getLeaf(key1);
+
+            if (leaf != null) {
+                leaf.removeLeaf(key2);
+
+                final ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> o = cast(this.children.get());
+                o.remove(key1);
+
+                if (o.isEmpty()) {
+                    this.children.compareAndSet(o, null);
+                }
+            }
+        }
+    }
+
+    /**
+     * This <b>IS NOT</b> safe to call outside of root.remove(...)
+     * <p>
+     * Removes a branch from the tree, and cleans up, if necessary
+     */
+    public final void remove(KEY key1, KEY key2, KEY key3) {
+        if (key1 == null || key2 == null) {
+            return;
+        }
+
+//        HashMapTree<KEY, VALUE> leaf;
+//        if (this.children != null) {
+//            leaf = getLeaf(key1);
+//
+//            if (leaf != null) {
+//                leaf.remove(key2, key3);
+//                this.children.remove(key1);
+//
+//                if (this.children.isEmpty()) {
+//                    this.children = null;
+//                }
+//            }
+//        }
+    }
+
+
+    /**
+     * This <b>IS NOT</b> safe to call outside of root.remove(...)
+     * <p>
+     * Removes a branch from the tree, and cleans up, if necessary
+     */
+    @SuppressWarnings("unchecked")
+    public final void remove(KEY... keys) {
+        if (keys == null) {
+            return;
+        }
+
+        removeLeaf(0, keys);
+    }
+
+
+    /**
+     * Removes a branch from the tree, and cleans up, if necessary
+     */
+    private void removeLeaf(KEY key) {
+        if (key != null) {
+            final ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> kids = cast(this.children.get());
+
+            if (kids != null) {
+                kids.remove(key);
+
+                if (kids.isEmpty()) {
+                    this.children.compareAndSet(kids, null);
+                }
+            }
+        }
+    }
+
+    // keys CANNOT be null here!
+    private void removeLeaf(int index, KEY[] keys) {
+        if (index == keys.length) {
+            // we have reached the leaf to remove!
+            this.value = null;
+            this.children = null;
+        } else {
+            final ConcurrentMap<KEY, HashMapTree<KEY, VALUE>> kids = cast(this.children.get());
+            if (kids != null) {
+//                HashMapTree<KEY, VALUE> leaf = this.children.get(keys[index]);
+
+//                if (leaf != null) {
+//                    leaf.removeLeaf(index + 1, keys);
+//                    if (leaf.children == null && leaf.value == null) {
+//                        this.children.remove(keys[index]);
+//                    }
+//
+//                    if (this.children.isEmpty()) {
+//                        this.children = null;
+//                    }
+//                }
+            }
+        }
     }
 }

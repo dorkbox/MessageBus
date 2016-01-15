@@ -18,8 +18,9 @@ package dorkbox.util.messagebus.publication;
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.synchrony.Synchrony;
 import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.lang.reflect.Array;
@@ -30,45 +31,41 @@ public
 class PublisherExactWithSuperTypesAndVarity implements Publisher {
     private final ErrorHandlingSupport errorHandler;
 
-    private final Subscriber subscriber;
+    private final SubscriptionManager subManager;
 
     private final AtomicBoolean varArgPossibility;
     final VarArgUtils varArgUtils;
 
     public
-    PublisherExactWithSuperTypesAndVarity(final ErrorHandlingSupport errorHandler, final Subscriber subscriber) {
+    PublisherExactWithSuperTypesAndVarity(final ErrorHandlingSupport errorHandler, final SubscriptionManager subManager) {
         this.errorHandler = errorHandler;
-        this.subscriber = subscriber;
+        this.subManager = subManager;
 
-        varArgPossibility = subscriber.getVarArgPossibility();
-        varArgUtils = subscriber.getVarArgUtils();
+        varArgPossibility = subManager.getVarArgPossibility();
+        varArgUtils = subManager.getVarArgUtils();
     }
 
     @Override
     public
-    void publish(final Object message1) {
+    void publish(final Synchrony synchrony, final Object message1) {
         try {
             final Class<?> messageClass = message1.getClass();
             final boolean isArray = messageClass.isArray();
 
-            final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass); // can return null
+            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass); // can return null
 
             boolean hasSubs = false;
             // Run subscriptions
             if (subscriptions != null) {
                 hasSubs = true;
 
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1);
-                }
+                synchrony.publish(subscriptions, message1);
             }
 
 
             // publish to var arg, only if not already an array (because that would be unnecessary)
             if (varArgPossibility.get() && !isArray) {
-                final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass, subscriber); // CAN NOT RETURN NULL
+                final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass, subManager); // CAN NOT RETURN NULL
 
                 Subscription sub;
                 int length = varArgSubs.length;
@@ -80,6 +77,9 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
                     asArray = (Object[]) Array.newInstance(messageClass, 1);
                     asArray[0] = message1;
 
+                    synchrony.publish(varArgSubs, asArray);
+
+
                     for (int i = 0; i < length; i++) {
                         sub = varArgSubs[i];
                         sub.publish(asArray);
@@ -88,8 +88,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
 
                 // now publish array based superClasses (but only if those ALSO accept vararg)
-                final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass,
-                                                                                               subscriber); // CAN NOT RETURN NULL
+                final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass, subManager); // CAN NOT RETURN NULL
 
                 length = varArgSuperSubs.length;
 
@@ -111,7 +110,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             // only get here if there were no other subscriptions
             // Dead Event must EXACTLY MATCH (no subclasses)
             if (!hasSubs) {
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class);
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class);
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1);
@@ -132,14 +131,14 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass1, messageClass2); // can return null
+            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass1, messageClass2); // can return null
 //            lock.unlockRead(stamp);
 
             boolean hasSubs = false;
@@ -160,7 +159,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
                 // vararg can ONLY work if all types are the same
                 if (messageClass1 == messageClass2) {
 //                    stamp = lock.readLock();
-                    final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subscriber); // can NOT return null
+                    final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subManager); // can NOT return null
 //                    lock.unlockRead(stamp);
 
                     final int length = varArgSubs.length;
@@ -181,8 +180,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
                 // now publish array based superClasses (but only if those ALSO accept vararg)
 //                stamp = lock.readLock();
-                final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2,
-                                                                                               subscriber); // CAN NOT RETURN NULL
+                final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2, subManager); // CAN NOT RETURN NULL
 //                lock.unlockRead(stamp);
 
 
@@ -210,7 +208,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                lock.unlockRead(stamp);
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -232,7 +230,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2, final Object message3) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
@@ -240,7 +238,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subs = subscriber.getExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
+            final Subscription[] subs = subManager.getExactAndSuper(messageClass1, messageClass2, messageClass3); // can return null
 //            lock.unlockRead(stamp);
 
 
@@ -263,7 +261,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
                 // vararg can ONLY work if all types are the same
                 if (messageClass1 == messageClass2 && messageClass1 == messageClass3) {
 //                    stamp = lock.readLock();
-                    final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subscriber); // can NOT return null
+                    final Subscription[] varArgSubs = varArgUtils.getVarArgSubscriptions(messageClass1, subManager); // can NOT return null
 //                    lock.unlockRead(stamp);
 
                     final int length = varArgSubs.length;
@@ -287,7 +285,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
                 // now publish array based superClasses (but only if those ALSO accept vararg)
 //                stamp = lock.readLock();
                 final Subscription[] varArgSuperSubs = varArgUtils.getVarArgSuperSubscriptions(messageClass1, messageClass2, messageClass3,
-                                                                                               subscriber); // CAN NOT RETURN NULL
+                                                                                               subManager); // CAN NOT RETURN NULL
 //                lock.unlockRead(stamp);
 
 
@@ -316,7 +314,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -338,7 +336,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
     @Override
     public
-    void publish(final Object[] messages) {
-        publish((Object) messages);
+    void publish(final Synchrony synchrony, final Object[] messages) {
+        publish(synchrony, (Object) messages);
     }
 }

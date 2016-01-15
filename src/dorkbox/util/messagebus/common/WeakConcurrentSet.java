@@ -22,11 +22,11 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.common.adapter.StampedLock;
 
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.WeakHashMap;
+import java.util.concurrent.locks.StampedLock;
 
 /**
  * This implementation uses weak references to the elements. Iterators automatically perform cleanups of

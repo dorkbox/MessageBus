@@ -15,6 +15,7 @@
  */
 package dorkbox.util.messagebus;
 
+import dorkbox.util.messagebus.publication.disruptor.MessageType;
 import org.jctools.util.UnsafeAccess;
 
 abstract class ColdItems {

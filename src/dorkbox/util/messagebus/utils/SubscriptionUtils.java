@@ -17,10 +17,11 @@ package dorkbox.util.messagebus.utils;
 
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
-import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public final
@@ -35,13 +36,13 @@ class SubscriptionUtils {
 
 
     public
-    SubscriptionUtils(final ClassUtils superClass, final float loadFactor) {
+    SubscriptionUtils(final ClassUtils superClass, final int numberOfThreads, final float loadFactor) {
         this.superClass = superClass;
 
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.superClassSubscriptions = JavaVersionAdapter.concurrentMap(8, loadFactor, 1);
+        this.superClassSubscriptions = JavaVersionAdapter.concurrentMap(8, loadFactor, numberOfThreads);
         this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 
@@ -62,7 +63,7 @@ class SubscriptionUtils {
      * @return CAN NOT RETURN NULL
      */
     public
-    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final Subscriber subscriber) {
+    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz, final SubscriptionManager subManager) {
         // whenever our subscriptions change, this map is cleared.
         final Map<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptions;
 
@@ -75,7 +76,7 @@ class SubscriptionUtils {
             final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz);  // never returns null, cached response
 
             Class<?> superClass;
-            ArrayList<Subscription> superSubs;
+            List<Subscription> superSubs;
             Subscription sub;
 
             final int length = superClasses.length;
@@ -84,7 +85,7 @@ class SubscriptionUtils {
 
             for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
-                superSubs = subscriber.getExactAsArray(superClass);
+                superSubs = subManager.getExactAsArray(superClass);
 
                 if (superSubs != null) {
                     superSubLength = superSubs.size();
@@ -115,7 +116,7 @@ class SubscriptionUtils {
      * @return CAN NOT RETURN NULL
      */
     public
-    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Subscriber subscriber) {
+    ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final SubscriptionManager subManager) {
         // whenever our subscriptions change, this map is cleared.
         final HashMapTree<Class<?>, ArrayList<Subscription>> cached = this.superClassSubscriptionsMulti;
 
@@ -154,7 +155,7 @@ class SubscriptionUtils {
                         continue;
                     }
 
-                    superSubs = subscriber.getExactAsArray(superClass1, superClass2);
+                    superSubs = subManager.getExactAsArray(superClass1, superClass2);
                     if (superSubs != null) {
                         for (int k = 0; k < superSubs.size(); k++) {
                             sub = superSubs.get(k);
@@ -184,7 +185,7 @@ class SubscriptionUtils {
      */
     public
     ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3,
-                                                  final Subscriber subscriber) {
+                                                  final SubscriptionManager subManager) {
         // whenever our subscriptions change, this map is cleared.
         final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
 
@@ -234,7 +235,7 @@ class SubscriptionUtils {
                             continue;
                         }
 
-                        superSubs = subscriber.getExactAsArray(superClass1, superClass2, superClass3);
+                        superSubs = subManager.getExactAsArray(superClass1, superClass2, superClass3);
                         if (superSubs != null) {
                             for (int m = 0; m < superSubs.size(); m++) {
                                 sub = superSubs.get(m);

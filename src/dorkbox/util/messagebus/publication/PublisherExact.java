@@ -18,28 +18,29 @@ package dorkbox.util.messagebus.publication;
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.synchrony.Synchrony;
 
 @SuppressWarnings("Duplicates")
 public
 class PublisherExact implements Publisher {
     private final ErrorHandlingSupport errorHandler;
-    private final Subscriber subscriber;
+    private final SubscriptionManager subManager;
 
     public
-    PublisherExact(final ErrorHandlingSupport errorHandler, final Subscriber subscriber) {
+    PublisherExact(final ErrorHandlingSupport errorHandler, final SubscriptionManager subManager) {
         this.errorHandler = errorHandler;
-        this.subscriber = subscriber;
+        this.subManager = subManager;
     }
 
     @Override
     public
-    void publish(final Object message1) {
+    void publish(final Synchrony synchrony, final Object message1) {
         try {
             final Class<?> messageClass = message1.getClass();
 
-            final Subscription[] subscriptions = subscriber.getExact(messageClass); // can return null
+            final Subscription[] subscriptions = subManager.getExact(messageClass); // can return null
 
             // Run subscriptions
             if (subscriptions != null) {
@@ -51,7 +52,7 @@ class PublisherExact implements Publisher {
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1);
@@ -72,14 +73,14 @@ class PublisherExact implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subscriber.getExact(messageClass1, messageClass2); // can return null
+            final Subscription[] subscriptions = subManager.getExact(messageClass1, messageClass2); // can return null
 //            lock.unlockRead(stamp);
 
             // Run subscriptions
@@ -93,7 +94,7 @@ class PublisherExact implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -115,7 +116,7 @@ class PublisherExact implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2, final Object message3) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
@@ -123,7 +124,7 @@ class PublisherExact implements Publisher {
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subscriber.getExact(messageClass1, messageClass2, messageClass3); // can return null
+            final Subscription[] subscriptions = subManager.getExact(messageClass1, messageClass2, messageClass3); // can return null
 //            lock.unlockRead(stamp);
 
             // Run subscriptions
@@ -137,7 +138,7 @@ class PublisherExact implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -159,7 +160,7 @@ class PublisherExact implements Publisher {
 
     @Override
     public
-    void publish(final Object[] messages) {
-        publish((Object) messages);
+    void publish(final Synchrony synchrony, final Object[] messages) {
+        publish(synchrony, (Object) messages);
     }
 }

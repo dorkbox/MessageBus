@@ -183,7 +183,7 @@ class Subscription {
     }
 
     public
-    void publishToSubscription(final Object... messages) throws Throwable {
+    void publish(final Object... messages) throws Throwable {
         final MethodAccess handler = this.handler.getHandler();
         final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;

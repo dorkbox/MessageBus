@@ -22,12 +22,11 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.common.adapter.StampedLock;
-
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.StampedLock;
 
 /**
  * This data structure is optimized for non-blocking reads even when write operations occur.

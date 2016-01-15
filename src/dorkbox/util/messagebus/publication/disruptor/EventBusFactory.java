@@ -1,6 +1,6 @@
-package com.lmax.disruptor;
+package dorkbox.util.messagebus.publication.disruptor;
 
-import dorkbox.util.messagebus.MessageHolder;
+import com.lmax.disruptor.EventFactory;
 
 /**
  * @author dorkbox, llc

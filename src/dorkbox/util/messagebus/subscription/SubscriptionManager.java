@@ -15,14 +15,23 @@
  */
 package dorkbox.util.messagebus.subscription;
 
+import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
+import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import dorkbox.util.messagebus.utils.ClassUtils;
+import dorkbox.util.messagebus.utils.SubscriptionUtils;
+import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+/**
+ * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
+ */
 /**
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
  * It provides fast lookup of existing subscriptions when another instance of an already known
@@ -34,6 +43,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final
 class SubscriptionManager {
+    public static final float LOAD_FACTOR = 0.8F;
+
+
     // remember already processed classes that do not contain any message handlers
     private final Map<Class<?>, Boolean> nonListeners;
 
@@ -44,27 +56,67 @@ class SubscriptionManager {
     private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
 
-    private final Subscriber subscriber;
 
+    private final ErrorHandlingSupport errorHandler;
+
+    private final SubscriptionUtils subUtils;
+    private final VarArgUtils varArgUtils;
+
+    // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
+    // this is the primary list for dispatching a specific message
+    // write access is synchronized and happens only when a listener of a specific class is registered the first time
+    final ConcurrentMap<Class<?>, List<Subscription>> subscriptionsPerMessageSingle;
+    private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
+
+    // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
+    final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
+
+    ThreadLocal<List<Subscription>> listCache = new ThreadLocal<List<Subscription>>() {
+        @Override
+        protected
+        List<Subscription> initialValue() {
+            return new CopyOnWriteArrayList<Subscription>();
+        }
+    };
+    private final ClassUtils classUtils;
+
+//NOTE for multiArg, can use the memory address concatenated with other ones and then just put it in the 'single" map (convert single to
+// use this too). it would likely have to be longs  no idea what to do for arrays?? (arrays should verify all the elements are the
+// correct type too)
 
     public
-    SubscriptionManager(final int numberOfThreads, final Subscriber subscriber) {
-        this.subscriber = subscriber;
+    SubscriptionManager(final int numberOfThreads, final ErrorHandlingSupport errorHandler) {
+        this.errorHandler = errorHandler;
 
+        classUtils = new ClassUtils(SubscriptionManager.LOAD_FACTOR);
 
         // modified ONLY during SUB/UNSUB
-        this.nonListeners = JavaVersionAdapter.concurrentMap(4, Subscriber.LOAD_FACTOR, numberOfThreads);
+        this.nonListeners = JavaVersionAdapter.concurrentMap(4, LOAD_FACTOR, numberOfThreads);
 
-        // only used during SUB/UNSUB, in a rw lock
-        this.subscriptionsPerListener = JavaVersionAdapter.concurrentMap(32, Subscriber.LOAD_FACTOR, 1);
+        // only used during SUB/UNSUB
+        this.subscriptionsPerListener = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, numberOfThreads);
+
+
+        this.subscriptionsPerMessageSingle = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, numberOfThreads);
+        this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
+
+        this.subUtils = new SubscriptionUtils(classUtils, numberOfThreads, LOAD_FACTOR);
+
+        // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
+        // it's a hit on SUB/UNSUB, but improves performance of handlers
+        this.varArgUtils = new VarArgUtils(classUtils, numberOfThreads, LOAD_FACTOR);
     }
 
     public
     void shutdown() {
         this.nonListeners.clear();
 
-        subscriber.shutdown();
+        this.subscriptionsPerMessageSingle.clear();
+        this.subscriptionsPerMessageMulti.clear();
+
         this.subscriptionsPerListener.clear();
+        this.classUtils.clear();
+        clear();
     }
 
     public
@@ -72,6 +124,35 @@ class SubscriptionManager {
         if (listener == null) {
             return;
         }
+
+        // when subscribing, this is a GREAT opportunity to figure out the classes/objects loaded -- their hierarchy, AND generate UUIDs
+        // for each CLASS that can be accessed. This then lets us lookup a UUID for each object that comes in -- if an ID is found (for
+        // any part of it's object hierarchy) -- it  means that we have that listeners for that object. this is MUCH faster checking if
+        // we have subscriptions first (and failing).
+        //
+        // so during subscribe we can check "getUUID for all parameter.class accessed by this listener" -> then during publish "lookup
+        // UUID of incoming message.class" (+ it's super classes, if necessary) -> then check if UUID exists. If yes, then we know there
+        // are subs. if no - then it's a dead message.
+        //
+        // This lets us accomplish TWO things
+        // 1) be able quickly determine if there are dead messages
+        // 2) be able to create "multi-class" UUIDs, when two+ classes are represented (always) by the same UUID, by a clever mixing of
+        //    the classes individual UUIDs.
+        //
+        // The generation of UUIDs happens ONLY during subscribe, and during publish they are looked up. This UUID can be a simple
+        // AtomicInteger that starts a MIN_VALUE and count's up.
+
+
+        // note: we can do PRE-STARTUP instrumentation (ie, BEFORE any classes are loaded by the classloader) and inject the UUID into
+        // every object (as a public static final field), then use reflection to look up this value. It would go something like this:
+        // 1) scan every class for annotations that match
+        // 2) for each method that has our annotation -- get the list of classes + hierarchy that are the parameters for the method
+        // 3) inject the UUID field into each class object that #2 returns, only if it doesn't already exist. use invalid field names
+        // (ie: start with numbers or ? or ^ or something
+        //
+        // then during SUB/UNSUB/PUB, we use this UUID for everything (and we can have multi-UUID lookups for the 'multi-arg' thing).
+        //  If there is no UUID, then we just abort the SUB/UNSUB or send a deadmessage
+
 
         final Class<?> listenerClass = listener.getClass();
 
@@ -81,7 +162,7 @@ class SubscriptionManager {
         }
 
         // these are concurrent collections
-        subscriber.clear();
+        clear();
 
         // this is an array, because subscriptions for a specific listener CANNOT change, either they exist or do not exist.
         // ONCE subscriptions are in THIS map, they are considered AVAILABLE.
@@ -103,7 +184,7 @@ class SubscriptionManager {
 
 
 
-            final AtomicBoolean varArgPossibility = subscriber.varArgPossibility;
+            final AtomicBoolean varArgPossibility = this.varArgPossibility;
             Subscription subscription;
 
             MessageHandler messageHandler;
@@ -111,7 +192,7 @@ class SubscriptionManager {
             Class<?> handlerType;
 
             // create the subscriptions
-            final ConcurrentMap<Class<?>, ArrayList<Subscription>> subsPerMessageSingle = subscriber.subscriptionsPerMessageSingle;
+            final ConcurrentMap<Class<?>, List<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
             subscriptions = new Subscription[handlersSize];
 
             for (int i = 0; i < handlersSize; i++) {
@@ -129,10 +210,10 @@ class SubscriptionManager {
                 handlerType = messageHandlerTypes[0];
 
                 // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
-                final ArrayList<Subscription> cachedSubs = subscriber.listCache.get();
-                ArrayList<Subscription> subs = subsPerMessageSingle.putIfAbsent(handlerType, cachedSubs);
+                final List<Subscription> cachedSubs = listCache.get();
+                List<Subscription> subs = subsPerMessageSingle.putIfAbsent(handlerType, cachedSubs);
                 if (subs == null) {
-                    subscriber.listCache.set(new ArrayList<Subscription>(8));
+                    listCache.set(new CopyOnWriteArrayList<Subscription>());
                 }
 
                 // create the subscription. This can be thrown away if the subscription succeeds in another thread
@@ -144,11 +225,10 @@ class SubscriptionManager {
 
             // now subsPerMessageSingle has a unique list of subscriptions for a specific handlerType, and MAY already have subscriptions
 
-            // putIfAbsent
             final Subscription[] previousSubs = subscriptionsPerListener.putIfAbsent(listenerClass, subscriptions); // activates this sub for sub/unsub
             if (previousSubs != null) {
                 // another thread beat us to creating subs (for this exact listenerClass). Since another thread won, we have to make sure
-                // all of the subscriptions are correct for a specific handler type, so we have to RECONSTRUT the correct list again.
+                // all of the subscriptions are correct for a specific handler type, so we have to RECONSTRUCT the correct list again.
                 // This is to make sure that "invalid" subscriptions don't exist in subsPerMessageSingle.
 
                 // since nothing is yet "subscribed" we can assign the correct values for everything now
@@ -195,7 +275,7 @@ class SubscriptionManager {
         }
 
         // these are concurrent collections
-        subscriber.clear();
+        clear();
 
         final Subscription[] subscriptions = this.subscriptionsPerListener.get(listenerClass);
         if (subscriptions != null) {
@@ -205,6 +285,250 @@ class SubscriptionManager {
                 subscription = subscriptions[i];
                 subscription.unsubscribe(listener);
             }
+        }
+    }
+
+
+    public
+    AtomicBoolean getVarArgPossibility() {
+        return varArgPossibility;
+    }
+
+    public
+    VarArgUtils getVarArgUtils() {
+        return varArgUtils;
+    }
+
+    public
+    void clear() {
+        this.subUtils.clear();
+        this.varArgUtils.clear();
+    }
+
+    // inside a write lock
+    // add this subscription to each of the handled types
+    // to activate this sub for publication
+    private
+    void registerMulti(final Subscription subscription, final Class<?> listenerClass,
+                       final Map<Class<?>, List<Subscription>> subsPerMessageSingle,
+                       final HashMapTree<Class<?>, ArrayList<Subscription>> subsPerMessageMulti, final AtomicBoolean varArgPossibility) {
+
+        final MessageHandler handler = subscription.getHandler();
+        final Class<?>[] messageHandlerTypes = handler.getHandledMessages();
+        final int size = messageHandlerTypes.length;
+
+        final Class<?> type0 = messageHandlerTypes[0];
+
+        switch (size) {
+            case 0: {
+                // TODO: maybe this SHOULD be permitted? so if a publisher publishes VOID, it call's a method?
+                errorHandler.handleError("Error while trying to subscribe class with zero arguments", listenerClass);
+                return;
+            }
+            case 1: {
+                // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
+                final List<Subscription> cachedSubs = listCache.get();
+                List<Subscription> subs = subsPerMessageSingle.putIfAbsent(type0, cachedSubs);
+                if (subs == null) {
+                    listCache.set(new CopyOnWriteArrayList<Subscription>());
+//                    listCache.set(new ArrayList<Subscription>(8));
+                    subs = cachedSubs;
+
+                    // is this handler able to accept var args?
+                    if (handler.getVarArgClass() != null) {
+                        varArgPossibility.lazySet(true);
+                    }
+                }
+
+                subs.add(subscription);
+                return;
+            }
+            case 2: {
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1]);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1]);
+                }
+
+                subs.add(subscription);
+                return;
+            }
+            case 3: {
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(type0, messageHandlerTypes[1], messageHandlerTypes[2]);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, type0, messageHandlerTypes[1], messageHandlerTypes[2]);
+                }
+
+                subs.add(subscription);
+                return;
+            }
+            default: {
+                ArrayList<Subscription> subs = subsPerMessageMulti.get(messageHandlerTypes);
+                if (subs == null) {
+                    subs = new ArrayList<Subscription>();
+
+                    subsPerMessageMulti.put(subs, messageHandlerTypes);
+                }
+
+                subs.add(subscription);
+            }
+        }
+    }
+
+
+
+    public
+    List<Subscription> getExactAsArray(final Class<?> messageClass) {
+        return subscriptionsPerMessageSingle.get(messageClass);
+    }
+
+    public
+    ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2) {
+        return subscriptionsPerMessageMulti.get(messageClass1, messageClass2);
+    }
+
+    public
+    ArrayList<Subscription> getExactAsArray(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+        return subscriptionsPerMessageMulti.get(messageClass1, messageClass2, messageClass3);
+    }
+
+    // can return null
+    public
+    Subscription[] getExact(final Class<?> messageClass) {
+        final List<Subscription> collection = getExactAsArray(messageClass);
+
+        if (collection != null) {
+            // convert to Array because the subscriptions can change and we want safe iteration over the list
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            return subscriptions;
+        }
+
+        return null;
+    }
+
+    // can return null
+    public
+    Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2) {
+        final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2);
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            return subscriptions;
+        }
+
+        return null;
+    }
+
+    // can return null
+    public
+    Subscription[] getExact(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+
+        final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3);
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+
+            return subscriptions;
+        }
+
+        return null;
+    }
+
+    // can return null
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass) {
+        List<Subscription> collection = getExactAsArray(messageClass); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubscriptions.isEmpty()) {
+                collection.addAll(superSubscriptions);
+            }
+        }
+        else if (!superSubscriptions.isEmpty()) {
+            collection = superSubscriptions;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
+    }
+
+    // can return null
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
+        ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubs = this.subUtils.getSuperSubscriptions(messageClass1, messageClass2,
+                                                                                      this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubs.isEmpty()) {
+                collection.addAll(superSubs);
+            }
+        }
+        else if (!superSubs.isEmpty()) {
+            collection = superSubs;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
+        }
+    }
+
+    // can return null
+    public
+    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
+
+        ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3); // can return null
+
+        // now publish superClasses
+        final ArrayList<Subscription> superSubs = this.subUtils.getSuperSubscriptions(messageClass1, messageClass2, messageClass3,
+                                                                                      this); // NOT return null
+
+        if (collection != null) {
+            collection = new ArrayList<Subscription>(collection);
+
+            if (!superSubs.isEmpty()) {
+                collection.addAll(superSubs);
+            }
+        }
+        else if (!superSubs.isEmpty()) {
+            collection = superSubs;
+        }
+
+        if (collection != null) {
+            final Subscription[] subscriptions = new Subscription[collection.size()];
+            collection.toArray(subscriptions);
+            return subscriptions;
+        }
+        else {
+            return null;
         }
     }
 }

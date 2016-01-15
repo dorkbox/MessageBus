@@ -1,5 +1,6 @@
-package com.lmax.disruptor;
+package dorkbox.util.messagebus.publication.disruptor;
 
+import com.lmax.disruptor.ExceptionHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 

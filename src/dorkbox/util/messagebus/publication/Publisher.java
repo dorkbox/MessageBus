@@ -15,12 +15,11 @@
  */
 package dorkbox.util.messagebus.publication;
 
+import dorkbox.util.messagebus.synchrony.Synchrony;
+
 public interface Publisher {
-    void publish(Object message1);
-
-    void publish(Object message1, Object message2);
-
-    void publish(Object message1, Object message2, Object message3);
-
-    void publish(Object[] messages);
+    void publish(final Synchrony synchrony, Object message1);
+    void publish(final Synchrony synchrony, Object message1, Object message2);
+    void publish(final Synchrony synchrony, Object message1, Object message2, Object message3);
+    void publish(final Synchrony synchrony, Object[] messages);
 }

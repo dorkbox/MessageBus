@@ -18,54 +18,45 @@ package dorkbox.util.messagebus.publication;
 import dorkbox.util.messagebus.common.DeadMessage;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.subscription.Subscriber;
 import dorkbox.util.messagebus.subscription.Subscription;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.synchrony.Synchrony;
 
 @SuppressWarnings("Duplicates")
 public
 class PublisherExactWithSuperTypes implements Publisher {
+
     private final ErrorHandlingSupport errorHandler;
-    private final Subscriber subscriber;
-//    private final StampedLock lock;
+    private final SubscriptionManager subManager;
 
     public
-    PublisherExactWithSuperTypes(final ErrorHandlingSupport errorHandler, final Subscriber subscriber) {
+    PublisherExactWithSuperTypes(final ErrorHandlingSupport errorHandler, final SubscriptionManager subManager) {
         this.errorHandler = errorHandler;
-        this.subscriber = subscriber;
+        this.subManager = subManager;
     }
 
     @Override
     public
-    void publish(final Object message1) {
+    void publish(final Synchrony synchrony, final Object message1) {
         try {
             final Class<?> messageClass = message1.getClass();
 
-            final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass); // can return null
+            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass); // can return null
 
             // Run subscriptions
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1);
-                }
+                synchrony.publish(subscriptions, message1);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }
             }
         } catch (Throwable e) {
-            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                       .setCause(e)
                                                                       .setPublishedObject(message1));
         }
@@ -73,14 +64,14 @@ class PublisherExactWithSuperTypes implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass1, messageClass2); // can return null
+            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass1, messageClass2); // can return null
 //            lock.unlockRead(stamp);
 
             // Run subscriptions
@@ -94,7 +85,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -116,7 +107,7 @@ class PublisherExactWithSuperTypes implements Publisher {
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) {
+    void publish(final Synchrony synchrony, final Object message1, final Object message2, final Object message3) {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
@@ -125,7 +116,7 @@ class PublisherExactWithSuperTypes implements Publisher {
 
 //            final StampedLock lock = this.lock;
 //            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subscriber.getExactAndSuper(messageClass1, messageClass2,
+            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass1, messageClass2,
                                                                              messageClass3); // can return null
 //            lock.unlockRead(stamp);
 
@@ -140,7 +131,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subscriber.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -162,7 +153,7 @@ class PublisherExactWithSuperTypes implements Publisher {
 
     @Override
     public
-    void publish(final Object[] messages) {
-        publish((Object) messages);
+    void publish(final Synchrony synchrony, final Object[] messages) {
+        publish(synchrony, (Object) messages);
     }
 }
