@@ -15,8 +15,7 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
-
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,7 +36,7 @@ public class HashMapTree<KEY, VALUE> {
         @Override
         protected
         Object initialValue() {
-            return JavaVersionAdapter.concurrentMap(INITIAL_SIZE, LOAD_FACTOR, 1);
+            return new ConcurrentHashMap(INITIAL_SIZE, LOAD_FACTOR, 1);
         }
     };
 
@@ -197,7 +196,7 @@ public class HashMapTree<KEY, VALUE> {
         if (checked == null) {
             final boolean success = children.compareAndSet(null, cached);
             if (success) {
-                keyCache.set(JavaVersionAdapter.concurrentMap(INITIAL_SIZE, LOAD_FACTOR, 1));
+                keyCache.set(new ConcurrentHashMap(INITIAL_SIZE, LOAD_FACTOR, 1));
                 kids = cast(cached);
             }
             else {

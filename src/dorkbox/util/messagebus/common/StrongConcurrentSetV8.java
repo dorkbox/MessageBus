@@ -15,7 +15,7 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This implementation uses strong references to the elements, uses an IdentityHashMap
@@ -28,11 +28,11 @@ public class StrongConcurrentSetV8<T> extends StrongConcurrentSet<T> {
 
     public StrongConcurrentSetV8(int size, float loadFactor) {
         // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
-        super(JavaVersionAdapter.<T, ISetEntry<T>>concurrentMap(size, loadFactor, 16));
+        super(new ConcurrentHashMap<T, ISetEntry<T>>(size, loadFactor, 16));
     }
 
     public StrongConcurrentSetV8(int size, float loadFactor, int stripeSize) {
         // 1 for the stripe size, because that is the max concurrency with our concurrent set (since it uses R/W locks)
-        super(JavaVersionAdapter.<T, ISetEntry<T>>concurrentMap(size, loadFactor, stripeSize));
+        super(new ConcurrentHashMap<T, ISetEntry<T>>(size, loadFactor, stripeSize));
     }
 }

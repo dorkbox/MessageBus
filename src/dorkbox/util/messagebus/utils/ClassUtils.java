@@ -15,11 +15,10 @@
  */
 package dorkbox.util.messagebus.utils;
 
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
-
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 public final
@@ -28,26 +27,30 @@ class ClassUtils {
     private final Map<Class<?>, Class<?>> arrayCache;
     private final Map<Class<?>, Class<?>[]> superClassesCache;
 
+    /**
+     * These data structures are never reset because the class hierarchy doesn't change at runtime
+     */
     public
     ClassUtils(final float loadFactor) {
-        this.arrayCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
-        this.superClassesCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
+//        this.arrayCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
+//        this.superClassesCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
+        this.arrayCache = new IdentityHashMap<Class<?>, Class<?>>(32);
+        this.superClassesCache = new IdentityHashMap<Class<?>, Class<?>[]>(32);
     }
 
     /**
-     * never returns null
-     * never reset, since it never needs to be reset (as the class hierarchy doesn't change at runtime)
-     * <p/>
      * if parameter clazz is of type array, then the super classes are of array type as well
-     * <p/>
-     * protected by read lock by caller. The cache version is called first, by write lock
+     * <p>
+     * race conditions will result in duplicate answers, which we don't care if happens
+     * never returns null
+     * never reset
      */
     public
     Class<?>[] getSuperClasses(final Class<?> clazz) {
         // this is never reset, since it never needs to be.
-        final Map<Class<?>, Class<?>[]> local = this.superClassesCache;
+        final Map<Class<?>, Class<?>[]> cache = this.superClassesCache;
 
-        Class<?>[] classes = local.get(clazz);
+        Class<?>[] classes = cache.get(clazz);
 
         if (classes == null) {
             // publish all super types of class
@@ -82,7 +85,7 @@ class ClassUtils {
 
             classes = new Class<?>[newList.size()];
             newList.toArray(classes);
-            local.put(clazz, classes);
+            cache.put(clazz, classes);
         }
 
         return classes;
@@ -91,18 +94,18 @@ class ClassUtils {
     /**
      * race conditions will result in duplicate answers, which we don't care if happens
      * never returns null
-     * never reset
+     * never resets
      */
     public
     Class<?> getArrayClass(final Class<?> c) {
-        final Map<Class<?>, Class<?>> arrayCache = this.arrayCache;
-        Class<?> clazz = arrayCache.get(c);
+        final Map<Class<?>, Class<?>> cache = this.arrayCache;
+        Class<?> clazz = cache.get(c);
 
         if (clazz == null) {
             // messy, but the ONLY way to do it. Array super types are also arrays
             final Object[] newInstance = (Object[]) Array.newInstance(c, 1);
             clazz = newInstance.getClass();
-            arrayCache.put(c, clazz);
+            cache.put(c, clazz);
         }
 
         return clazz;
@@ -110,10 +113,10 @@ class ClassUtils {
 
 
     /**
-     * Clears the caches
+     * Clears the caches, should only be called on shutdown
      */
     public
-    void clear() {
+    void shutdown() {
         this.arrayCache.clear();
         this.superClassesCache.clear();
     }

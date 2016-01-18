@@ -15,12 +15,11 @@
  */
 package dorkbox.util.messagebus.common.thread;
 
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -49,7 +48,7 @@ class ConcurrentSet<T> extends ConcurrentLinkedQueue2<T> {
     public
     ConcurrentSet(int size, float loadFactor, int stripeSize) {
         super();
-        this.entries = JavaVersionAdapter.concurrentMap(size, loadFactor, 32);
+        this.entries = new ConcurrentHashMap<>(size, loadFactor, stripeSize);
     }
 
     @Override

@@ -17,13 +17,13 @@ package dorkbox.util.messagebus.utils;
 
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.MessageHandler;
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final
 class VarArgUtils {
@@ -37,14 +37,14 @@ class VarArgUtils {
 
 
     public
-    VarArgUtils(final ClassUtils superClassUtils, final int numberOfThreads, final float loadFactor) {
+    VarArgUtils(final ClassUtils superClassUtils, final float loadFactor, final int numberOfThreads) {
 
         this.superClassUtils = superClassUtils;
 
-        this.varArgSubscriptionsSingle = JavaVersionAdapter.concurrentMap(16, loadFactor, numberOfThreads);
+        this.varArgSubscriptionsSingle = new ConcurrentHashMap<Class<?>, ArrayList<Subscription>>(16, loadFactor, numberOfThreads);
         this.varArgSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
 
-        this.varArgSuperSubscriptionsSingle = JavaVersionAdapter.concurrentMap(16, loadFactor, numberOfThreads);
+        this.varArgSuperSubscriptionsSingle = new ConcurrentHashMap<Class<?>, ArrayList<Subscription>>(16, loadFactor, numberOfThreads);
         this.varArgSuperSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 

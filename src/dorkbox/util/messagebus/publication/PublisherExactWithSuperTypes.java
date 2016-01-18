@@ -39,6 +39,7 @@ class PublisherExactWithSuperTypes implements Publisher {
     public
     void publish(final Synchrony synchrony, final Object message1) {
         try {
+            final SubscriptionManager subManager = this.subManager;
             final Class<?> messageClass = message1.getClass();
 
             final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass); // can return null

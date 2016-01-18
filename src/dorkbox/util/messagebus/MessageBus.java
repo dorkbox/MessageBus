@@ -17,14 +17,15 @@ package dorkbox.util.messagebus;
 
 import dorkbox.util.messagebus.error.DefaultErrorHandler;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.synchrony.AsyncDisruptor;
-import dorkbox.util.messagebus.synchrony.Sync;
-import dorkbox.util.messagebus.synchrony.Synchrony;
 import dorkbox.util.messagebus.publication.Publisher;
 import dorkbox.util.messagebus.publication.PublisherExact;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypesAndVarity;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.subscription.WriterDistruptor;
+import dorkbox.util.messagebus.synchrony.AsyncDisruptor;
+import dorkbox.util.messagebus.synchrony.Sync;
+import dorkbox.util.messagebus.synchrony.Synchrony;
 
 /**
  * The base class for all message bus implementations with support for asynchronous message dispatch.
@@ -38,6 +39,8 @@ import dorkbox.util.messagebus.subscription.SubscriptionManager;
 public
 class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
+
+    private final WriterDistruptor subscriptionWriter;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -90,6 +93,9 @@ class MessageBus implements IMessageBus {
          */
         this.subscriptionManager = new SubscriptionManager(numberOfThreads, errorHandler);
 
+        subscriptionWriter = new WriterDistruptor(errorHandler, subscriptionManager);
+
+
         switch (publishMode) {
             case Exact:
                 publisher = new PublisherExact(errorHandler, subscriptionManager);
@@ -123,13 +129,23 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void subscribe(final Object listener) {
-        MessageBus.this.subscriptionManager.subscribe(listener);
+        if (listener == null) {
+            return;
+        }
+
+        subscriptionManager.subscribe(listener);
+//        subscriptionWriter.subscribe(listener);
     }
 
     @Override
     public
     void unsubscribe(final Object listener) {
-        MessageBus.this.subscriptionManager.unsubscribe(listener);
+        if (listener == null) {
+            return;
+        }
+
+        subscriptionManager.unsubscribe(listener);
+//        subscriptionWriter.unsubscribe(listener);
     }
 
     @Override
@@ -232,6 +248,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void shutdown() {
+        this.subscriptionWriter.shutdown();
         this.asyncPublication.shutdown();
         this.subscriptionManager.shutdown();
     }

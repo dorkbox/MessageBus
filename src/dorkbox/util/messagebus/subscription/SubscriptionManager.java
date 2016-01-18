@@ -17,7 +17,6 @@ package dorkbox.util.messagebus.subscription;
 
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.common.MessageHandler;
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.utils.ClassUtils;
 import dorkbox.util.messagebus.utils.SubscriptionUtils;
@@ -26,6 +25,7 @@ import dorkbox.util.messagebus.utils.VarArgUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,13 +45,15 @@ public final
 class SubscriptionManager {
     public static final float LOAD_FACTOR = 0.8F;
 
+    // TODO: during startup, precalculate the number of subscription listeners and x2 to save as subsPerListener expected max size
 
+
+    // ONLY used by SUB/UNSUB
     // remember already processed classes that do not contain any message handlers
-    private final Map<Class<?>, Boolean> nonListeners;
+    private final ConcurrentMap<Class<?>, Boolean> nonListeners;
 
     // all subscriptions per messageHandler type
     // this map provides fast access for subscribing and unsubscribing
-    // write access is synchronized and happens very infrequently
     // once a collection of subscriptions is stored it does not change
     private final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerListener;
 
@@ -69,15 +71,8 @@ class SubscriptionManager {
     private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
     // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
-    final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
+    private final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
 
-    ThreadLocal<List<Subscription>> listCache = new ThreadLocal<List<Subscription>>() {
-        @Override
-        protected
-        List<Subscription> initialValue() {
-            return new CopyOnWriteArrayList<Subscription>();
-        }
-    };
     private final ClassUtils classUtils;
 
 //NOTE for multiArg, can use the memory address concatenated with other ones and then just put it in the 'single" map (convert single to
@@ -91,20 +86,18 @@ class SubscriptionManager {
         classUtils = new ClassUtils(SubscriptionManager.LOAD_FACTOR);
 
         // modified ONLY during SUB/UNSUB
-        this.nonListeners = JavaVersionAdapter.concurrentMap(4, LOAD_FACTOR, numberOfThreads);
+        this.nonListeners = new ConcurrentHashMap<Class<?>, Boolean>(4, LOAD_FACTOR, numberOfThreads);
 
-        // only used during SUB/UNSUB
-        this.subscriptionsPerListener = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, numberOfThreads);
+        subscriptionsPerListener = new ConcurrentHashMap<Class<?>, Subscription[]>(32, LOAD_FACTOR, numberOfThreads);
+        subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, List<Subscription>>(32, LOAD_FACTOR, numberOfThreads);
 
-
-        this.subscriptionsPerMessageSingle = JavaVersionAdapter.concurrentMap(32, LOAD_FACTOR, numberOfThreads);
         this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
 
-        this.subUtils = new SubscriptionUtils(classUtils, numberOfThreads, LOAD_FACTOR);
+        this.subUtils = new SubscriptionUtils(classUtils, LOAD_FACTOR, numberOfThreads);
 
         // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(classUtils, numberOfThreads, LOAD_FACTOR);
+        this.varArgUtils = new VarArgUtils(classUtils, LOAD_FACTOR, numberOfThreads);
     }
 
     public
@@ -115,16 +108,12 @@ class SubscriptionManager {
         this.subscriptionsPerMessageMulti.clear();
 
         this.subscriptionsPerListener.clear();
-        this.classUtils.clear();
+        this.classUtils.shutdown();
         clear();
     }
 
     public
     void subscribe(final Object listener) {
-        if (listener == null) {
-            return;
-        }
-
         // when subscribing, this is a GREAT opportunity to figure out the classes/objects loaded -- their hierarchy, AND generate UUIDs
         // for each CLASS that can be accessed. This then lets us lookup a UUID for each object that comes in -- if an ID is found (for
         // any part of it's object hierarchy) -- it  means that we have that listeners for that object. this is MUCH faster checking if
@@ -184,7 +173,6 @@ class SubscriptionManager {
 
 
 
-            final AtomicBoolean varArgPossibility = this.varArgPossibility;
             Subscription subscription;
 
             MessageHandler messageHandler;
@@ -209,18 +197,14 @@ class SubscriptionManager {
                 messageHandlerTypes = messageHandler.getHandledMessages();
                 handlerType = messageHandlerTypes[0];
 
-                // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
-                final List<Subscription> cachedSubs = listCache.get();
-                List<Subscription> subs = subsPerMessageSingle.putIfAbsent(handlerType, cachedSubs);
-                if (subs == null) {
-                    listCache.set(new CopyOnWriteArrayList<Subscription>());
+                if (!subsPerMessageSingle.containsKey(handlerType)) {
+                    subsPerMessageSingle.put(handlerType, new CopyOnWriteArrayList<Subscription>());
                 }
+
 
                 // create the subscription. This can be thrown away if the subscription succeeds in another thread
                 subscription = new Subscription(messageHandler);
                 subscriptions[i] = subscription;
-
-                // now add this subscription to each of the handled types
             }
 
             // now subsPerMessageSingle has a unique list of subscriptions for a specific handlerType, and MAY already have subscriptions
@@ -264,11 +248,8 @@ class SubscriptionManager {
 
     public
     void unsubscribe(final Object listener) {
-        if (listener == null) {
-            return;
-        }
-
         final Class<?> listenerClass = listener.getClass();
+
         if (this.nonListeners.containsKey(listenerClass)) {
             // early reject of known classes that do not define message handlers
             return;
@@ -302,7 +283,7 @@ class SubscriptionManager {
     public
     void clear() {
         this.subUtils.clear();
-        this.varArgUtils.clear();
+//        this.varArgUtils.clear();
     }
 
     // inside a write lock
@@ -326,21 +307,21 @@ class SubscriptionManager {
                 return;
             }
             case 1: {
-                // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
-                final List<Subscription> cachedSubs = listCache.get();
-                List<Subscription> subs = subsPerMessageSingle.putIfAbsent(type0, cachedSubs);
-                if (subs == null) {
-                    listCache.set(new CopyOnWriteArrayList<Subscription>());
-//                    listCache.set(new ArrayList<Subscription>(8));
-                    subs = cachedSubs;
-
-                    // is this handler able to accept var args?
-                    if (handler.getVarArgClass() != null) {
-                        varArgPossibility.lazySet(true);
-                    }
-                }
-
-                subs.add(subscription);
+//                // using ThreadLocal cache's is SIGNIFICANTLY faster for subscribing to new types
+//                final List<Subscription> cachedSubs = listCache.get();
+//                List<Subscription> subs = subsPerMessageSingle.putIfAbsent(type0, cachedSubs);
+//                if (subs == null) {
+//                    listCache.set(new CopyOnWriteArrayList<Subscription>());
+////                    listCache.set(new ArrayList<Subscription>(8));
+//                    subs = cachedSubs;
+//
+//                    // is this handler able to accept var args?
+//                    if (handler.getVarArgClass() != null) {
+//                        varArgPossibility.lazySet(true);
+//                    }
+//                }
+//
+//                subs.add(subscription);
                 return;
             }
             case 2: {

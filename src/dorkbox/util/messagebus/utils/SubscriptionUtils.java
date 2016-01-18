@@ -16,13 +16,13 @@
 package dorkbox.util.messagebus.utils;
 
 import dorkbox.util.messagebus.common.HashMapTree;
-import dorkbox.util.messagebus.common.adapter.JavaVersionAdapter;
 import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final
 class SubscriptionUtils {
@@ -36,13 +36,13 @@ class SubscriptionUtils {
 
 
     public
-    SubscriptionUtils(final ClassUtils superClass, final int numberOfThreads, final float loadFactor) {
+    SubscriptionUtils(final ClassUtils superClass, final float loadFactor, final int numberOfThreads) {
         this.superClass = superClass;
 
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.superClassSubscriptions = JavaVersionAdapter.concurrentMap(8, loadFactor, numberOfThreads);
+        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, ArrayList<Subscription>>(8, loadFactor, numberOfThreads);
         this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 
@@ -57,8 +57,6 @@ class SubscriptionUtils {
      * Returns an array COPY of the super subscriptions for the specified type.
      * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p/>
-     * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
@@ -110,8 +108,6 @@ class SubscriptionUtils {
      * Returns an array COPY of the super subscriptions for the specified type.
      * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p/>
-     * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */
@@ -178,8 +174,6 @@ class SubscriptionUtils {
      * Returns an array COPY of the super subscriptions for the specified type.
      * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
-     * <p/>
-     * protected by read lock by caller
      *
      * @return CAN NOT RETURN NULL
      */

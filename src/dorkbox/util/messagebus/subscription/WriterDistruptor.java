@@ -1,5 +1,6 @@
-package dorkbox.util.messagebus.synchrony;
+package dorkbox.util.messagebus.subscription;
 
+import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.LiteBlockingWaitStrategy;
 import com.lmax.disruptor.PhasedBackoffWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
@@ -10,52 +11,46 @@ import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
 import dorkbox.util.messagebus.common.thread.NamedThreadFactory;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.publication.Publisher;
-import dorkbox.util.messagebus.publication.disruptor.EventBusFactory;
-import dorkbox.util.messagebus.publication.disruptor.MessageHandler;
-import dorkbox.util.messagebus.publication.disruptor.MessageHolder;
-import dorkbox.util.messagebus.publication.disruptor.MessageType;
 import dorkbox.util.messagebus.publication.disruptor.PublicationExceptionHandler;
-import dorkbox.util.messagebus.subscription.Subscription;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
-public
-class AsyncDisruptor implements Synchrony {
 
-    private final ErrorHandlingSupport errorHandler;
-    private WorkProcessor[] workProcessors;
-    private MessageHandler[] handlers;
-    private RingBuffer<MessageHolder> ringBuffer;
+/**
+ * Objective of this class is to conform to the "single writer principle", in order to maintain CLEAN AND SIMPLE concurrency for the
+ * subscriptions. Even with concurrent hashMaps, there is still locks happening during contention.
+ */
+public
+class WriterDistruptor {
+
+    private WorkProcessor workProcessor;
+    private SubscriptionHandler handler;
+    private RingBuffer<SubscriptionHolder> ringBuffer;
     private Sequence workSequence;
 
     public
-    AsyncDisruptor(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Publisher publisher, final Synchrony syncPublication) {
-        this.errorHandler = errorHandler;
+    WriterDistruptor(final ErrorHandlingSupport errorHandler, final SubscriptionManager subscriptionManager) {
         // Now we setup the disruptor and work handlers
 
-        ExecutorService executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
+        ExecutorService executor = new ThreadPoolExecutor(1, 1,
                                                           0, TimeUnit.NANOSECONDS, // handlers are never idle, so this doesn't matter
                                                           new java.util.concurrent.LinkedTransferQueue<Runnable>(),
-                                                          new NamedThreadFactory("MessageBus"));
+                                                          new NamedThreadFactory("MessageBus-Subscriber"));
 
-        final PublicationExceptionHandler<MessageHolder> exceptionHandler = new PublicationExceptionHandler<MessageHolder>(errorHandler);
-        EventBusFactory factory = new EventBusFactory();
+        final PublicationExceptionHandler<SubscriptionHolder> exceptionHandler = new PublicationExceptionHandler<SubscriptionHolder>(errorHandler);
+        EventFactory<SubscriptionHolder> factory = new SubscriptionFactory();
 
         // setup the work handlers
-        handlers = new MessageHandler[numberOfThreads];
-        for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new MessageHandler(publisher, syncPublication);  // exactly one per thread is used
-        }
+        handler = new SubscriptionHandler(subscriptionManager);
 
 
 //        final int BUFFER_SIZE = ringBufferSize * 64;
-//        final int BUFFER_SIZE = 1024 * 64;
+        final int BUFFER_SIZE = 1024 * 64;
 //        final int BUFFER_SIZE = 1024;
-        final int BUFFER_SIZE = 32;
+//        final int BUFFER_SIZE = 32;
 //        final int BUFFER_SIZE = 16;
 //        final int BUFFER_SIZE = 8;
 //        final int BUFFER_SIZE = 4;
@@ -78,16 +73,8 @@ class AsyncDisruptor implements Synchrony {
 
         // setup the WorkProcessors (these consume from the ring buffer -- one at a time) and tell the "handler" to execute the item
         workSequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
+        workProcessor = new WorkProcessor<SubscriptionHolder>(ringBuffer, sequenceBarrier, handler, exceptionHandler, workSequence);
 
-        final int numWorkers = handlers.length;
-        workProcessors = new WorkProcessor[numWorkers];
-
-        for (int i = 0; i < numWorkers; i++) {
-            workProcessors[i] = new WorkProcessor<MessageHolder>(ringBuffer,
-                                                                 sequenceBarrier,
-                                                                 handlers[i],
-                                                                 exceptionHandler, workSequence);
-        }
 
         // setup the WorkProcessor sequences (control what is consumed from the ring buffer)
         final Sequence[] sequences = getSequences();
@@ -98,52 +85,47 @@ class AsyncDisruptor implements Synchrony {
         final long cursor = ringBuffer.getCursor();
         workSequence.set(cursor);
 
-        for (WorkProcessor<?> processor : workProcessors) {
-            processor.getSequence()
+        workProcessor.getSequence()
                      .set(cursor);
-            executor.execute(processor);
-        }
+
+        executor.execute(workProcessor);
     }
 
-
+    /**
+     * @param listener is never null
+     */
     public
-    void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
+    void subscribe(final Object listener) {
         long seq = ringBuffer.next();
 
-        MessageHolder job = ringBuffer.get(seq);
-        job.type = MessageType.ONE;
-        job.subscriptions = subscriptions;
-        job.message1 = message1;
+        SubscriptionHolder job = ringBuffer.get(seq);
+        job.doSubscribe = true;
+        job.listener = listener;
 
         ringBuffer.publish(seq);
     }
 
-    @Override
+    /**
+     * @param listener is never null
+     */
     public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable  {
+    void unsubscribe(final Object listener) {
+        long seq = ringBuffer.next();
 
+        SubscriptionHolder job = ringBuffer.get(seq);
+        job.doSubscribe = false;
+        job.listener = listener;
+
+        ringBuffer.publish(seq);
     }
 
-    @Override
-    public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable  {
-
-    }
-
-    @Override
-    public
-    void publish(final Subscription[] subscriptions, final Object[] messages) throws Throwable  {
-
-    }
 
     // gets the sequences used for processing work
     private
     Sequence[] getSequences() {
-        final Sequence[] sequences = new Sequence[workProcessors.length + 1];
-        for (int i = 0, size = workProcessors.length; i < size; i++) {
-            sequences[i] = workProcessors[i].getSequence();
-        }
-        sequences[sequences.length - 1] = workSequence;   // always add the work sequence
+        final Sequence[] sequences = new Sequence[2];
+        sequences[0] = workProcessor.getSequence();
+        sequences[1] = workSequence;   // always add the work sequence
         return sequences;
     }
 
@@ -154,14 +136,10 @@ class AsyncDisruptor implements Synchrony {
 
     public
     void shutdown() {
-        for (WorkProcessor<?> processor : workProcessors) {
-            processor.halt();
-        }
+        workProcessor.halt();
 
-        for (MessageHandler handler : handlers) {
-            while (!handler.isShutdown()) {
-                LockSupport.parkNanos(100L); // wait 100ms for handlers to quit
-            }
+        while (!handler.isShutdown()) {
+            LockSupport.parkNanos(100L); // wait 100ms for handlers to quit
         }
     }
 
