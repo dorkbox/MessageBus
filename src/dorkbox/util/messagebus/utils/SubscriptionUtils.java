@@ -15,13 +15,12 @@
  */
 package dorkbox.util.messagebus.utils;
 
+import com.esotericsoftware.kryo.util.IdentityMap;
 import dorkbox.util.messagebus.common.HashMapTree;
 import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final
 class SubscriptionUtils {
@@ -30,7 +29,9 @@ class SubscriptionUtils {
     // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
     // it's a hit on SUB/UNSUB, but REALLY improves performance on handlers
     // it's faster to create a new one for SUB/UNSUB than it is to shutdown() on the original one
-    private final Map<Class<?>, Subscription[]> superClassSubscriptions;
+
+    // keeps track of all subscriptions of the super classes of a message type.
+    private volatile IdentityMap<Class<?>, Subscription[]> superClassSubscriptions;
     private final HashMapTree<Class<?>, ArrayList<Subscription>> superClassSubscriptionsMulti;
 
 
@@ -41,7 +42,7 @@ class SubscriptionUtils {
 
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.superClassSubscriptions = new ConcurrentHashMap<Class<?>, Subscription[]>(8, loadFactor, numberOfThreads);
+        this.superClassSubscriptions = new IdentityMap<Class<?>, Subscription[]>(8, loadFactor);
         this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
     }
 
@@ -51,65 +52,66 @@ class SubscriptionUtils {
         this.superClassSubscriptionsMulti.clear();
     }
 
-    // ALWAYS register and create a cached version of the requested class + superClasses
-    public
-    Subscription[] register(final Class<?> clazz, final SubscriptionManager subManager) {
-        final Map<Class<?>, Subscription[]> local = this.superClassSubscriptions;
-
-        // types was not empty, so collect subscriptions for each type and collate them
-
-        // save the subscriptions
-        final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz);  // never returns null, cached response
-
-        Class<?> superClass;
-        Subscription[] superSubs;
-        Subscription sub;
-
-        final int length = superClasses.length;
-        int superSubLength;
-        final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
-
-        for (int i = 0; i < length; i++) {
-            superClass = superClasses[i];
-            superSubs = subManager.getExactAsArray(superClass);
-
-            if (superSubs != null) {
-                superSubLength = superSubs.length;
-                for (int j = 0; j < superSubLength; j++) {
-                    sub = superSubs[j];
-
-                    if (sub.getHandler().acceptsSubtypes()) {
-                        subsAsList.add(sub);
-                    }
-                }
-            }
-        }
-
-        Subscription[] subs = new Subscription[subsAsList.size()];
-        subsAsList.toArray(subs);
-        local.put(clazz, subs);
-
-        return subs;
-    }
+//    // ALWAYS register and create a cached version of the requested class + superClasses
+//    // ONLY called during subscribe
+//    public
+//    Subscription[] register(final Class<?> clazz, final SubscriptionManager subManager) {
+//        final IdentityMap<Class<?>, Subscription[]> local = this.superClassSubscriptions;
+//
+//        // types was not empty, so collect subscriptions for each type and collate them
+//
+//        // save the subscriptions
+//        final Class<?>[] superClasses = this.superClass.getSuperClasses(clazz);  // never returns null, cached response
+//
+//        Class<?> superClass;
+//        Subscription[] superSubs;
+//        Subscription sub;
+//
+//        final int length = superClasses.length;
+//        int superSubLength;
+//        final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
+//
+//        for (int i = 0; i < length; i++) {
+//            superClass = superClasses[i];
+//            superSubs = subManager.getExactAsArray(superClass);
+//
+//            if (superSubs != null) {
+//                superSubLength = superSubs.length;
+//                for (int j = 0; j < superSubLength; j++) {
+//                    sub = superSubs[j];
+//
+//                    if (sub.getHandler().acceptsSubtypes()) {
+//                        subsAsList.add(sub);
+//                    }
+//                }
+//            }
+//        }
+//
+//        final int size = subsAsList.size();
+//        if (size > 0) {
+//            Subscription[] subs = new Subscription[size];
+//            subsAsList.toArray(subs);
+//            local.put(clazz, subs);
+//
+//            superClassSubscriptions = local;
+//
+//            return subs;
+//        }
+//
+//        return null;
+//    }
 
     /**
      * Returns an array COPY of the super subscriptions for the specified type.
      * <p/>
      * This ALSO checks to see if the superClass accepts subtypes.
      *
-     * @return CAN NOT RETURN NULL
+     * @return CAN RETURN NULL
      */
     public
-    Subscription[] getSuperSubscriptions(final Class<?> clazz, final SubscriptionManager subManager) {
+    Subscription[] getSuperSubscriptions(final Class<?> clazz) {
         // whenever our subscriptions change, this map is cleared.
-        final Map<Class<?>, Subscription[]> local = this.superClassSubscriptions;
-        Subscription[] subs = local.get(clazz);
-
-        if (subs != null) {
-            return subs;
-        }
-
-        return register(clazz, subManager);
+        return this.superClassSubscriptions.get(clazz);
     }
 
     /**

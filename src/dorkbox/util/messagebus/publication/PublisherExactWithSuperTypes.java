@@ -40,18 +40,29 @@ class PublisherExactWithSuperTypes implements Publisher {
     void publish(final Synchrony synchrony, final Object message1) {
         try {
             final SubscriptionManager subManager = this.subManager;
-            final Class<?> messageClass = message1.getClass();
+            final Class<?> message1Class = message1.getClass();
+            boolean hasSubs = false;
 
-            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass); // can return null
 
             // Run subscriptions
+            final Subscription[] subscriptions = subManager.getExactAsArray(message1Class); // can return null
             if (subscriptions != null) {
+                hasSubs = true;
                 synchrony.publish(subscriptions, message1);
             }
-            else {
-                // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
 
+            // Run superClasses
+            final Subscription[] superSubscriptions = subManager.getSuperExactAsArray(message1Class); // can return null
+            if (superSubscriptions != null) {
+                hasSubs = true;
+                synchrony.publish(superSubscriptions, message1);
+            }
+
+
+            // Run dead message subscriptions
+            if (!hasSubs) {
+                // Dead Event must EXACTLY MATCH (no subclasses)
+                final Subscription[] deadSubscriptions = subManager.getExactAsArray(DeadMessage.class); // can return null
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }

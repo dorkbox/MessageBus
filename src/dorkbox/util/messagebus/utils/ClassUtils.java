@@ -15,27 +15,25 @@
  */
 package dorkbox.util.messagebus.utils;
 
+import com.esotericsoftware.kryo.util.IdentityMap;
+
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Map;
 
 public final
 class ClassUtils {
 
-    private final Map<Class<?>, Class<?>> arrayCache;
-    private final Map<Class<?>, Class<?>[]> superClassesCache;
+    private final IdentityMap<Class<?>, Class<?>> arrayCache;
+    private final IdentityMap<Class<?>, Class<?>[]> superClassesCache;
 
     /**
      * These data structures are never reset because the class hierarchy doesn't change at runtime
      */
     public
     ClassUtils(final float loadFactor) {
-//        this.arrayCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
-//        this.superClassesCache = JavaVersionAdapter.concurrentMap(32, loadFactor, 1);
-        this.arrayCache = new IdentityHashMap<Class<?>, Class<?>>(32);
-        this.superClassesCache = new IdentityHashMap<Class<?>, Class<?>[]>(32);
+        this.arrayCache = new IdentityMap<Class<?>, Class<?>>(32);
+        this.superClassesCache = new IdentityMap<Class<?>, Class<?>[]>(32);
     }
 
     /**
@@ -48,7 +46,7 @@ class ClassUtils {
     public
     Class<?>[] getSuperClasses(final Class<?> clazz) {
         // this is never reset, since it never needs to be.
-        final Map<Class<?>, Class<?>[]> cache = this.superClassesCache;
+        final IdentityMap<Class<?>, Class<?>[]> cache = this.superClassesCache;
 
         Class<?>[] classes = cache.get(clazz);
 
@@ -101,7 +99,7 @@ class ClassUtils {
     public
     Class<?> getArrayClass(final Class<?> c) {
         // this is never reset, since it never needs to be.
-        final Map<Class<?>, Class<?>> cache = this.arrayCache;
+        final IdentityMap<Class<?>, Class<?>> cache = this.arrayCache;
         Class<?> clazz = cache.get(c);
 
         if (clazz == null) {

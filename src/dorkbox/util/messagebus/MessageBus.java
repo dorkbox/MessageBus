@@ -133,8 +133,8 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-        subscriptionManager.subscribe(listener);
-//        subscriptionWriter.subscribe(listener);
+//        subscriptionManager.subscribe(listener);
+        subscriptionWriter.subscribe(listener);
     }
 
     @Override
@@ -144,8 +144,8 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-        subscriptionManager.unsubscribe(listener);
-//        subscriptionWriter.unsubscribe(listener);
+//        subscriptionManager.unsubscribe(listener);
+        subscriptionWriter.unsubscribe(listener);
     }
 
     @Override
