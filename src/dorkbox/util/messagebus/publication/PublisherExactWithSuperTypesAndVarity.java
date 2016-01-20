@@ -15,7 +15,7 @@
  */
 package dorkbox.util.messagebus.publication;
 
-import dorkbox.util.messagebus.common.DeadMessage;
+import dorkbox.util.messagebus.error.DeadMessage;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;

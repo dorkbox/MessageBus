@@ -35,7 +35,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.common;
+package dorkbox.util.messagebus.error;
 
 import java.util.Arrays;
 

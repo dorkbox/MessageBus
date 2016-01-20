@@ -15,7 +15,7 @@
  */
 package dorkbox.util.messagebus.publication;
 
-import dorkbox.util.messagebus.common.DeadMessage;
+import dorkbox.util.messagebus.error.DeadMessage;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.subscription.Subscription;
@@ -45,7 +45,7 @@ class PublisherExactWithSuperTypes implements Publisher {
 
 
             // Run subscriptions
-            final Subscription[] subscriptions = subManager.getExactAsArray(message1Class); // can return null
+            final Subscription[] subscriptions = subManager.getExact(message1Class); // can return null
             if (subscriptions != null) {
                 hasSubs = true;
                 synchrony.publish(subscriptions, message1);
@@ -62,7 +62,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run dead message subscriptions
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getExactAsArray(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }

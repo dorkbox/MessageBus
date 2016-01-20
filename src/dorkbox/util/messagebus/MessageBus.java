@@ -22,7 +22,7 @@ import dorkbox.util.messagebus.publication.PublisherExact;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypesAndVarity;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
-import dorkbox.util.messagebus.subscription.WriterDistruptor;
+import dorkbox.util.messagebus.subscription.SubscriptionWriterDistruptor;
 import dorkbox.util.messagebus.synchrony.AsyncDisruptor;
 import dorkbox.util.messagebus.synchrony.Sync;
 import dorkbox.util.messagebus.synchrony.Synchrony;
@@ -31,7 +31,7 @@ import dorkbox.util.messagebus.synchrony.Synchrony;
  * The base class for all message bus implementations with support for asynchronous message dispatch.
  *
  * See this post for insight on how it operates:  http://psy-lob-saw.blogspot.com/2012/12/atomiclazyset-is-performance-win-for.html
- * tldr; we use single-writer-principle + Atomic.lazySet
+ * tldr; we use single-writer-principle + lazySet/get
  *
  * @author dorkbox, llc
  *         Date: 2/2/15
@@ -40,7 +40,7 @@ public
 class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
 
-    private final WriterDistruptor subscriptionWriter;
+    private final SubscriptionWriterDistruptor subscriptionWriter;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -93,7 +93,7 @@ class MessageBus implements IMessageBus {
          */
         this.subscriptionManager = new SubscriptionManager(numberOfThreads, errorHandler);
 
-        subscriptionWriter = new WriterDistruptor(errorHandler, subscriptionManager);
+        subscriptionWriter = new SubscriptionWriterDistruptor(errorHandler, subscriptionManager);
 
 
         switch (publishMode) {
@@ -133,7 +133,7 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-//        subscriptionManager.subscribe(listener);
+        // single writer principle
         subscriptionWriter.subscribe(listener);
     }
 
@@ -144,7 +144,7 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-//        subscriptionManager.unsubscribe(listener);
+        // single writer principle
         subscriptionWriter.unsubscribe(listener);
     }
 

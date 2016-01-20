@@ -58,7 +58,6 @@ import java.util.Arrays;
  * <p/>
  * BECAUSE OF THIS, we always treat the two the same
  * <p/>
- * <p/>
  *
  * @author bennidi
  *         Date: 11/14/12
@@ -67,14 +66,12 @@ import java.util.Arrays;
  */
 public
 class MessageHandler {
-    // publish all listeners defined by the given class (includes
-    // listeners defined in super classes)
+    // publish all listeners defined by the given class (includes listeners defined in super classes)
     public static
-//cache this?
-    MessageHandler[] get(final Class<?> target) {
+    MessageHandler[] get(final Class<?> messageClass) {
 
         // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)
-        final Method[] allMethods = ReflectionUtils.getMethods(target);
+        final Method[] allMethods = ReflectionUtils.getMethods(messageClass);
         final int length = allMethods.length;
 
         final ArrayList<MessageHandler> finalMethods = new ArrayList<MessageHandler>(length);
@@ -94,7 +91,7 @@ class MessageHandler {
                     continue;
                 }
 
-                Method overriddenHandler = ReflectionUtils.getOverridingMethod(method, target);
+                Method overriddenHandler = ReflectionUtils.getOverridingMethod(method, messageClass);
                 if (overriddenHandler == null) {
                     overriddenHandler = method;
                 }

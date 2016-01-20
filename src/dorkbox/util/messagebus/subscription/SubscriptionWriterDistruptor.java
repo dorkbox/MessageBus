@@ -24,7 +24,7 @@ import java.util.concurrent.locks.LockSupport;
  * subscriptions. Even with concurrent hashMaps, there is still locks happening during contention.
  */
 public
-class WriterDistruptor {
+class SubscriptionWriterDistruptor {
 
     private WorkProcessor workProcessor;
     private SubscriptionHandler handler;
@@ -32,7 +32,7 @@ class WriterDistruptor {
     private Sequence workSequence;
 
     public
-    WriterDistruptor(final ErrorHandlingSupport errorHandler, final SubscriptionManager subscriptionManager) {
+    SubscriptionWriterDistruptor(final ErrorHandlingSupport errorHandler, final SubscriptionManager subscriptionManager) {
         // Now we setup the disruptor and work handlers
 
         ExecutorService executor = new ThreadPoolExecutor(1, 1,
