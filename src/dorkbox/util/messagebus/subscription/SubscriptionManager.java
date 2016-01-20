@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
@@ -67,7 +66,7 @@ class SubscriptionManager {
     // all subscriptions per message type. We perpetually KEEP the types, as this lowers the amount of locking required
     // this is the primary list for dispatching a specific message
     // write access is synchronized and happens only when a listener of a specific class is registered the first time
-    final ConcurrentMap<Class<?>, List<Subscription>> subscriptionsPerMessageSingle;
+    final ConcurrentMap<Class<?>, Subscription[]> subscriptionsPerMessageSingle;
     private final HashMapTree<Class<?>, ArrayList<Subscription>> subscriptionsPerMessageMulti;
 
     // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
@@ -89,7 +88,7 @@ class SubscriptionManager {
         this.nonListeners = new ConcurrentHashMap<Class<?>, Boolean>(4, LOAD_FACTOR, numberOfThreads);
 
         subscriptionsPerListener = new ConcurrentHashMap<Class<?>, Subscription[]>(32, LOAD_FACTOR, numberOfThreads);
-        subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, List<Subscription>>(32, LOAD_FACTOR, numberOfThreads);
+        subscriptionsPerMessageSingle = new ConcurrentHashMap<Class<?>, Subscription[]>(32, LOAD_FACTOR, numberOfThreads);
 
         this.subscriptionsPerMessageMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
 
@@ -180,7 +179,7 @@ class SubscriptionManager {
             Class<?> handlerType;
 
             // create the subscriptions
-            final ConcurrentMap<Class<?>, List<Subscription>> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
+            final ConcurrentMap<Class<?>, Subscription[]> subsPerMessageSingle = this.subscriptionsPerMessageSingle;
             subscriptions = new Subscription[handlersSize];
 
             for (int i = 0; i < handlersSize; i++) {
@@ -198,7 +197,7 @@ class SubscriptionManager {
                 handlerType = messageHandlerTypes[0];
 
                 if (!subsPerMessageSingle.containsKey(handlerType)) {
-                    subsPerMessageSingle.put(handlerType, new CopyOnWriteArrayList<Subscription>());
+                    subsPerMessageSingle.put(handlerType, new Subscription[0]);
                 }
 
 
@@ -220,6 +219,9 @@ class SubscriptionManager {
             } else {
                 // we can now safely add for publication AND subscribe since the data structures are consistent
                 for (int i = 0; i < handlersSize; i++) {
+                    // register the super types/varity types
+                    subUtils.register(listenerClass, this);
+
                     subscription = subscriptions[i];
                     subscription.subscribe(listener);  // register this callback listener to this subscription
 
@@ -231,7 +233,14 @@ class SubscriptionManager {
                     handlerType = messageHandlerTypes[0];
 
                     // makes this subscription visible for publication
-                    subsPerMessageSingle.get(handlerType).add(subscription);
+                    final Subscription[] currentSubs = subsPerMessageSingle.get(handlerType);
+                    final int currentLength = currentSubs.length;
+
+                    // add the new subscription to the beginning of the array
+                    final Subscription[] newSubs = new Subscription[currentLength + 1];
+                    newSubs[0] = subscription;
+                    System.arraycopy(currentSubs, 0, newSubs, 1, currentLength);
+                    subsPerMessageSingle.put(handlerType, newSubs);
                 }
 
                 return;
@@ -362,7 +371,7 @@ class SubscriptionManager {
 
 
     public
-    List<Subscription> getExactAsArray(final Class<?> messageClass) {
+    Subscription[] getExactAsArray(final Class<?> messageClass) {
         return subscriptionsPerMessageSingle.get(messageClass);
     }
 
@@ -379,17 +388,7 @@ class SubscriptionManager {
     // can return null
     public
     Subscription[] getExact(final Class<?> messageClass) {
-        final List<Subscription> collection = getExactAsArray(messageClass);
-
-        if (collection != null) {
-            // convert to Array because the subscriptions can change and we want safe iteration over the list
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-
-            return subscriptions;
-        }
-
-        return null;
+        return getExactAsArray(messageClass);
     }
 
     // can return null
@@ -423,32 +422,26 @@ class SubscriptionManager {
         return null;
     }
 
-    // can return null
+    // can NOT return null
     public
     Subscription[] getExactAndSuper(final Class<?> messageClass) {
-        List<Subscription> collection = getExactAsArray(messageClass); // can return null
+        Subscription[] collection = getExactAsArray(messageClass); // can return null
 
         // now publish superClasses
-        final ArrayList<Subscription> superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
+        final Subscription[] superSubscriptions = this.subUtils.getSuperSubscriptions(messageClass, this); // NOT return null
 
         if (collection != null) {
-            collection = new ArrayList<Subscription>(collection);
+            final int length = collection.length;
+            final int lengthSuper = superSubscriptions.length;
 
-            if (!superSubscriptions.isEmpty()) {
-                collection.addAll(superSubscriptions);
-            }
-        }
-        else if (!superSubscriptions.isEmpty()) {
-            collection = superSubscriptions;
-        }
+            final Subscription[] newSubs = new Subscription[length + lengthSuper];
+            System.arraycopy(collection, 0, newSubs, 0, length);
+            System.arraycopy(superSubscriptions, 0, newSubs, length, lengthSuper);
 
-        if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-            return subscriptions;
+            return newSubs;
         }
         else {
-            return null;
+            return superSubscriptions;
         }
     }
 

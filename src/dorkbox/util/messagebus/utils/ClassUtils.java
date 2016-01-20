@@ -95,15 +95,18 @@ class ClassUtils {
      * race conditions will result in duplicate answers, which we don't care if happens
      * never returns null
      * never resets
+     *
+     * https://bugs.openjdk.java.net/browse/JDK-6525802  (fixed this in 2007, so Array.newInstance is just as fast (via intrinsics) new [])
      */
     public
     Class<?> getArrayClass(final Class<?> c) {
+        // this is never reset, since it never needs to be.
         final Map<Class<?>, Class<?>> cache = this.arrayCache;
         Class<?> clazz = cache.get(c);
 
         if (clazz == null) {
             // messy, but the ONLY way to do it. Array super types are also arrays
-            final Object[] newInstance = (Object[]) Array.newInstance(c, 1);
+            final Object[] newInstance = (Object[]) Array.newInstance(c, 0);
             clazz = newInstance.getClass();
             cache.put(c, clazz);
         }
