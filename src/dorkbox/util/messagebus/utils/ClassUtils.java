@@ -32,8 +32,8 @@ class ClassUtils {
      */
     public
     ClassUtils(final float loadFactor) {
-        this.arrayCache = new IdentityMap<Class<?>, Class<?>>(32);
-        this.superClassesCache = new IdentityMap<Class<?>, Class<?>[]>(32);
+        this.arrayCache = new IdentityMap<Class<?>, Class<?>>(32, loadFactor);
+        this.superClassesCache = new IdentityMap<Class<?>, Class<?>[]>(32, loadFactor);
     }
 
     /**

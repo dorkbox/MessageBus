@@ -37,6 +37,7 @@
  */
 package dorkbox.util.messagebus.utils;
 
+import com.esotericsoftware.kryo.util.IdentityMap;
 import dorkbox.util.messagebus.annotations.Handler;
 
 import java.lang.annotation.Annotation;
@@ -44,7 +45,6 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 
 /**
  * @author bennidi
@@ -153,7 +153,6 @@ class ReflectionUtils {
         return false;
     }
 
-
     /**
      * Searches for an Annotation of the given type on the class.  Supports meta annotations.
      *
@@ -163,11 +162,11 @@ class ReflectionUtils {
      * @return Annotation instance or null
      */
     private static
-    <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType, Collection<AnnotatedElement> visited) {
-        if (visited.contains(from)) {
+    <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType, IdentityMap<AnnotatedElement, Boolean> visited) {
+        if (visited.containsKey(from)) {
             return null;
         }
-        visited.add(from);
+        visited.put(from, Boolean.TRUE);
         A ann = from.getAnnotation(annotationType);
         if (ann != null) {
             return ann;
@@ -183,7 +182,7 @@ class ReflectionUtils {
 
     public static
     <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType) {
-        A annotation = getAnnotation(from, annotationType, new HashSet<AnnotatedElement>(16));
+        A annotation = getAnnotation(from, annotationType, new IdentityMap<AnnotatedElement, Boolean>());
         return annotation;
     }
 

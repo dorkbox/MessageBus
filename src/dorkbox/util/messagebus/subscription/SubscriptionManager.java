@@ -59,11 +59,19 @@ class SubscriptionManager {
     private final IdentityMap<Class<?>, Subscription[]> subsPerListener;
 
 
-    // all subscriptions per message type. We perpetually KEEP the types
-    private volatile IdentityMap<Class<?>, Subscription[]> subsPerMessageSingle;
+    // We perpetually KEEP the types registered here, and just change what is sub/unsub
+
+    // all subscriptions of a message type.
+    private volatile IdentityMap<Class<?>, Subscription[]> subsSingle;
 
     // keeps track of all subscriptions of the super classes of a message type.
-    private volatile IdentityMap<Class<?>, Subscription[]> subsPerSuperMessageSingle;
+    private volatile IdentityMap<Class<?>, Subscription[]> subsSuperSingle;
+
+    // keeps track of all subscriptions of varity (var-arg) classes of a message type
+    private volatile IdentityMap<Class<?>, Subscription[]> subsVaritySingle;
+
+    // keeps track of all subscriptions of super-class varity (var-arg) classes of a message type
+    private volatile IdentityMap<Class<?>, Subscription[]> subsSuperVaritySingle;
 
 
 
@@ -83,15 +91,25 @@ class SubscriptionManager {
 
 
     // Recommended for best performance while adhering to the "single writer principle"
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsPerMessageSingleREF =
+    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
                                                           IdentityMap.class,
-                                                          "subsPerMessageSingle");
+                                                          "subsSingle");
 
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsPerSuperMessageSingleREF =
+    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperSingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
                                                            IdentityMap.class,
-                                                           "subsPerSuperMessageSingle");
+                                                           "subsSuperSingle");
+
+    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsVaritySingleREF =
+                    AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
+                                                           IdentityMap.class,
+                                                           "subsVaritySingle");
+
+    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperVaritySingleREF =
+                    AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
+                                                           IdentityMap.class,
+                                                           "subsSuperVaritySingle");
 
 //NOTE for multiArg, can use the memory address concatenated with other ones and then just put it in the 'single" map (convert single to
 // use this too). it would likely have to be longs  no idea what to do for arrays?? (arrays should verify all the elements are the
@@ -106,8 +124,10 @@ class SubscriptionManager {
         // modified ONLY during SUB/UNSUB
         nonListeners = new IdentityMap<Class<?>, Boolean>(16, LOAD_FACTOR);
         subsPerListener = new IdentityMap<>(32, LOAD_FACTOR);
-        subsPerMessageSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
-        subsPerSuperMessageSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
+        subsSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
+        subsSuperSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
+        subsVaritySingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
+        subsSuperVaritySingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
 
 
 
@@ -127,13 +147,17 @@ class SubscriptionManager {
     void shutdown() {
         this.nonListeners.clear();
 
-        this.subsPerMessageSingle.clear();
-        this.subsPerSuperMessageSingle.clear();
+        this.subsPerListener.clear();
+
+        this.subsSingle.clear();
+        this.subsSuperSingle.clear();
+        this.subsVaritySingle.clear();
+        this.subsSuperVaritySingle.clear();
+
+
         this.subscriptionsPerMessageMulti.clear();
 
-        this.subsPerListener.clear();
         this.classUtils.shutdown();
-        clear();
     }
 
     public
@@ -169,17 +193,15 @@ class SubscriptionManager {
 
         final Class<?> listenerClass = listener.getClass();
 
-        if (this.nonListeners.containsKey(listenerClass)) {
+        final IdentityMap<Class<?>, Boolean> nonListeners = this.nonListeners;
+        if (nonListeners.containsKey(listenerClass)) {
             // early reject of known classes that do not define message handlers
             return;
         }
 
-        // these are concurrent collections
-        clear();
-
         // this is an array, because subscriptions for a specific listener CANNOT change, either they exist or do not exist.
         // ONCE subscriptions are in THIS map, they are considered AVAILABLE.
-        Subscription[] subscriptions = this.subsPerListener.get(listenerClass);
+        Subscription[] subscriptions = subsPerListener.get(listenerClass);
 
         // the subscriptions from the map were null, so create them
         if (subscriptions == null) {
@@ -196,7 +218,10 @@ class SubscriptionManager {
             subscriptions = new Subscription[handlersSize];
 
             // access a snapshot of the subscriptions (single-writer-principle)
-            final IdentityMap<Class<?>, Subscription[]> local = subsPerMessageSingleREF.get(this);
+            final IdentityMap<Class<?>, Subscription[]> localSubs = subsSingleREF.get(this);
+            final IdentityMap<Class<?>, Subscription[]> localSuperSubs = subsSuperSingleREF.get(this);
+            final IdentityMap<Class<?>, Subscription[]> localVaritySubs = subsVaritySingleREF.get(this);
+            final IdentityMap<Class<?>, Subscription[]> localSuperVaritySubs = subsSuperVaritySingleREF.get(this);
 
             Subscription subscription;
 
@@ -218,8 +243,9 @@ class SubscriptionManager {
                 messageHandlerTypes = messageHandler.getHandledMessages();
                 handlerType = messageHandlerTypes[0];
 
-                if (!local.containsKey(handlerType)) {
-                    local.put(handlerType, SUBSCRIPTIONS);  // this is copied to a larger array if necessary
+                if (!localSubs.containsKey(handlerType)) {
+                    // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
+                    localSubs.put(handlerType, SUBSCRIPTIONS);
                 }
 
                 // create the subscription. This can be thrown away if the subscription succeeds in another thread
@@ -246,21 +272,25 @@ class SubscriptionManager {
 
 
                 // makes this subscription visible for publication
-                final Subscription[] currentSubs = local.get(handlerType);
+                final Subscription[] currentSubs = localSubs.get(handlerType);
                 final int currentLength = currentSubs.length;
 
                 // add the new subscription to the beginning of the array
                 final Subscription[] newSubs = new Subscription[currentLength + 1];
                 newSubs[0] = subscription;
                 System.arraycopy(currentSubs, 0, newSubs, 1, currentLength);
-                local.put(handlerType, newSubs);
+                localSubs.put(handlerType, newSubs);
 
-                // update the super types
-                registerSuperSubs(handlerType, local);
+                // update the varity/super types
+                registerExtraSubs(handlerType, localSubs, localSuperSubs, localVaritySubs);
             }
 
+
             // save this snapshot back to the original (single writer principle)
-            subsPerMessageSingleREF.lazySet(this, local);
+            subsSingleREF.lazySet(this, localSubs);
+            subsSuperSingleREF.lazySet(this, localSuperSubs);
+            subsVaritySingleREF.lazySet(this, localVaritySubs);
+            subsSuperVaritySingleREF.lazySet(this, localSuperVaritySubs);
         }
         else {
             // subscriptions already exist and must only be updated
@@ -276,15 +306,12 @@ class SubscriptionManager {
     void unsubscribe(final Object listener) {
         final Class<?> listenerClass = listener.getClass();
 
-        if (this.nonListeners.containsKey(listenerClass)) {
+        if (nonListeners.containsKey(listenerClass)) {
             // early reject of known classes that do not define message handlers
             return;
         }
 
-        // these are concurrent collections
-        clear();
-
-        final Subscription[] subscriptions = this.subsPerListener.get(listenerClass);
+        final Subscription[] subscriptions = subsPerListener.get(listenerClass);
         if (subscriptions != null) {
             Subscription subscription;
 
@@ -296,30 +323,51 @@ class SubscriptionManager {
     }
 
     private
-    void registerSuperSubs(final Class<?> clazz, final IdentityMap<Class<?>, Subscription[]> subsPerMessageSingle) {
+    void registerExtraSubs(final Class<?> clazz,
+                           final IdentityMap<Class<?>, Subscription[]> subsPerMessageSingle,
+                           final IdentityMap<Class<?>, Subscription[]> subsPerSuperMessageSingle,
+                           final IdentityMap<Class<?>, Subscription[]> subsPerVarityMessageSingle) {
+
+        final Class<?> arrayVersion = this.classUtils.getArrayClass(clazz);  // never returns null, cached response
         final Class<?>[] superClasses = this.classUtils.getSuperClasses(clazz);  // never returns null, cached response
 
-        // access a snapshot of the subscriptions (single-writer-principle)
-        final IdentityMap<Class<?>, Subscription[]> local = subsPerSuperMessageSingleREF.get(this);
-
-        // types was not empty, so collect subscriptions for each type and collate them
-        // save the subscriptions
-
-        Class<?> superClass;
-        Subscription[] superSubs;
         Subscription sub;
 
+        // Register Varity (Var-Arg) subscriptions
+        final Subscription[] arraySubs = subsPerMessageSingle.get(arrayVersion);
+        if (arraySubs != null) {
+            final int length = arraySubs.length;
+            final ArrayList<Subscription> varArgSubsAsList = new ArrayList<Subscription>(length);
+
+            for (int i = 0; i < length; i++) {
+                sub = arraySubs[i];
+
+                if (sub.getHandler().acceptsVarArgs()) {
+                    varArgSubsAsList.add(sub);
+                }
+            }
+
+            final int size = varArgSubsAsList.size();
+            if (size > 0) {
+                Subscription[] varArgSubs = new Subscription[size];
+                varArgSubsAsList.toArray(varArgSubs);
+                subsPerVarityMessageSingle.put(clazz, varArgSubs);
+            }
+        }
+
+
+
+        // Register SuperClass subscriptions
         final int length = superClasses.length;
-        int superSubLength;
         final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
 
         // walks through all of the subscriptions that might exist for super types, and if applicable, save them
         for (int i = 0; i < length; i++) {
-            superClass = superClasses[i];
-            superSubs = subsPerMessageSingle.get(superClass);
+            final Class<?> superClass = superClasses[i];
+            final Subscription[]  superSubs = subsPerMessageSingle.get(superClass);
 
             if (superSubs != null) {
-                superSubLength = superSubs.length;
+                int superSubLength = superSubs.length;
                 for (int j = 0; j < superSubLength; j++) {
                     sub = superSubs[j];
 
@@ -332,13 +380,14 @@ class SubscriptionManager {
 
         final int size = subsAsList.size();
         if (size > 0) {
+            // save the subscriptions
             Subscription[] subs = new Subscription[size];
             subsAsList.toArray(subs);
-            local.put(clazz, subs);
-
-            // save this snapshot back to the original (single writer principle)
-            subsPerSuperMessageSingleREF.lazySet(this, local);
+            subsPerSuperMessageSingle.put(clazz, subs);
         }
+
+
+
     }
 
 
@@ -364,12 +413,6 @@ class SubscriptionManager {
     public
     VarArgUtils getVarArgUtils() {
         return varArgUtils;
-    }
-
-    public
-    void clear() {
-//        this.subUtils.clear();
-//        this.varArgUtils.clear();
     }
 
     // inside a write lock
@@ -448,16 +491,14 @@ class SubscriptionManager {
     // can return null
     public
     Subscription[] getExact(final Class<?> messageClass) {
-        return (Subscription[]) subsPerMessageSingleREF.get(this).get(messageClass);
-//        return subsPerMessageSingle.get(messageClass);
+        return (Subscription[]) subsSingleREF.get(this).get(messageClass);
     }
 
     // can return null
     public
     Subscription[] getSuperExactAsArray(final Class<?> messageClass) {
         // whenever our subscriptions change, this map is cleared.
-        return (Subscription[]) subsPerSuperMessageSingleREF.get(this).get(messageClass);
-//        return this.subsPerMessageSuperSingle.get(messageClass);
+        return (Subscription[]) subsSuperSingleREF.get(this).get(messageClass);
     }
 
 
