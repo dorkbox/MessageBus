@@ -113,7 +113,7 @@ class ReflectionUtils {
      * @return A set of classes, each representing a super type of the root class
      */
     public static
-    Class<?>[] getSuperTypes(Class<?> from) {
+    Class<?>[] getSuperTypes2(Class<?> from) {
         ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
 
         collectInterfaces(from, superclasses);
@@ -128,6 +128,21 @@ class ReflectionUtils {
         superclasses.toArray(classes);
         return classes;
     }
+
+    public static Class[] getSuperTypes(Class from) {
+        ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
+
+        collectInterfaces( from, superclasses );
+        while ( !from.equals( Object.class ) && !from.isInterface() ) {
+            superclasses.add( from.getSuperclass() );
+            from = from.getSuperclass();
+            collectInterfaces( from, superclasses );
+        }
+
+        return superclasses.toArray(new Class[0]);
+    }
+
+
 
     public static
     void collectInterfaces(Class<?> from, Collection<Class<?>> accumulator) {

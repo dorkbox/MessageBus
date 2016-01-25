@@ -22,7 +22,6 @@ import dorkbox.util.messagebus.publication.PublisherExact;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypesAndVarity;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
-import dorkbox.util.messagebus.subscription.SubscriptionWriterDistruptor;
 import dorkbox.util.messagebus.synchrony.AsyncDisruptor;
 import dorkbox.util.messagebus.synchrony.Sync;
 import dorkbox.util.messagebus.synchrony.Synchrony;
@@ -39,8 +38,6 @@ import dorkbox.util.messagebus.synchrony.Synchrony;
 public
 class MessageBus implements IMessageBus {
     private final ErrorHandlingSupport errorHandler;
-
-    private final SubscriptionWriterDistruptor subscriptionWriter;
 
     private final SubscriptionManager subscriptionManager;
 
@@ -93,9 +90,6 @@ class MessageBus implements IMessageBus {
          */
         this.subscriptionManager = new SubscriptionManager(numberOfThreads, errorHandler);
 
-        subscriptionWriter = new SubscriptionWriterDistruptor(errorHandler, subscriptionManager);
-
-
         switch (publishMode) {
             case Exact:
                 publisher = new PublisherExact(errorHandler, subscriptionManager);
@@ -133,8 +127,8 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-        // single writer principle
-        subscriptionWriter.subscribe(listener);
+        // single writer principle using synchronised
+        subscriptionManager.subscribe(listener);
     }
 
     @Override
@@ -144,8 +138,8 @@ class MessageBus implements IMessageBus {
             return;
         }
 
-        // single writer principle
-        subscriptionWriter.unsubscribe(listener);
+        // single writer principle using synchronised
+        subscriptionManager.unsubscribe(listener);
     }
 
     @Override
@@ -248,7 +242,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void shutdown() {
-        this.subscriptionWriter.shutdown();
+        this.syncPublication.shutdown();
         this.asyncPublication.shutdown();
         this.subscriptionManager.shutdown();
     }

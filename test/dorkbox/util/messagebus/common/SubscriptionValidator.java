@@ -66,7 +66,12 @@ public class SubscriptionValidator extends AssertSupport {
 
             // we split subs + superSubs into TWO calls.
             Collection<Subscription> collection = new ArrayDeque<Subscription>(8);
-            Subscription[] subscriptions = subManager.getExactAndSuper(messageType);
+            Subscription[] subscriptions = subManager.getSubs(messageType);
+            if (subscriptions != null) {
+                collection.addAll(Arrays.asList(subscriptions));
+            }
+
+            subscriptions = subManager.getSuperSubs(messageType);
             if (subscriptions != null) {
                 collection.addAll(Arrays.asList(subscriptions));
             }
@@ -95,19 +100,10 @@ public class SubscriptionValidator extends AssertSupport {
      */
     // only in unit test
     public boolean belongsTo(Subscription subscription, Class<?> listener) {
-
-
-//        return this.handlerMetadata.isFromListener(listener);
-//
-//
-//        // only in unit test
-//        public boolean isFromListener(Class<?> listener){
-//            return this.listenerConfig.isFromListener(listener);
-//        }
-        return false;
+        return subscription.getListenerClass() == listener;
     }
 
-    // only in unit test
+
 //    public boolean isFromListener(Class<?> listener) {
 //        return this.listenerDefinition.equals(listener);
 //    }

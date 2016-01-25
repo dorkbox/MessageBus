@@ -89,7 +89,7 @@ class PerfTest_Collections {
 
         for (int i = 0; i < size; i++) {
             for (MessageHandler x : allHandlers) {
-                set.add(new Subscription(x));
+                set.add(new Subscription(Object.class, x)); // not testing listeners, so it doesn't matter that this is Object.class
             }
         }
 

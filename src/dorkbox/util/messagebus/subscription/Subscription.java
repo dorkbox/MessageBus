@@ -70,6 +70,9 @@ class Subscription {
     public final int ID = ID_COUNTER.getAndIncrement();
 
 
+    // What is the listener class that created this subscription?
+    private final Class<?> listenerClass;
+
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
     private final MessageHandler handler;
 
@@ -77,7 +80,9 @@ class Subscription {
     private final Collection<Object> listeners;
 
     public
-    Subscription(final MessageHandler handler) {
+    Subscription(final Class<?> listenerClass, final MessageHandler handler) {
+        this.listenerClass = listenerClass;
+
         this.handler = handler;
 
 //        this.listeners = Collections.newSetFromMap(new ConcurrentHashMap<Object, Boolean>(8));  // really bad performance
@@ -103,6 +108,12 @@ class Subscription {
         }
 
         this.invocation = invocation;
+    }
+
+    // only used by unit-tests to verify that the subscriptionManager is working correctly
+    public
+    Class<?> getListenerClass() {
+        return listenerClass;
     }
 
     public

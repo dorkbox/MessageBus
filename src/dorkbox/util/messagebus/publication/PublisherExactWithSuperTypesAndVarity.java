@@ -52,7 +52,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             final Class<?> messageClass = message1.getClass();
             final boolean isArray = messageClass.isArray();
 
-            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass); // can return null
+            Subscription[] subscriptions = subManager.getSubs(messageClass); // can return null
 
             boolean hasSubs = false;
             // Run subscriptions
@@ -61,6 +61,8 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
 
                 synchrony.publish(subscriptions, message1);
             }
+
+            subscriptions = subManager.getSuperSubs(messageClass); // can return null
 
 
             // publish to var arg, only if not already an array (because that would be unnecessary)
@@ -110,7 +112,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             // only get here if there were no other subscriptions
             // Dead Event must EXACTLY MATCH (no subclasses)
             if (!hasSubs) {
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class);
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class);
 
                 if (deadSubscriptions != null) {
                     final DeadMessage deadMessage = new DeadMessage(message1);
@@ -208,7 +210,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                lock.unlockRead(stamp);
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -314,7 +316,7 @@ class PublisherExactWithSuperTypesAndVarity implements Publisher {
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {

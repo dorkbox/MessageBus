@@ -72,7 +72,7 @@ class VarArgUtils {
             // this gets (and caches) our array type. This is never cleared.
             final Class<?> arrayVersion = this.superClassUtils.getArrayClass(messageClass);
 
-            final Subscription[] subs = subManager.getExact(arrayVersion);
+            final Subscription[] subs = subManager.getSubs(arrayVersion);
             if (subs != null) {
                 final int length = subs.length;
                 final ArrayList<Subscription> varArgSubsAsList = new ArrayList<Subscription>(length);
@@ -134,7 +134,7 @@ class VarArgUtils {
 
             for (int i = 0; i < typesLength; i++) {
                 type = types[i];
-                subs = subManager.getExact(type);
+                subs = subManager.getSubs(type);
 
                 if (subs != null) {
                     length = subs.length;

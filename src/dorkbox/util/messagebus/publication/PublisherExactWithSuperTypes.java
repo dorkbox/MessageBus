@@ -45,14 +45,14 @@ class PublisherExactWithSuperTypes implements Publisher {
 
 
             // Run subscriptions
-            final Subscription[] subscriptions = subManager.getExact(message1Class); // can return null
+            final Subscription[] subscriptions = subManager.getSubs(message1Class); // can return null
             if (subscriptions != null) {
                 hasSubs = true;
                 synchrony.publish(subscriptions, message1);
             }
 
             // Run superClasses
-            final Subscription[] superSubscriptions = subManager.getSuperExactAsArray(message1Class); // can return null
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(message1Class); // can return null
             if (superSubscriptions != null) {
                 hasSubs = true;
                 synchrony.publish(superSubscriptions, message1);
@@ -62,7 +62,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run dead message subscriptions
             if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }
@@ -97,7 +97,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
@@ -143,7 +143,7 @@ class PublisherExactWithSuperTypes implements Publisher {
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
 //                stamp = lock.readLock();
-                final Subscription[] deadSubscriptions = subManager.getExact(DeadMessage.class); // can return null
+                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
 //                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
