@@ -105,11 +105,6 @@ public class SubscriptionValidator extends AssertSupport {
     }
 
 
-//    public boolean isFromListener(Class<?> listener) {
-//        return this.listenerDefinition.equals(listener);
-//    }
-
-
     private Collection<ValidationEntry> getEntries(Class<?> messageType) {
         Collection<ValidationEntry> matching = new LinkedList<ValidationEntry>();
         for (ValidationEntry validationValidationEntry : this.validations) {

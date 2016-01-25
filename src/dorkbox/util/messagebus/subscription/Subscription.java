@@ -71,6 +71,9 @@ class Subscription {
     public final int ID = ID_COUNTER.getAndIncrement();
 
 
+    // this is the listener class that created this subscription
+    private final Class<?> listenerClass;
+
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
     private final MessageHandler handler;
     private final IHandlerInvocation invocation;
@@ -89,14 +92,22 @@ class Subscription {
 
 
     public
-    Subscription(final MessageHandler handler) {
+    Subscription(final Class<?> listenerClass, final MessageHandler handler) {
+        this.listenerClass = listenerClass;
         this.handler = handler;
+
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
             invocation = new SynchronizedHandlerInvocation(invocation);
         }
 
         this.invocation = invocation;
+    }
+
+    // only used in unit tests to verify that the subscription manager is working correctly
+    public
+    Class<?> getListenerClass() {
+        return listenerClass;
     }
 
     public

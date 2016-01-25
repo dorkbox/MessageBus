@@ -60,12 +60,11 @@ public class SubscriptionManagerTest extends AssertSupport {
     private static final int InstancesPerListener = 5000;
 
     @Test
-    public void testIMessageListener() {
-        ListenerFactory listeners = listeners(IMessageListener.DefaultListener.class
-//                        ,
-//                                              IMessageListener.DisabledListener.class,
-//                                              IMessageListener.NoSubtypesListener.class
-        );
+    public
+    void testIMessageListener() {
+        ListenerFactory listeners = listeners(IMessageListener.DefaultListener.class,
+                                              IMessageListener.DisabledListener.class,
+                                              IMessageListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
         expectedSubscriptions.listener(IMessageListener.DefaultListener.class)
@@ -75,106 +74,149 @@ public class SubscriptionManagerTest extends AssertSupport {
                                       StandardMessage.class,
                                       MessageTypes.class);
 
-//        expectedSubscriptions.listener(IMessageListener.NoSubtypesListener.class)
-//                             .handles(IMessage.class);
+        expectedSubscriptions.listener(IMessageListener.NoSubtypesListener.class)
+                             .handles(IMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testAbstractMessageListener() {
-        ListenerFactory listeners = listeners(AbstractMessageListener.DefaultListener.class, AbstractMessageListener.DisabledListener.class,
+    public
+    void testAbstractMessageListener() {
+        ListenerFactory listeners = listeners(AbstractMessageListener.DefaultListener.class,
+                                              AbstractMessageListener.DisabledListener.class,
                                               AbstractMessageListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        AbstractMessageListener.NoSubtypesListener.class).handles(AbstractMessage.class).listener(
-                        AbstractMessageListener.DefaultListener.class).handles(StandardMessage.class, AbstractMessage.class);
+        final SubscriptionValidator subscriptionValidator = new SubscriptionValidator(listeners);
+        subscriptionValidator.listener(AbstractMessageListener.NoSubtypesListener.class)
+                             .handles(AbstractMessage.class);
 
-        runTestWith(listeners, expectedSubscriptions);
+        subscriptionValidator.listener(AbstractMessageListener.DefaultListener.class)
+                             .handles(StandardMessage.class, AbstractMessage.class);
+
+        runTestWith(listeners, subscriptionValidator);
     }
 
     @Test
-    public void testMessagesListener() {
-        ListenerFactory listeners = listeners(MessagesListener.DefaultListener.class, MessagesListener.DisabledListener.class,
+    public
+    void testMessagesListener() {
+        ListenerFactory listeners = listeners(MessagesListener.DefaultListener.class,
+                                              MessagesListener.DisabledListener.class,
                                               MessagesListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        MessagesListener.NoSubtypesListener.class).handles(MessageTypes.class).listener(
-                        MessagesListener.DefaultListener.class).handles(MessageTypes.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(MessagesListener.NoSubtypesListener.class)
+                             .handles(MessageTypes.class);
+
+        expectedSubscriptions.listener(MessagesListener.DefaultListener.class)
+                             .handles(MessageTypes.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testMultipartMessageListener() {
+    public
+    void testMultipartMessageListener() {
         ListenerFactory listeners = listeners(MultipartMessageListener.DefaultListener.class,
                                               MultipartMessageListener.DisabledListener.class,
                                               MultipartMessageListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        MultipartMessageListener.NoSubtypesListener.class).handles(MultipartMessage.class).listener(
-                        MultipartMessageListener.DefaultListener.class).handles(MultipartMessage.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(MultipartMessageListener.NoSubtypesListener.class)
+                             .handles(MultipartMessage.class);
+
+        expectedSubscriptions.listener(MultipartMessageListener.DefaultListener.class)
+                             .handles(MultipartMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testIMultipartMessageListener() {
+    public
+    void testIMultipartMessageListener() {
         ListenerFactory listeners = listeners(IMultipartMessageListener.DefaultListener.class,
                                               IMultipartMessageListener.DisabledListener.class,
                                               IMultipartMessageListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        IMultipartMessageListener.NoSubtypesListener.class).handles(IMultipartMessage.class).listener(
-                        IMultipartMessageListener.DefaultListener.class).handles(MultipartMessage.class, IMultipartMessage.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(IMultipartMessageListener.NoSubtypesListener.class)
+                             .handles(IMultipartMessage.class);
+
+        expectedSubscriptions.listener(IMultipartMessageListener.DefaultListener.class)
+                             .handles(MultipartMessage.class,
+                                      IMultipartMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testStandardMessageListener() {
-        ListenerFactory listeners = listeners(StandardMessageListener.DefaultListener.class, StandardMessageListener.DisabledListener.class,
+    public
+    void testStandardMessageListener() {
+        ListenerFactory listeners = listeners(StandardMessageListener.DefaultListener.class,
+                                              StandardMessageListener.DisabledListener.class,
                                               StandardMessageListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        StandardMessageListener.NoSubtypesListener.class).handles(StandardMessage.class).listener(
-                        StandardMessageListener.DefaultListener.class).handles(StandardMessage.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(StandardMessageListener.NoSubtypesListener.class)
+                             .handles(StandardMessage.class);
+
+        expectedSubscriptions.listener(StandardMessageListener.DefaultListener.class)
+                             .handles(StandardMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testICountableListener() {
-        ListenerFactory listeners = listeners(ICountableListener.DefaultListener.class, ICountableListener.DisabledListener.class,
+    public
+    void testICountableListener() {
+        ListenerFactory listeners = listeners(ICountableListener.DefaultListener.class,
+                                              ICountableListener.DisabledListener.class,
                                               ICountableListener.NoSubtypesListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        ICountableListener.DefaultListener.class).handles(ICountable.class).listener(
-                        ICountableListener.DefaultListener.class).handles(MultipartMessage.class, IMultipartMessage.class, ICountable.class,
-                                                                          StandardMessage.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
+                             .handles(ICountable.class);
+
+        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
+                             .handles(MultipartMessage.class,
+                                      IMultipartMessage.class,
+                                      ICountable.class,
+                                      StandardMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
     @Test
-    public void testMultipleMessageListeners() {
-        ListenerFactory listeners = listeners(ICountableListener.DefaultListener.class, ICountableListener.DisabledListener.class,
+    public
+    void testMultipleMessageListeners() {
+        ListenerFactory listeners = listeners(ICountableListener.DefaultListener.class,
+                                              ICountableListener.DisabledListener.class,
                                               IMultipartMessageListener.DefaultListener.class,
-                                              IMultipartMessageListener.DisabledListener.class, MessagesListener.DefaultListener.class,
+                                              IMultipartMessageListener.DisabledListener.class,
+                                              MessagesListener.DefaultListener.class,
                                               MessagesListener.DisabledListener.class);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(
-                        ICountableListener.DefaultListener.class).handles(MultipartMessage.class, IMultipartMessage.class, ICountable.class,
-                                                                          StandardMessage.class).listener(
-                        IMultipartMessageListener.DefaultListener.class).handles(MultipartMessage.class, IMultipartMessage.class).listener(
-                        MessagesListener.DefaultListener.class).handles(MessageTypes.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
+                             .handles(MultipartMessage.class,
+                                      IMultipartMessage.class,
+                                      ICountable.class,
+                                      StandardMessage.class);
+
+        expectedSubscriptions.listener(IMultipartMessageListener.DefaultListener.class)
+                             .handles(MultipartMessage.class,
+                                      IMultipartMessage.class);
+
+        expectedSubscriptions.listener(MessagesListener.DefaultListener.class)
+                             .handles(MessageTypes.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
 
 
     @Test
-    public void testOverloadedMessageHandlers() {
+    public
+    void testOverloadedMessageHandlers() {
         ListenerFactory listeners = listeners(Overloading.ListenerBase.class, Overloading.ListenerSub.class);
 
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
@@ -182,9 +224,15 @@ public class SubscriptionManagerTest extends AssertSupport {
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(Overloading.ListenerBase.class).handles(
-                        Overloading.TestMessageA.class, Overloading.TestMessageA.class).listener(Overloading.ListenerSub.class).handles(
-                        Overloading.TestMessageA.class, Overloading.TestMessageA.class, Overloading.TestMessageB.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(Overloading.ListenerBase.class)
+                             .handles(Overloading.TestMessageA.class,
+                                      Overloading.TestMessageA.class);
+
+        expectedSubscriptions.listener(Overloading.ListenerSub.class)
+                             .handles(Overloading.TestMessageA.class,
+                                      Overloading.TestMessageA.class,
+                                      Overloading.TestMessageB.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
