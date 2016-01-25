@@ -86,7 +86,7 @@ class VarArgUtils {
                     }
                 }
 
-                varArgSubs = new Subscription[varArgSubsAsList.size()];
+                varArgSubs = new Subscription[0];
                 varArgSubsAsList.toArray(varArgSubs);
 
                 local.put(messageClass, varArgSubs);

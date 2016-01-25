@@ -24,6 +24,7 @@ import dorkbox.util.messagebus.utils.SubscriptionUtils;
 import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -90,23 +91,23 @@ class SubscriptionManager {
     private final ClassUtils classUtils;
 
 
-    // Recommended for best performance while adhering to the "single writer principle"
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSingleREF =
+    // Recommended for best performance while adhering to the "single writer principle". Must be static-final
+    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
-                                                          IdentityMap.class,
-                                                          "subsSingle");
+                                                           IdentityMap.class,
+                                                           "subsSingle");
 
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperSingleREF =
+    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperSingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
                                                            IdentityMap.class,
                                                            "subsSuperSingle");
 
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsVaritySingleREF =
+    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsVaritySingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
                                                            IdentityMap.class,
                                                            "subsVaritySingle");
 
-    private final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperVaritySingleREF =
+    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperVaritySingleREF =
                     AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
                                                            IdentityMap.class,
                                                            "subsSuperVaritySingle");
@@ -255,8 +256,9 @@ class SubscriptionManager {
 
             // now subsPerMessageSingle has a unique list of subscriptions for a specific handlerType, and MAY already have subscriptions
 
+            // activates this sub for sub/unsub (only used by the subscription writer thread)
+            subsPerListener.put(listenerClass, subscriptions);
 
-            subsPerListener.put(listenerClass, subscriptions); // activates this sub for sub/unsub
 
             // we can now safely add for publication AND subscribe since the data structures are consistent
             for (int i = 0; i < handlersSize; i++) {
@@ -275,10 +277,9 @@ class SubscriptionManager {
                 final Subscription[] currentSubs = localSubs.get(handlerType);
                 final int currentLength = currentSubs.length;
 
-                // add the new subscription to the beginning of the array
-                final Subscription[] newSubs = new Subscription[currentLength + 1];
-                newSubs[0] = subscription;
-                System.arraycopy(currentSubs, 0, newSubs, 1, currentLength);
+                // add the new subscription to the array
+                final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                newSubs[currentLength] = subscription;
                 localSubs.put(handlerType, newSubs);
 
                 // update the varity/super types
@@ -328,32 +329,29 @@ class SubscriptionManager {
                            final IdentityMap<Class<?>, Subscription[]> subsPerSuperMessageSingle,
                            final IdentityMap<Class<?>, Subscription[]> subsPerVarityMessageSingle) {
 
-        final Class<?> arrayVersion = this.classUtils.getArrayClass(clazz);  // never returns null, cached response
+//        final Class<?> arrayVersion = this.classUtils.getArrayClass(clazz);  // never returns null, cached response
         final Class<?>[] superClasses = this.classUtils.getSuperClasses(clazz);  // never returns null, cached response
 
         Subscription sub;
-
-        // Register Varity (Var-Arg) subscriptions
-        final Subscription[] arraySubs = subsPerMessageSingle.get(arrayVersion);
-        if (arraySubs != null) {
-            final int length = arraySubs.length;
-            final ArrayList<Subscription> varArgSubsAsList = new ArrayList<Subscription>(length);
-
-            for (int i = 0; i < length; i++) {
-                sub = arraySubs[i];
-
-                if (sub.getHandler().acceptsVarArgs()) {
-                    varArgSubsAsList.add(sub);
-                }
-            }
-
-            final int size = varArgSubsAsList.size();
-            if (size > 0) {
-                Subscription[] varArgSubs = new Subscription[size];
-                varArgSubsAsList.toArray(varArgSubs);
-                subsPerVarityMessageSingle.put(clazz, varArgSubs);
-            }
-        }
+//
+//        // Register Varity (Var-Arg) subscriptions
+//        final Subscription[] arraySubs = subsPerMessageSingle.get(arrayVersion);
+//        if (arraySubs != null) {
+//            final int length = arraySubs.length;
+//            final ArrayList<Subscription> varArgSubsAsList = new ArrayList<Subscription>(length);
+//
+//            for (int i = 0; i < length; i++) {
+//                sub = arraySubs[i];
+//
+//                if (sub.getHandler().acceptsVarArgs()) {
+//                    varArgSubsAsList.add(sub);
+//                }
+//            }
+//
+//            if (!varArgSubsAsList.isEmpty()) {
+//                subsPerVarityMessageSingle.put(clazz, varArgSubsAsList.toArray(new Subscription[0]));
+//            }
+//        }
 
 
 
@@ -378,16 +376,10 @@ class SubscriptionManager {
             }
         }
 
-        final int size = subsAsList.size();
-        if (size > 0) {
+        if (!subsAsList.isEmpty()) {
             // save the subscriptions
-            Subscription[] subs = new Subscription[size];
-            subsAsList.toArray(subs);
-            subsPerSuperMessageSingle.put(clazz, subs);
+            subsPerSuperMessageSingle.put(clazz, subsAsList.toArray(new Subscription[0]));
         }
-
-
-
     }
 
 
@@ -519,10 +511,7 @@ class SubscriptionManager {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2);
 
         if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-
-            return subscriptions;
+            return collection.toArray(new Subscription[0]);
         }
 
         return null;
@@ -535,10 +524,7 @@ class SubscriptionManager {
         final ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3);
 
         if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-
-            return subscriptions;
+            return collection.toArray(new Subscription[0]);
         }
 
         return null;
@@ -592,9 +578,7 @@ class SubscriptionManager {
         }
 
         if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-            return subscriptions;
+            return collection.toArray(new Subscription[0]);
         }
         else {
             return null;
@@ -623,9 +607,7 @@ class SubscriptionManager {
         }
 
         if (collection != null) {
-            final Subscription[] subscriptions = new Subscription[collection.size()];
-            collection.toArray(subscriptions);
-            return subscriptions;
+            return collection.toArray(new Subscription[0]);
         }
         else {
             return null;

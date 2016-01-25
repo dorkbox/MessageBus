@@ -61,15 +61,22 @@ public class SubscriptionManagerTest extends AssertSupport {
 
     @Test
     public void testIMessageListener() {
-        ListenerFactory listeners = listeners(IMessageListener.DefaultListener.class, IMessageListener.DisabledListener.class,
-                                              IMessageListener.NoSubtypesListener.class);
+        ListenerFactory listeners = listeners(IMessageListener.DefaultListener.class
+//                        ,
+//                                              IMessageListener.DisabledListener.class,
+//                                              IMessageListener.NoSubtypesListener.class
+        );
 
-        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners).listener(IMessageListener.DefaultListener.class)
-                                                                                          .handles(IMessage.class, AbstractMessage.class,
-                                                                                                   IMultipartMessage.class,
-                                                                                                   StandardMessage.class,
-                                                                                                   MessageTypes.class).listener(
-                                        IMessageListener.NoSubtypesListener.class).handles(IMessage.class);
+        SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+        expectedSubscriptions.listener(IMessageListener.DefaultListener.class)
+                             .handles(IMessage.class,
+                                      AbstractMessage.class,
+                                      IMultipartMessage.class,
+                                      StandardMessage.class,
+                                      MessageTypes.class);
+
+//        expectedSubscriptions.listener(IMessageListener.NoSubtypesListener.class)
+//                             .handles(IMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }

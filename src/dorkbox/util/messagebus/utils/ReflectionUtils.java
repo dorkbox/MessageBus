@@ -65,9 +65,7 @@ class ReflectionUtils {
         ArrayList<Method> methods = new ArrayList<Method>();
 
         getMethods(target, methods);
-        final Method[] array = new Method[methods.size()];
-        methods.toArray(array);
-        return array;
+        return methods.toArray(new Method[0]);
     }
 
     private static
@@ -124,9 +122,7 @@ class ReflectionUtils {
             collectInterfaces(from, superclasses);
         }
 
-        final Class<?>[] classes = new Class<?>[superclasses.size()];
-        superclasses.toArray(classes);
-        return classes;
+        return superclasses.toArray(new Class<?>[0]);
     }
 
     public static
