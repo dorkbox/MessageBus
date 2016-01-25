@@ -55,6 +55,7 @@ public class SubscriptionValidator extends AssertSupport {
     private SubscriptionValidator expect(Class subscriber, Class messageType) {
         this.validations.add(new ValidationEntry(messageType, subscriber));
         this.messageTypes.add(messageType);
+
         return this;
     }
 
@@ -122,8 +123,11 @@ public class SubscriptionValidator extends AssertSupport {
 
 
 
-    public class Expectation {
 
+
+
+
+    public class Expectation {
         private Class listener;
 
         private Expectation(Class listener) {
@@ -134,24 +138,19 @@ public class SubscriptionValidator extends AssertSupport {
             for (Class message : messages) {
                 expect(this.listener, message);
             }
+
             return SubscriptionValidator.this;
         }
     }
 
 
     private class ValidationEntry {
-
-
         private Class subscriber;
-
         private Class messageType;
 
         private ValidationEntry(Class messageType, Class subscriber) {
             this.messageType = messageType;
             this.subscriber = subscriber;
         }
-
-
     }
-
 }

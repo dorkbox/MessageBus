@@ -13,18 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus;
+package dorkbox.util.messagebus.queuePerf;
 
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.StrongConcurrentSet;
 import dorkbox.util.messagebus.common.StrongConcurrentSetV8;
 import dorkbox.util.messagebus.common.thread.ConcurrentLinkedQueue2;
-import dorkbox.util.messagebus.common.thread.ConcurrentSet;
 import dorkbox.util.messagebus.subscription.Subscription;
 
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedTransferQueue;
@@ -64,7 +69,6 @@ class PerfTest_Collections {
         System.err.println("Done");
 
         bench(size, new ArrayList<Subscription>(size * 2));
-        bench(size, new ConcurrentSet<Subscription>(size * 2, LOAD_FACTOR, 5));
         bench(size, new ConcurrentLinkedQueue2<Subscription>());
         bench(size, new ConcurrentLinkedQueue<Subscription>());
         bench(size, new LinkedTransferQueue<Subscription>());

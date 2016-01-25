@@ -37,28 +37,27 @@
  */
 package dorkbox.util.messagebus.subscription;
 
+import com.esotericsoftware.kryo.util.IdentityMap;
 import com.esotericsoftware.reflectasm.MethodAccess;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
- * A subscription is a thread-safe container that manages exactly one message handler of all registered
- * message listeners of the same class, i.e. all subscribed instances (excluding subclasses) of a SingleMessageHandler.class
- * will be referenced in the subscription created for SingleMessageHandler.class.
+ * A subscription is a container that manages exactly one message handler of all registered
+ * message listeners of the same class, i.e. all subscribed instances (excluding subclasses) of a message
+ * will be referenced in the subscription created for a message.
  * <p/>
  * There will be as many unique subscription objects per message listener class as there are message handlers
  * defined in the message listeners class hierarchy.
  * <p/>
- * The subscription provides functionality for message publication by means of delegation to the respective
- * message dispatcher.
+ * This class uses the "single writer principle", so that the subscription are only MODIFIED by a single thread,
+ * but are READ by X number of threads (in a safe way). This uses object thread visibility/publication to work.
  *
  * @author bennidi
  * @author dorkbox, llc
@@ -66,42 +65,32 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final
 class Subscription {
+    private static final int GROW_SIZE = 8;
+
     private static final AtomicInteger ID_COUNTER = new AtomicInteger();
     public final int ID = ID_COUNTER.getAndIncrement();
 
 
-    // What is the listener class that created this subscription?
-    private final Class<?> listenerClass;
-
     // the handler's metadata -> for each handler in a listener, a unique subscription context is created
     private final MessageHandler handler;
-
     private final IHandlerInvocation invocation;
-    private final Collection<Object> listeners;
+
+    // NOTE: this is still inside the single-writer! can use the same techniques as subscription manager (for thread safe publication)
+    private int firstFreeSpot = 0; // only touched by a single thread
+    private volatile Object[] listeners = new Object[GROW_SIZE];  // only modified by a single thread
+
+    private final IdentityMap<Object, Integer> listenerMap = new IdentityMap<>(GROW_SIZE);
+
+    // Recommended for best performance while adhering to the "single writer principle". Must be static-final
+    private static final AtomicReferenceFieldUpdater<Subscription, Object[]> listenersREF =
+                    AtomicReferenceFieldUpdater.newUpdater(Subscription.class,
+                                                           Object[].class,
+                                                           "listeners");
+
 
     public
-    Subscription(final Class<?> listenerClass, final MessageHandler handler) {
-        this.listenerClass = listenerClass;
-
+    Subscription(final MessageHandler handler) {
         this.handler = handler;
-
-//        this.listeners = Collections.newSetFromMap(new ConcurrentHashMap<Object, Boolean>(8));  // really bad performance
-//        this.listeners = new StrongConcurrentSetV8<Object>(16, 0.7F, 8);
-
-        ///this is by far, the fastest
-        this.listeners = new ConcurrentSkipListSet<>(new Comparator() {
-            @Override
-            public
-            int compare(final Object o1, final Object o2) {
-                return Integer.compare(o1.hashCode(), o2.hashCode());
-//                return 0;
-            }
-        });
-//        this.listeners = new StrongConcurrentSet<Object>(16, 0.85F);
-//        this.listeners = new ConcurrentLinkedQueue2<Object>();
-//        this.listeners = new CopyOnWriteArrayList<Object>();
-//        this.listeners = new CopyOnWriteArraySet<Object>();  // not very good
-
         IHandlerInvocation invocation = new ReflectiveHandlerInvocation();
         if (handler.isSynchronized()) {
             invocation = new SynchronizedHandlerInvocation(invocation);
@@ -110,39 +99,88 @@ class Subscription {
         this.invocation = invocation;
     }
 
-    // only used by unit-tests to verify that the subscriptionManager is working correctly
-    public
-    Class<?> getListenerClass() {
-        return listenerClass;
-    }
-
     public
     MessageHandler getHandler() {
         return handler;
     }
 
     public
-    boolean isEmpty() {
-        return this.listeners.isEmpty();
-    }
+    void subscribe(final Object listener) {
+        // single writer principle!
 
-    public
-    void subscribe(Object listener) {
-        this.listeners.add(listener);
+        Object[] localListeners = listenersREF.get(this);
+
+        final int length = localListeners.length;
+        int spotToPlace = firstFreeSpot;
+
+        while (true) {
+            if (spotToPlace >= length) {
+                // if we couldn't find a place to put the listener, grow the array, but it is never shrunk
+                localListeners = Arrays.copyOf(localListeners, length + GROW_SIZE, Object[].class);
+                break;
+            }
+
+            if (localListeners[spotToPlace] == null) {
+                break;
+            }
+            spotToPlace++;
+        }
+
+        listenerMap.put(listener, spotToPlace);
+        localListeners[spotToPlace] = listener;
+
+        // mark this spot as taken, so the next subscribe starts out a little ahead
+        firstFreeSpot = spotToPlace + 1;
+        listenersREF.lazySet(this, localListeners);
     }
 
     /**
      * @return TRUE if the element was removed
      */
     public
-    boolean unsubscribe(Object existingListener) {
-        return this.listeners.remove(existingListener);
+    boolean unsubscribe(final Object listener) {
+        // single writer principle!
+
+        final Integer integer = listenerMap.remove(listener);
+        Object[] localListeners = listenersREF.get(this);
+
+        if (integer != null) {
+            final int index = integer;
+            firstFreeSpot = index;
+            localListeners[index] = null;
+            listenersREF.lazySet(this, localListeners);
+            return true;
+        }
+        else {
+            for (int i = 0; i < localListeners.length; i++) {
+                if (localListeners[i] == listener) {
+                    firstFreeSpot = i;
+                    localListeners[i] = null;
+                    listenersREF.lazySet(this, localListeners);
+                    return true;
+                }
+            }
+        }
+
+        firstFreeSpot = 0;
+        return false;
     }
 
-    // only used in unit-test
+    /**
+     * only used in unit tests
+     */
     public
     int size() {
-        return this.listeners.size();
+        // since this is ONLY used in unit tests, we count how many are non-null
+
+        int count = 0;
+        for (int i = 0; i < listeners.length; i++) {
+            if (listeners[i] != null) {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     public
@@ -151,62 +189,62 @@ class Subscription {
         final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
-        Iterator<Object> iterator;
         Object listener;
-
-        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-            listener = iterator.next();
-
-            invocation.invoke(listener, handler, handleIndex, message);
+        final Object[] localListeners = listenersREF.get(this);
+        for (int i = 0; i < localListeners.length; i++) {
+            listener = localListeners[i];
+            if (listener != null) {
+                invocation.invoke(listener, handler, handleIndex, message);
+            }
         }
     }
 
     public
     void publish(final Object message1, final Object message2) throws Throwable {
-        final MethodAccess handler = this.handler.getHandler();
-        final int handleIndex = this.handler.getMethodIndex();
-        final IHandlerInvocation invocation = this.invocation;
-
-        Iterator<Object> iterator;
-        Object listener;
-
-        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-            listener = iterator.next();
-
-            invocation.invoke(listener, handler, handleIndex, message1, message2);
-        }
+//        final MethodAccess handler = this.handler.getHandler();
+//        final int handleIndex = this.handler.getMethodIndex();
+//        final IHandlerInvocation invocation = this.invocation;
+//
+//        Iterator<Object> iterator;
+//        Object listener;
+//
+//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+//            listener = iterator.next();
+//
+//            invocation.invoke(listener, handler, handleIndex, message1, message2);
+//        }
     }
 
     public
     void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-        final MethodAccess handler = this.handler.getHandler();
-        final int handleIndex = this.handler.getMethodIndex();
-        final IHandlerInvocation invocation = this.invocation;
-
-        Iterator<Object> iterator;
-        Object listener;
-
-        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-            listener = iterator.next();
-
-            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
-        }
+//        final MethodAccess handler = this.handler.getHandler();
+//        final int handleIndex = this.handler.getMethodIndex();
+//        final IHandlerInvocation invocation = this.invocation;
+//
+//        Iterator<Object> iterator;
+//        Object listener;
+//
+//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+//            listener = iterator.next();
+//
+//            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+//        }
     }
 
     public
     void publish(final Object... messages) throws Throwable {
-        final MethodAccess handler = this.handler.getHandler();
-        final int handleIndex = this.handler.getMethodIndex();
-        final IHandlerInvocation invocation = this.invocation;
-
-        Iterator<Object> iterator;
-        Object listener;
-
-        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-            listener = iterator.next();
-
-            invocation.invoke(listener, handler, handleIndex, messages);
-        }
+//        final MethodAccess handler = this.handler.getHandler();
+//        final int handleIndex = this.handler.getMethodIndex();
+//        final IHandlerInvocation invocation = this.invocation;
+//
+//        Iterator<Object> iterator;
+//        Object listener;
+//
+//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
+//            listener = iterator.next();
+//
+//            invocation.invoke(listener, handler, handleIndex, messages);
+//        }
     }
 
 
@@ -218,7 +256,7 @@ class Subscription {
 
     @Override
     public
-    boolean equals(Object obj) {
+    boolean equals(final Object obj) {
         if (this == obj) {
             return true;
         }

@@ -25,8 +25,23 @@ public class MultiMessageTest extends MessageBusTest {
 
         MultiListener listener1 = new MultiListener();
         bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+        bus.subscribe(listener1);
+
+        bus.unsubscribe(listener1);
+        bus.unsubscribe(listener1);
+        bus.unsubscribe(listener1);
         bus.unsubscribe(listener1);
 
+        bus.publish("s");
+        bus.publish("s");
+        bus.publish("s");
         bus.publish("s");
         bus.publish("s", "s");
         bus.publish("s", "s", "s");
@@ -84,40 +99,40 @@ public class MultiMessageTest extends MessageBusTest {
             System.err.println("match String");
         }
 
-        @Handler
-        public void handleSync(String o1, String o2) {
-            count.getAndIncrement();
-            System.err.println("match String, String");
-        }
-
-        @Handler
-        public void handleSync(String o1, String o2, String o3) {
-            count.getAndIncrement();
-            System.err.println("match String, String, String");
-        }
-
-        @Handler
-        public void handleSync(Integer o1, Integer o2, String o3) {
-            count.getAndIncrement();
-            System.err.println("match Integer, Integer, String");
-        }
-
-        @Handler(acceptVarargs = true)
-        public void handleSync(String... o) {
-            count.getAndIncrement();
-            System.err.println("match String[]");
-        }
-
-        @Handler
-        public void handleSync(Integer... o) {
-            count.getAndIncrement();
-            System.err.println("match Integer[]");
-        }
-
-        @Handler(acceptVarargs = true)
-        public void handleSync(Object... o) {
-            count.getAndIncrement();
-            System.err.println("match Object[]");
-        }
+//        @Handler
+//        public void handleSync(String o1, String o2) {
+//            count.getAndIncrement();
+//            System.err.println("match String, String");
+//        }
+//
+//        @Handler
+//        public void handleSync(String o1, String o2, String o3) {
+//            count.getAndIncrement();
+//            System.err.println("match String, String, String");
+//        }
+//
+//        @Handler
+//        public void handleSync(Integer o1, Integer o2, String o3) {
+//            count.getAndIncrement();
+//            System.err.println("match Integer, Integer, String");
+//        }
+//
+//        @Handler(acceptVarargs = true)
+//        public void handleSync(String... o) {
+//            count.getAndIncrement();
+//            System.err.println("match String[]");
+//        }
+//
+//        @Handler
+//        public void handleSync(Integer... o) {
+//            count.getAndIncrement();
+//            System.err.println("match Integer[]");
+//        }
+//
+//        @Handler(acceptVarargs = true)
+//        public void handleSync(Object... o) {
+//            count.getAndIncrement();
+//            System.err.println("match Object[]");
+//        }
     }
 }

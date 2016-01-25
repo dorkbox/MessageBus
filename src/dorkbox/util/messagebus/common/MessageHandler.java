@@ -101,9 +101,7 @@ class MessageHandler {
             }
         }
 
-        final MessageHandler[] messageHandlers = new MessageHandler[finalMethods.size()];
-        finalMethods.toArray(messageHandlers);
-        return messageHandlers;
+        return finalMethods.toArray(new MessageHandler[0]);
     }
 
     private final MethodAccess handler;
