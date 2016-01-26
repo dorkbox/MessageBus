@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.IgnoreExceptionHandler;

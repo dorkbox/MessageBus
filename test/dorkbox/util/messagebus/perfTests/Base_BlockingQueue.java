@@ -1,13 +1,13 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TransferQueue;
+import java.util.concurrent.BlockingQueue;
 
 @SuppressWarnings("Duplicates")
 public
-class Base_TransferQueue<T> {
+class Base_BlockingQueue<T> {
 
     public
     void run(final int repetitions,
@@ -17,7 +17,7 @@ class Base_TransferQueue<T> {
              final int runs,
              final int bestRunsToAverage,
              final boolean showStats,
-             final TransferQueue<T> queue,
+             final BlockingQueue<T> queue,
              final T initialValue) throws Exception {
 
         for (int i = 0; i < warmups; i++) {
@@ -54,7 +54,7 @@ class Base_TransferQueue<T> {
      */
     private
     long performanceRun(final int runNumber,
-                        final TransferQueue<T> queue,
+                        final BlockingQueue<T> queue,
                         final boolean showStats,
                         final int producersCount,
                         final int consumersCount,
@@ -128,12 +128,12 @@ class Base_TransferQueue<T> {
     }
 
     public static class Producer<T> implements Runnable {
-        private final TransferQueue<T> queue;
+        private final BlockingQueue<T> queue;
         volatile long start;
         private int repetitions;
         private final T initialValue;
 
-        public Producer(TransferQueue<T> queue, int repetitions, T initialValue) {
+        public Producer(BlockingQueue<T> queue, int repetitions, T initialValue) {
             this.queue = queue;
             this.repetitions = repetitions;
             this.initialValue = initialValue;
@@ -141,14 +141,14 @@ class Base_TransferQueue<T> {
 
         @Override
         public void run() {
-            TransferQueue<T> producer = this.queue;
+            BlockingQueue<T> producer = this.queue;
             int i = this.repetitions;
             this.start = System.nanoTime();
             final T initialValue = this.initialValue;
 
             try {
                 do {
-                    producer.transfer(initialValue);
+                    producer.put(initialValue);
                 } while (0 != --i);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -157,18 +157,18 @@ class Base_TransferQueue<T> {
     }
 
     public static class Consumer<T> implements Runnable {
-        private final TransferQueue<T> queue;
+        private final BlockingQueue<T> queue;
         Object result;
         volatile long end;
         private int repetitions;
 
-        public Consumer(TransferQueue<T> queue, int repetitions) {
+        public Consumer(BlockingQueue<T> queue, int repetitions) {
             this.queue = queue;
             this.repetitions = repetitions;
         }
 
         public void run() {
-            TransferQueue<T> consumer = this.queue;
+            BlockingQueue<T> consumer = this.queue;
             int i = this.repetitions;
 
             T result = null;

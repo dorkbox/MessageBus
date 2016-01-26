@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus;
+package dorkbox.util.messagebus.perfTests;
 import com.esotericsoftware.reflectasm.MethodAccess;
 
 import java.lang.invoke.MethodHandle;

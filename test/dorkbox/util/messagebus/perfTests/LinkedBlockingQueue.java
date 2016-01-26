@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 public class LinkedBlockingQueue {
     public static final int REPETITIONS = 50 * 1000 * 100;

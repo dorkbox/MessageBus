@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 import dorkbox.util.messagebus.MTAQ_Accessor;
 

@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 import java.util.Arrays;
 import java.util.Collections;

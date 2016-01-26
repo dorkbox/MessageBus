@@ -1,4 +1,4 @@
-package dorkbox.util.messagebus.queuePerf;
+package dorkbox.util.messagebus.perfTests;
 
 @SuppressWarnings("Duplicates")
 public class ArrayBlockingQueue extends Base_BlockingQueue {
