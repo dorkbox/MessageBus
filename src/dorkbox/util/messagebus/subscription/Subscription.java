@@ -39,12 +39,12 @@ package dorkbox.util.messagebus.subscription;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
 import com.esotericsoftware.reflectasm.MethodAccess;
+import dorkbox.util.messagebus.common.Entry;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.dispatch.IHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.ReflectiveHandlerInvocation;
 import dorkbox.util.messagebus.dispatch.SynchronizedHandlerInvocation;
 
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
@@ -65,8 +65,6 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  */
 public final
 class Subscription {
-    private static final int GROW_SIZE = 8;
-
     private static final AtomicInteger ID_COUNTER = new AtomicInteger();
     public final int ID = ID_COUNTER.getAndIncrement();
 
@@ -78,17 +76,18 @@ class Subscription {
     private final MessageHandler handler;
     private final IHandlerInvocation invocation;
 
-    // NOTE: this is still inside the single-writer! can use the same techniques as subscription manager (for thread safe publication)
-    private int firstFreeSpot = 0; // only touched by a single thread
-    private volatile Object[] listeners = new Object[GROW_SIZE];  // only modified by a single thread
-
-    private final IdentityMap<Object, Integer> listenerMap = new IdentityMap<>(GROW_SIZE);
-
     // Recommended for best performance while adhering to the "single writer principle". Must be static-final
-    private static final AtomicReferenceFieldUpdater<Subscription, Object[]> listenersREF =
+    private static final AtomicReferenceFieldUpdater<Subscription, Entry> headREF =
                     AtomicReferenceFieldUpdater.newUpdater(Subscription.class,
-                                                           Object[].class,
-                                                           "listeners");
+                                                           Entry.class,
+                                                           "head");
+
+
+    // This is only touched by a single thread!
+    private final IdentityMap<Object, Entry> entries; // maintain a map of entries for FAST lookup during unsubscribe.
+
+    // this is still inside the single-writer, and can use the same techniques as subscription manager (for thread safe publication)
+    public volatile Entry head; // reference to the first element
 
 
     public
@@ -102,6 +101,21 @@ class Subscription {
         }
 
         this.invocation = invocation;
+
+        entries = new IdentityMap<>(32, SubscriptionManager.LOAD_FACTOR);
+
+
+        if (handler.acceptsSubtypes()) {
+            // keep a list of "super-class" messages that access this. This is updated by multiple threads. This is so we know WHAT
+            // super-subscriptions to clear when we sub/unsub
+
+        }
+    }
+
+    // called on shutdown for GC purposes
+    public void clear() {
+        this.entries.clear();
+        this.head.clear();
     }
 
     // only used in unit tests to verify that the subscription manager is working correctly
@@ -118,31 +132,14 @@ class Subscription {
     public
     void subscribe(final Object listener) {
         // single writer principle!
+        Entry head = headREF.get(this);
 
-        Object[] localListeners = listenersREF.get(this);
+        if (!entries.containsKey(listener)) {
+            head = new Entry(listener, head);
 
-        final int length = localListeners.length;
-        int spotToPlace = firstFreeSpot;
-
-        while (true) {
-            if (spotToPlace >= length) {
-                // if we couldn't find a place to put the listener, grow the array, but it is never shrunk
-                localListeners = Arrays.copyOf(localListeners, length + GROW_SIZE, Object[].class);
-                break;
-            }
-
-            if (localListeners[spotToPlace] == null) {
-                break;
-            }
-            spotToPlace++;
+            entries.put(listener, head);
+            headREF.lazySet(this, head);
         }
-
-        listenerMap.put(listener, spotToPlace);
-        localListeners[spotToPlace] = listener;
-
-        // mark this spot as taken, so the next subscribe starts out a little ahead
-        firstFreeSpot = spotToPlace + 1;
-        listenersREF.lazySet(this, localListeners);
     }
 
     /**
@@ -150,31 +147,28 @@ class Subscription {
      */
     public
     boolean unsubscribe(final Object listener) {
-        // single writer principle!
-
-        final Integer integer = listenerMap.remove(listener);
-        Object[] localListeners = listenersREF.get(this);
-
-        if (integer != null) {
-            final int index = integer;
-            firstFreeSpot = index;
-            localListeners[index] = null;
-            listenersREF.lazySet(this, localListeners);
-            return true;
+        Entry entry = entries.get(listener);
+        if (entry == null || entry.getValue() == null) {
+            // fast exit
+            return false;
         }
         else {
-            for (int i = 0; i < localListeners.length; i++) {
-                if (localListeners[i] == listener) {
-                    firstFreeSpot = i;
-                    localListeners[i] = null;
-                    listenersREF.lazySet(this, localListeners);
-                    return true;
-                }
-            }
-        }
+            // single writer principle!
+            Entry head = headREF.get(this);
 
-        firstFreeSpot = 0;
-        return false;
+            if (entry != head) {
+                entry.remove();
+            }
+            else {
+                // if it was second, now it's first
+                head = head.next();
+                //oldHead.clear(); // optimize for GC not possible because of potentially running iterators
+            }
+
+            this.entries.remove(listener);
+            headREF.lazySet(this, head);
+            return true;
+        }
     }
 
     /**
@@ -182,16 +176,7 @@ class Subscription {
      */
     public
     int size() {
-        // since this is ONLY used in unit tests, we count how many are non-null
-
-        int count = 0;
-        for (int i = 0; i < listeners.length; i++) {
-            if (listeners[i] != null) {
-                count++;
-            }
-        }
-
-        return count;
+        return this.entries.size;
     }
 
     public
@@ -200,62 +185,46 @@ class Subscription {
         final int handleIndex = this.handler.getMethodIndex();
         final IHandlerInvocation invocation = this.invocation;
 
+        Entry current = headREF.get(this);
         Object listener;
-        final Object[] localListeners = listenersREF.get(this);
-        for (int i = 0; i < localListeners.length; i++) {
-            listener = localListeners[i];
-            if (listener != null) {
-                invocation.invoke(listener, handler, handleIndex, message);
-            }
+        while (current != null) {
+            listener = current.getValue();
+            current = current.next();
+
+            invocation.invoke(listener, handler, handleIndex, message);
         }
     }
 
     public
     void publish(final Object message1, final Object message2) throws Throwable {
-//        final MethodAccess handler = this.handler.getHandler();
-//        final int handleIndex = this.handler.getMethodIndex();
-//        final IHandlerInvocation invocation = this.invocation;
-//
-//        Iterator<Object> iterator;
-//        Object listener;
-//
-//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-//            listener = iterator.next();
-//
-//            invocation.invoke(listener, handler, handleIndex, message1, message2);
-//        }
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
+
+        Entry current = headREF.get(this);
+        Object listener;
+        while (current != null) {
+            listener = current.getValue();
+            current = current.next();
+
+            invocation.invoke(listener, handler, handleIndex, message1, message2);
+        }
     }
 
     public
     void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
-//        final MethodAccess handler = this.handler.getHandler();
-//        final int handleIndex = this.handler.getMethodIndex();
-//        final IHandlerInvocation invocation = this.invocation;
-//
-//        Iterator<Object> iterator;
-//        Object listener;
-//
-//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-//            listener = iterator.next();
-//
-//            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
-//        }
-    }
+        final MethodAccess handler = this.handler.getHandler();
+        final int handleIndex = this.handler.getMethodIndex();
+        final IHandlerInvocation invocation = this.invocation;
 
-    public
-    void publish(final Object... messages) throws Throwable {
-//        final MethodAccess handler = this.handler.getHandler();
-//        final int handleIndex = this.handler.getMethodIndex();
-//        final IHandlerInvocation invocation = this.invocation;
-//
-//        Iterator<Object> iterator;
-//        Object listener;
-//
-//        for (iterator = this.listeners.iterator(); iterator.hasNext(); ) {
-//            listener = iterator.next();
-//
-//            invocation.invoke(listener, handler, handleIndex, messages);
-//        }
+        Entry current = headREF.get(this);
+        Object listener;
+        while (current != null) {
+            listener = current.getValue();
+            current = current.next();
+
+            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+        }
     }
 
 
