@@ -233,7 +233,6 @@ class MessageBus implements IMessageBus {
     public
     void start() {
         errorHandler.init();
-        asyncPublication.start();
     }
 
     @Override

@@ -166,23 +166,7 @@ class AsyncDisruptor implements Synchrony {
     }
 
 
-    public
-    void start() {
-    }
-
-    public
-    void shutdown() {
-        for (WorkProcessor<?> processor : workProcessors) {
-            processor.halt();
-        }
-
-        for (MessageHandler handler : handlers) {
-            while (!handler.isShutdown()) {
-                LockSupport.parkNanos(100L); // wait 100ms for handlers to quit
-            }
-        }
-    }
-
+    @Override
     public
     boolean hasPendingMessages() {
         // from workerPool.drainAndHalt()
@@ -195,5 +179,19 @@ class AsyncDisruptor implements Synchrony {
         }
 
         return false;
+    }
+
+    @Override
+    public
+    void shutdown() {
+        for (WorkProcessor<?> processor : workProcessors) {
+            processor.halt();
+        }
+
+        for (MessageHandler handler : handlers) {
+            while (!handler.isShutdown()) {
+                LockSupport.parkNanos(100L); // wait 100ms for handlers to quit
+            }
+        }
     }
 }

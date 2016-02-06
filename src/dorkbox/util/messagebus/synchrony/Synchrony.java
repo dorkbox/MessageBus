@@ -26,7 +26,6 @@ interface Synchrony {
     void publish(final Subscription[] subscriptions, Object message1, Object message2) throws Throwable ;
     void publish(final Subscription[] subscriptions, Object message1, Object message2, Object message3) throws Throwable ;
 
-    void start();
     void shutdown();
     boolean hasPendingMessages();
 }

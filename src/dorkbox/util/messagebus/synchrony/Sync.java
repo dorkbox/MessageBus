@@ -53,11 +53,6 @@ class Sync implements Synchrony {
 
     @Override
     public
-    void start() {
-    }
-
-    @Override
-    public
     void shutdown() {
     }
 

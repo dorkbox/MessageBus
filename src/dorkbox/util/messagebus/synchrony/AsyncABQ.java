@@ -22,8 +22,10 @@ import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.synchrony.disruptor.MessageType;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * This is similar to the disruptor, however the downside of this implementation is that, while faster than the no-gc version, it
@@ -38,6 +40,7 @@ class AsyncABQ implements Synchrony {
 
     private final ArrayBlockingQueue<MessageHolder> dispatchQueue;
     private final Collection<Thread> threads;
+    private final Collection<Boolean> shutdown;
 
     /**
      * Notifies the consumers during shutdown, that it's on purpose.
@@ -63,14 +66,21 @@ class AsyncABQ implements Synchrony {
                 while (!AsyncABQ.this.shuttingDown) {
                     process(IN_QUEUE, syncPublication1, errorHandler1);
                 }
+
+                synchronized (shutdown) {
+                    shutdown.add(Boolean.TRUE);
+                }
             }
         };
 
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
+        this.shutdown = new ArrayList<Boolean>();
+
         final NamedThreadFactory threadFactory = new NamedThreadFactory("MessageBus");
         for (int i = 0; i < numberOfThreads; i++) {
-            Thread runner = threadFactory.newThread(runnable);
-            this.threads.add(runner);
+            Thread thread = threadFactory.newThread(runnable);
+            this.threads.add(thread);
+            thread.start();
         }
     }
 
@@ -108,7 +118,7 @@ class AsyncABQ implements Synchrony {
                 }
             }
         } catch (Throwable e) {
-            if (event != null) {
+            if (event != null && !this.shuttingDown) {
                 switch (messageType) {
                     case MessageType.ONE: {
                         errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
@@ -133,7 +143,6 @@ class AsyncABQ implements Synchrony {
             }
         }
     }
-
 
     @Override
     public
@@ -174,17 +183,14 @@ class AsyncABQ implements Synchrony {
         this.dispatchQueue.put(take);
     }
 
+    @Override
     public
-    void start() {
-        if (shuttingDown) {
-            throw new Error("Unable to restart the MessageBus");
-        }
-
-        for (Thread t : this.threads) {
-            t.start();
-        }
+    boolean hasPendingMessages() {
+        return !this.dispatchQueue.isEmpty();
     }
 
+    @SuppressWarnings("Duplicates")
+    @Override
     public
     void shutdown() {
         this.shuttingDown = true;
@@ -192,10 +198,14 @@ class AsyncABQ implements Synchrony {
         for (Thread t : this.threads) {
             t.interrupt();
         }
-    }
 
-    public
-    boolean hasPendingMessages() {
-        return !this.dispatchQueue.isEmpty();
+        while (true) {
+            synchronized (shutdown) {
+                if (shutdown.size() == threads.size()) {
+                    return;
+                }
+                LockSupport.parkNanos(100L); // wait 100ms for threads to quit
+            }
+        }
     }
 }
