@@ -43,7 +43,7 @@ class AsyncABQ implements Synchrony {
     private final Collection<Boolean> shutdown;
 
     /**
-     * Notifies the consumers during shutdown, that it's on purpose.
+     * Notifies the consumers during shutdown that it's on purpose.
      */
     private volatile boolean shuttingDown = false;
 
