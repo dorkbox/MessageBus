@@ -67,12 +67,6 @@ class Subscription {
         this.handler = handler;
 
         entries = new IdentityMap<Object, Entry>(32, SubscriptionManager.LOAD_FACTOR);
-
-
-        if (handler.acceptsSubtypes()) {
-            // TODO keep a list of "super-class" messages that access this. This is updated by multiple threads. This is so we know WHAT
-            // super-subscriptions to clear when we sub/unsub
-        }
     }
 
     // called on shutdown for GC purposes
@@ -143,21 +137,12 @@ class Subscription {
         return this.entries.size;
     }
 
-    /**
-     * @return true if messages were published
-     */
     public abstract
     void publish(final Object message) throws Throwable;
 
-    /**
-     * @return true if messages were published
-     */
     public abstract
     void publish(final Object message1, final Object message2) throws Throwable;
 
-    /**
-     * @return true if messages were published
-     */
     public abstract
     void publish(final Object message1, final Object message2, final Object message3) throws Throwable;
 

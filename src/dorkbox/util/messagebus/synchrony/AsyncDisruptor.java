@@ -15,22 +15,14 @@
  */
 package dorkbox.util.messagebus.synchrony;
 
-import com.lmax.disruptor.LiteBlockingWaitStrategy;
-import com.lmax.disruptor.PhasedBackoffWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.Sequence;
-import com.lmax.disruptor.SequenceBarrier;
-import com.lmax.disruptor.Sequencer;
-import com.lmax.disruptor.WaitStrategy;
-import com.lmax.disruptor.WorkProcessor;
+import com.lmax.disruptor.*;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
-import dorkbox.util.messagebus.publication.Publisher;
+import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.synchrony.disruptor.EventBusFactory;
 import dorkbox.util.messagebus.synchrony.disruptor.MessageHandler;
 import dorkbox.util.messagebus.synchrony.disruptor.MessageType;
 import dorkbox.util.messagebus.synchrony.disruptor.PublicationExceptionHandler;
-import dorkbox.util.messagebus.subscription.Subscription;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -43,15 +35,13 @@ import java.util.concurrent.locks.LockSupport;
 public final
 class AsyncDisruptor implements Synchrony {
 
-    private final ErrorHandlingSupport errorHandler;
     private WorkProcessor[] workProcessors;
     private MessageHandler[] handlers;
     private RingBuffer<MessageHolder> ringBuffer;
     private Sequence workSequence;
 
     public
-    AsyncDisruptor(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Publisher publisher, final Synchrony syncPublication) {
-        this.errorHandler = errorHandler;
+    AsyncDisruptor(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {
         // Now we setup the disruptor and work handlers
 
         ExecutorService executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
@@ -65,7 +55,7 @@ class AsyncDisruptor implements Synchrony {
         // setup the work handlers
         handlers = new MessageHandler[numberOfThreads];
         for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new MessageHandler(publisher, syncPublication);  // exactly one per thread is used
+            handlers[i] = new MessageHandler(syncPublication, errorHandler);  // exactly one per thread is used
         }
 
 
@@ -79,14 +69,14 @@ class AsyncDisruptor implements Synchrony {
 
 
         WaitStrategy consumerWaitStrategy;
-//        consumerWaitStrategy = new LiteBlockingWaitStrategy(); // good one
+//        consumerWaitStrategy = new LiteBlockingWaitStrategy(); // good blocking one
 //        consumerWaitStrategy = new BlockingWaitStrategy();
 //        consumerWaitStrategy = new YieldingWaitStrategy();
-//        consumerWaitStrategy = new BusySpinWaitStrategy();
+//        consumerWaitStrategy = new BusySpinWaitStrategy();  // best for low latency
 //        consumerWaitStrategy = new SleepingWaitStrategy();
 //        consumerWaitStrategy = new PhasedBackoffWaitStrategy(20, 50, TimeUnit.MILLISECONDS, new SleepingWaitStrategy(0));
-//        consumerWaitStrategy = new PhasedBackoffWaitStrategy(20, 50, TimeUnit.MILLISECONDS, new BlockingWaitStrategy());
-        consumerWaitStrategy = new PhasedBackoffWaitStrategy(2, 5, TimeUnit.MILLISECONDS, new LiteBlockingWaitStrategy());
+//        consumerWaitStrategy = new PhasedBackoffWaitStrategy(10, 50, TimeUnit.MILLISECONDS, new BlockingWaitStrategy());
+        consumerWaitStrategy = new PhasedBackoffWaitStrategy(10, 50, TimeUnit.MILLISECONDS, new LiteBlockingWaitStrategy()); // good combo
 
 
         ringBuffer = RingBuffer.createMultiProducer(factory, BUFFER_SIZE, consumerWaitStrategy);

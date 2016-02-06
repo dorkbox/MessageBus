@@ -18,7 +18,6 @@ package dorkbox.util.messagebus.synchrony;
 import dorkbox.util.messagebus.common.NamedThreadFactory;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.publication.Publisher;
 import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.synchrony.disruptor.MessageType;
 
@@ -42,7 +41,6 @@ class AsyncABQ_noGc implements Synchrony {
     // have two queues to prevent garbage, So we pull off one queue to add to another queue and when done, we put it back
     private final ArrayBlockingQueue<MessageHolder> gcQueue;
 
-
     private final Collection<Thread> threads;
 
     /**
@@ -52,10 +50,7 @@ class AsyncABQ_noGc implements Synchrony {
 
 
     public
-    AsyncABQ_noGc(final int numberOfThreads,
-                  final ErrorHandlingSupport errorHandler,
-                  final Publisher publisher,
-                  final Synchrony syncPublication) {
+    AsyncABQ_noGc(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
         this.gcQueue = new ArrayBlockingQueue<MessageHolder>(1024);
@@ -65,100 +60,95 @@ class AsyncABQ_noGc implements Synchrony {
             gcQueue.add(new MessageHolder());
         }
 
+        // each thread will run forever and process incoming message publication requests
+        Runnable runnable = new Runnable() {
+            @SuppressWarnings("ConstantConditions")
+            @Override
+            public
+            void run() {
+                final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ_noGc.this.dispatchQueue;
+                final ArrayBlockingQueue<MessageHolder> OUT_QUEUE = AsyncABQ_noGc.this.gcQueue;
+
+                final Synchrony syncPublication1 = syncPublication;
+                final ErrorHandlingSupport errorHandler1 = errorHandler;
+
+                while (!AsyncABQ_noGc.this.shuttingDown) {
+                    process(IN_QUEUE, OUT_QUEUE, syncPublication1, errorHandler1);
+                }
+            }
+        };
+
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
         final NamedThreadFactory threadFactory = new NamedThreadFactory("MessageBus");
         for (int i = 0; i < numberOfThreads; i++) {
-
-            // each thread will run forever and process incoming message publication requests
-            Runnable runnable = new Runnable() {
-                @Override
-                public
-                void run() {
-                    final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ_noGc.this.dispatchQueue;
-                    final ArrayBlockingQueue<MessageHolder> OUT_QUEUE = AsyncABQ_noGc.this.gcQueue;
-                    final Publisher publisher1 = publisher;
-                    final Synchrony syncPublication1 = syncPublication;
-                    final ErrorHandlingSupport errorHandler1 = errorHandler;
-
-                    MessageHolder event = null;
-                    int messageType = MessageType.ONE;
-                    Object message1 = null;
-                    Object message2 = null;
-                    Object message3 = null;
-
-                    while (!AsyncABQ_noGc.this.shuttingDown) {
-                        try {
-                            event = IN_QUEUE.take();
-                            messageType = event.type;
-                            message1 = event.message1;
-                            message2 = event.message2;
-                            message3 = event.message3;
-
-                            OUT_QUEUE.put(event);
-
-
-                            switch (messageType) {
-                                case MessageType.ONE: {
-                                    publisher1.publish(syncPublication1, message1);
-                                    break;
-                                }
-                                case MessageType.TWO: {
-                                    publisher1.publish(syncPublication1, message1, message2);
-                                    break;
-                                }
-                                case MessageType.THREE: {
-                                    publisher1.publish(syncPublication1, message3, message1, message2);
-                                    break;
-                                }
-                            }
-                        } catch (InterruptedException e) {
-                            if (!AsyncABQ_noGc.this.shuttingDown) {
-                                switch (messageType) {
-                                    case MessageType.ONE: {
-                                        PublicationError publicationError = new PublicationError()
-                                                        .setMessage("Thread interrupted while processing message")
-                                                        .setCause(e);
-
-                                        if (event != null) {
-                                            publicationError.setPublishedObject(message1);
-                                        }
-
-                                        errorHandler1.handlePublicationError(publicationError);
-                                        break;
-                                    }
-                                    case MessageType.TWO: {
-                                        PublicationError publicationError = new PublicationError()
-                                                        .setMessage("Thread interrupted while processing message")
-                                                        .setCause(e);
-
-                                        if (event != null) {
-                                            publicationError.setPublishedObject(message1, message2);
-                                        }
-
-                                        errorHandler1.handlePublicationError(publicationError);
-                                        break;
-                                    }
-                                    case MessageType.THREE: {
-                                        PublicationError publicationError = new PublicationError()
-                                                        .setMessage("Thread interrupted while processing message")
-                                                        .setCause(e);
-
-                                        if (event != null) {
-                                            publicationError.setPublishedObject(message1, message2, message3);
-                                        }
-
-                                        errorHandler1.handlePublicationError(publicationError);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
             Thread runner = threadFactory.newThread(runnable);
             this.threads.add(runner);
+        }
+    }
+
+    @SuppressWarnings("Duplicates")
+    private
+    void process(final ArrayBlockingQueue<MessageHolder> queue,
+                 final ArrayBlockingQueue<MessageHolder> gcQueue,
+                 final Synchrony sync,
+                 final ErrorHandlingSupport errorHandler) {
+
+        MessageHolder event = null;
+        int messageType = MessageType.ONE;
+        Subscription[] subscriptions;
+        Object message1 = null;
+        Object message2 = null;
+        Object message3 = null;
+
+        try {
+            event = queue.take();
+            messageType = event.type;
+            subscriptions = event.subscriptions;
+            message1 = event.message1;
+            message2 = event.message2;
+            message3 = event.message3;
+
+            gcQueue.put(event);
+
+            switch (messageType) {
+                case MessageType.ONE: {
+                    sync.publish(subscriptions, message1);
+                    return;
+                }
+                case MessageType.TWO: {
+                    sync.publish(subscriptions, message1, message2);
+                    return;
+                }
+                case MessageType.THREE: {
+                    sync.publish(subscriptions, message1, message2, message3);
+                    //noinspection UnnecessaryReturnStatement
+                    return;
+                }
+            }
+        } catch (Throwable e) {
+            if (event != null) {
+                switch (messageType) {
+                    case MessageType.ONE: {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message1));
+                        return;
+                    }
+                    case MessageType.TWO: {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message1, message2));
+                        return;
+                    }
+                    case MessageType.THREE: {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message1, message2, message3));
+                        //noinspection UnnecessaryReturnStatement
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -166,6 +156,7 @@ class AsyncABQ_noGc implements Synchrony {
     public
     void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
         MessageHolder take = gcQueue.take();
+
         take.type = MessageType.ONE;
         take.subscriptions = subscriptions;
         take.message1 = message1;
@@ -177,6 +168,7 @@ class AsyncABQ_noGc implements Synchrony {
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable {
         MessageHolder take = gcQueue.take();
+
         take.type = MessageType.TWO;
         take.subscriptions = subscriptions;
         take.message1 = message1;
@@ -189,6 +181,7 @@ class AsyncABQ_noGc implements Synchrony {
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable {
         MessageHolder take = gcQueue.take();
+
         take.type = MessageType.THREE;
         take.subscriptions = subscriptions;
         take.message1 = message1;

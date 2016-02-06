@@ -135,15 +135,15 @@ class MessageBus implements IMessageBus {
 
         // the disruptor is preferred, but if it cannot be loaded -- we want to try to continue working, hence the use of ArrayBlockingQueue
         if (useDisruptorForAsyncPublish) {
-            asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, publisher, syncPublication);
+            asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, syncPublication);
         } else {
             if (useNoGarbageVersionOfABQ) {
                 // no garbage is created, but this is slow (but faster than other messagebus implementations)
-                asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler, publisher, syncPublication);
+                asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler, syncPublication);
             }
             else {
                 // garbage is created, but this is fast
-                asyncPublication = new AsyncABQ(numberOfThreads, errorHandler, publisher, syncPublication);
+                asyncPublication = new AsyncABQ(numberOfThreads, errorHandler, syncPublication);
             }
         }
     }

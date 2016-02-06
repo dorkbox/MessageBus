@@ -17,51 +17,77 @@ package dorkbox.util.messagebus.synchrony.disruptor;
 
 import com.lmax.disruptor.LifecycleAware;
 import com.lmax.disruptor.WorkHandler;
+import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import dorkbox.util.messagebus.error.PublicationError;
+import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.synchrony.MessageHolder;
 import dorkbox.util.messagebus.synchrony.Synchrony;
-import dorkbox.util.messagebus.publication.Publisher;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * @author dorkbox, llc
- *         Date: 2/2/15
+ * @author dorkbox, llc Date: 2/2/15
  */
 public
 class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
-    private final Publisher publisher;
+
     private final Synchrony syncPublication;
+    private final ErrorHandlingSupport errorHandler;
 
-    AtomicBoolean shutdown = new AtomicBoolean(false);
-
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     public
-    MessageHandler(final Publisher publisher, final Synchrony syncPublication) {
-        this.publisher = publisher;
+    MessageHandler(final Synchrony syncPublication, final ErrorHandlingSupport errorHandler) {
         this.syncPublication = syncPublication;
+        this.errorHandler = errorHandler;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public
     void onEvent(final MessageHolder event) throws Exception {
         final int messageType = event.type;
-        switch (messageType) {
-            case MessageType.ONE: {
-                this.publisher.publish(syncPublication, event.message1);
-                return;
+        final Subscription[] subscriptions = event.subscriptions;
+
+        try {
+            switch (messageType) {
+                case MessageType.ONE: {
+                    syncPublication.publish(subscriptions, event.message1);
+                    return;
+                }
+                case MessageType.TWO: {
+                    syncPublication.publish(subscriptions, event.message1, event.message2);
+                    return;
+                }
+                case MessageType.THREE: {
+                    syncPublication.publish(subscriptions, event.message1, event.message2, event.message3);
+                    //noinspection UnnecessaryReturnStatement
+                    return;
+                }
             }
-            case MessageType.TWO: {
-                Object message1 = event.message1;
-                Object message2 = event.message2;
-                this.publisher.publish(syncPublication, message1, message2);
-                return;
-            }
-            case MessageType.THREE: {
-                Object message1 = event.message1;
-                Object message2 = event.message2;
-                Object message3 = event.message3;
-                this.publisher.publish(syncPublication, message3, message1, message2);
-                return;
+        } catch (Throwable e) {
+            switch (messageType) {
+                case MessageType.ONE: {
+                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                              .setCause(e)
+                                                                              .setPublishedObject(event.message1));
+                    return;
+                }
+                case MessageType.TWO: {
+                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                              .setCause(e)
+                                                                              .setPublishedObject(event.message1, event.message2));
+                    return;
+                }
+                case MessageType.THREE: {
+                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                                                                              .setCause(e)
+                                                                              .setPublishedObject(event.message1,
+                                                                                                  event.message2,
+                                                                                                  event.message3));
+                    //noinspection UnnecessaryReturnStatement
+                    return;
+                }
             }
         }
     }
@@ -69,7 +95,6 @@ class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
     @Override
     public
     void onStart() {
-
     }
 
     @Override
