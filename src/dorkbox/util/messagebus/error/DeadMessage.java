@@ -37,11 +37,8 @@
  */
 package dorkbox.util.messagebus.error;
 
-import java.util.Arrays;
-
 /**
- * The dead message event is published whenever no message
- * handlers could be found for a given message publication.
+ * The dead message event is published whenever no message handlers could be found for a given message publication.
  *
  * @author bennidi
  *         Date: 1/18/13
@@ -52,7 +49,6 @@ public final
 class DeadMessage {
 
     private final Object[] relatedMessages;
-
 
     public
     DeadMessage(Object message) {
@@ -73,11 +69,6 @@ class DeadMessage {
         this.relatedMessages[0] = message1;
         this.relatedMessages[1] = message2;
         this.relatedMessages[2] = message3;
-    }
-
-    public
-    DeadMessage(Object[] messages) {
-        this.relatedMessages = Arrays.copyOf(messages, messages.length);
     }
 
     public
