@@ -27,5 +27,5 @@ package dorkbox.util.messagebus.messages;
  * @author bennidi
  *         Date: 5/24/13
  */
-public class MultipartMessage extends AbstractMessage implements IMultipartMessage, ICountable{
+public class MultipartMessage extends AbstractMessage implements IMultipartMessage, ICountable {
 }

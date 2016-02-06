@@ -33,7 +33,6 @@ import org.junit.runners.Suite;
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
-        WeakConcurrentSetTest.class,
         MBassadorTest.class,
         MetadataReaderTest.class,
         MethodDispatchTest.class,
@@ -41,7 +40,7 @@ import org.junit.runners.Suite;
         SynchronizedHandlerTest.class,
         SubscriptionManagerTest.class,
         AsyncFIFOBusTest.class,
-        ObjectTreeTest.class,
+        MultiTreeTest.class,
         MultiMessageTest.class,
 })
 public class AllTests {

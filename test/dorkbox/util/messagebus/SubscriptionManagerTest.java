@@ -177,11 +177,11 @@ public class SubscriptionManagerTest extends AssertSupport {
         expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
                              .handles(ICountable.class);
 
-        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
-                             .handles(MultipartMessage.class,
-                                      IMultipartMessage.class,
-                                      ICountable.class,
-                                      StandardMessage.class);
+//        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
+//                             .handles(MultipartMessage.class,
+//                                      IMultipartMessage.class,
+//                                      ICountable.class,
+//                                      StandardMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }

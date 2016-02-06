@@ -23,7 +23,6 @@
 package dorkbox.util.messagebus.listeners;
 
 import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.annotations.Listener;
 import dorkbox.util.messagebus.messages.AbstractMessage;
 
 /**
@@ -36,18 +35,13 @@ public class Overloading {
     public static class TestMessageB extends AbstractMessage {}
 
     public static class ListenerSub extends ListenerBase {
-
         @Handler
         public void handleEvent(TestMessageB event) {
             event.handled(this.getClass());
         }
-
     }
 
-    @Listener()
     public static class ListenerBase {
-
-
         /**
          * (!) If this method is removed, NO event handler will be called.
          */
@@ -60,7 +54,5 @@ public class Overloading {
         public void handleEvent(TestMessageA event) {
             event.handled(this.getClass());
         }
-
     }
-
 }
