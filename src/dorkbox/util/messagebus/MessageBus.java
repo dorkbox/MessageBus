@@ -55,7 +55,6 @@ class MessageBus implements IMessageBus {
             }
         }
 
-
         // check to see if we can use the disruptor for publication (otherwise, we use native java). The disruptor is a lot faster, but
         // not available on all platforms/JRE's because of it's use of UNSAFE.
         if (useDisruptorForAsyncPublish) {
@@ -92,7 +91,6 @@ class MessageBus implements IMessageBus {
      */
     public
     MessageBus(int numberOfThreads) {
-//        this(PublishMode.ExactWithSuperTypesAndVarity, numberOfThreads);
         this(PublishMode.ExactWithSuperTypes, numberOfThreads);
     }
 
@@ -210,33 +208,13 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publishAsync(final Object message1, final Object message2) {
-//        if (message1 != null && message2 != null) {
-//            try {
-//                this.dispatchQueue.transfer(message1, message2);
-//            } catch (Exception e) {
-//                errorHandler.handlePublicationError(new PublicationError().setMessage(
-//                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(message1, message2));
-//            }
-//        }
-//        else {
-//            throw new NullPointerException("Messages cannot be null.");
-//        }
+        publisher.publish(asyncPublication, message1, message2);
     }
 
     @Override
     public
     void publishAsync(final Object message1, final Object message2, final Object message3) {
-//        if (message1 != null || message2 != null | message3 != null) {
-//            try {
-//                this.dispatchQueue.transfer(message1, message2, message3);
-//            } catch (Exception e) {
-//                errorHandler.handlePublicationError(new PublicationError().setMessage(
-//                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(message1, message2, message3));
-//            }
-//        }
-//        else {
-//            throw new NullPointerException("Messages cannot be null.");
-//        }
+        publisher.publish(asyncPublication, message1, message2, message3);
     }
 
     @Override
