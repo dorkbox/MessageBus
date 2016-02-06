@@ -20,12 +20,11 @@ import dorkbox.util.messagebus.subscription.Subscription;
 /**
  * @author dorkbox, llc Date: 2/2/15
  */
-public
+public final
 class Sync implements Synchrony {
     public
     void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
         Subscription sub;
-        boolean hasSubs = false;
         for (int i = 0; i < subscriptions.length; i++) {
             sub = subscriptions[i];
             sub.publish(message1);
@@ -55,13 +54,11 @@ class Sync implements Synchrony {
     @Override
     public
     void start() {
-
     }
 
     @Override
     public
     void shutdown() {
-
     }
 
     @Override

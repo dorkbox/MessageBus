@@ -90,68 +90,56 @@ class SubscriptionAsm extends Subscription {
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message) throws Throwable {
+    void publish(final Object message) throws Throwable {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, handler, handleIndex, message);
         }
-
-        return hasSubs;
     }
 
     /**
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message1, final Object message2) throws Throwable {
+    void publish(final Object message1, final Object message2) throws Throwable {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, handler, handleIndex, message1, message2);
         }
-
-        return hasSubs;
     }
 
     /**
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message1, final Object message2, final Object message3) throws Throwable {
+    void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
         }
-
-        return hasSubs;
     }
 }

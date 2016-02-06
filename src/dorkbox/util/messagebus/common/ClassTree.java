@@ -35,9 +35,6 @@ import java.util.concurrent.atomic.AtomicReference;
  *         Date: 2/2/15
  */
 public class ClassTree<KEY> {
-
-
-
     public static int INITIAL_SIZE = 4;
     public static float LOAD_FACTOR = 0.8F;
 

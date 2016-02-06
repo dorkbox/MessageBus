@@ -83,65 +83,53 @@ class SubscriptionReflection extends Subscription {
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message) throws Throwable {
+    void publish(final Object message) throws Throwable {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, method, message);
         }
-
-        return hasSubs;
     }
 
     /**
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message1, final Object message2) throws Throwable {
+    void publish(final Object message1, final Object message2) throws Throwable {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, method, message1, message2);
         }
-
-        return hasSubs;
     }
 
     /**
      * @return true if messages were published
      */
     public
-    boolean publish(final Object message1, final Object message2, final Object message3) throws Throwable {
+    void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
-        boolean hasSubs = false;
 
         Entry current = headREF.get(this);
         Object listener;
         while (current != null) {
-            hasSubs = true;
             listener = current.getValue();
             current = current.next();
 
             invocation.invoke(listener, method, message1, message2, message3);
         }
-
-        return hasSubs;
     }
 }

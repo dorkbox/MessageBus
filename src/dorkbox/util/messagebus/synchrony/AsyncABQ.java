@@ -34,7 +34,7 @@ import java.util.concurrent.ArrayBlockingQueue;
  *
  * @author dorkbox, llc Date: 2/3/16
  */
-public
+public final
 class AsyncABQ implements Synchrony {
 
     private final ArrayBlockingQueue<MessageHolder> dispatchQueue;
@@ -147,8 +147,7 @@ class AsyncABQ implements Synchrony {
         }
     }
 
-    // unfortunately, this isn't as friendly to GC as the disruptor is...
-
+    @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
         MessageHolder take = new MessageHolder();
@@ -162,13 +161,26 @@ class AsyncABQ implements Synchrony {
     @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable {
-        this.dispatchQueue.put(new MessageHolder(subscriptions, message1, message2));
+        MessageHolder take = new MessageHolder();
+        take.type = MessageType.TWO;
+        take.subscriptions = subscriptions;
+        take.message1 = message1;
+        take.message2 = message2;
+
+        this.dispatchQueue.put(take);
     }
 
     @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable {
-        this.dispatchQueue.put(new MessageHolder(subscriptions, message1, message2, message3));
+        MessageHolder take = new MessageHolder();
+        take.type = MessageType.THREE;
+        take.subscriptions = subscriptions;
+        take.message1 = message1;
+        take.message2 = message2;
+        take.message3 = message3;
+
+        this.dispatchQueue.put(take);
     }
 
     public

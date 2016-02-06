@@ -40,7 +40,7 @@ import java.util.concurrent.locks.LockSupport;
 /**
  * @author dorkbox, llc Date: 2/3/16
  */
-public
+public final
 class AsyncDisruptor implements Synchrony {
 
     private final ErrorHandlingSupport errorHandler;
@@ -122,7 +122,7 @@ class AsyncDisruptor implements Synchrony {
         }
     }
 
-
+    @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
         long seq = ringBuffer.next();
@@ -138,13 +138,30 @@ class AsyncDisruptor implements Synchrony {
     @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable  {
+        long seq = ringBuffer.next();
 
+        MessageHolder job = ringBuffer.get(seq);
+        job.type = MessageType.TWO;
+        job.subscriptions = subscriptions;
+        job.message1 = message1;
+        job.message2 = message2;
+
+        ringBuffer.publish(seq);
     }
 
     @Override
     public
     void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable  {
+        long seq = ringBuffer.next();
 
+        MessageHolder job = ringBuffer.get(seq);
+        job.type = MessageType.THREE;
+        job.subscriptions = subscriptions;
+        job.message1 = message1;
+        job.message3 = message2;
+        job.message2 = message3;
+
+        ringBuffer.publish(seq);
     }
 
     // gets the sequences used for processing work

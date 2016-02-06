@@ -47,6 +47,8 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run subscriptions
             final Subscription[] subscriptions = subManager.getSubs(message1Class); // can return null
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(subscriptions, message1);
             }
@@ -54,6 +56,8 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run superSubscriptions
             final Subscription[] superSubscriptions = subManager.getSuperSubs(message1Class); // NOT return null
             if (superSubscriptions.length > 0) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(superSubscriptions, message1);
             }
@@ -86,14 +90,18 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run subscriptions
             final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2); // can return null
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(subscriptions, message1, message2);
             }
 
 
             // Run superSubscriptions
-            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2); // can return null
-            if (superSubscriptions != null) {
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2); // NOT return null
+            if (superSubscriptions.length > 0) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(superSubscriptions, message1, message2);
             }
@@ -127,14 +135,18 @@ class PublisherExactWithSuperTypes implements Publisher {
             // Run subscriptions
             final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2, messageClass3); // can return null
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(subscriptions, message1, message2, message3);
             }
 
 
             // Run superSubscriptions
-            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2, messageClass3); // can return null
-            if (superSubscriptions != null) {
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2, messageClass3); // NOT return null
+            if (superSubscriptions.length > 0) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 hasSubs = true;
                 synchrony.publish(superSubscriptions, message1, message2, message3);
             }

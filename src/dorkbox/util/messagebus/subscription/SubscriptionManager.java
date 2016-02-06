@@ -20,11 +20,9 @@ import dorkbox.util.messagebus.MessageBus;
 import dorkbox.util.messagebus.common.ClassTree;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.MultiClass;
-import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.subscription.asm.SubMakerAsm;
 import dorkbox.util.messagebus.subscription.reflection.SubMakerReflection;
 import dorkbox.util.messagebus.utils.ClassUtils;
-import dorkbox.util.messagebus.utils.SubscriptionUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,12 +39,11 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "ToArrayCallWithZeroLengthArrayArgument"})
 public final
 class SubscriptionManager {
     public static final float LOAD_FACTOR = 0.8F;
-
-    // TODO: during startup, pre-calculate the number of subscription listeners and x2 to save as subsPerListener expected max size
+    public static final Subscription[] EMPTY_SUBS = new Subscription[0];
 
     // controls if we use java reflection or ASM to access methods during publication
     private final SubMaker subMaker;
@@ -70,6 +67,7 @@ class SubscriptionManager {
 
     // keeps track of all subscriptions of the super classes of a message type.
     private volatile IdentityMap<Class<?>, Subscription[]> subsSuperSingle;
+    private volatile IdentityMap<MultiClass, Subscription[]> subsSuperMulti;
 
     // In order to force the "Single writer principle" on subscribe & unsubscribe, they are within WRITE LOCKS. They could be dispatched
     // to another thread, however we do NOT want them asynchronous - as publish() should ALWAYS succeed if a correct subscribe() is
@@ -77,11 +75,6 @@ class SubscriptionManager {
     private final Object singleWriterLock = new Object();
 
 
-
-
-    private final ErrorHandlingSupport errorHandler;
-
-    private final SubscriptionUtils subUtils;
 
     private final ClassTree<Class<?>> classTree;
 
@@ -105,14 +98,13 @@ class SubscriptionManager {
                                                            IdentityMap.class,
                                                            "subsSuperSingle");
 
-//NOTE for multiArg, can use the memory address concatenated with other ones and then just put it in the 'single" map (convert single to
-// use this too). it would likely have to be longs  no idea what to do for arrays?? (arrays should verify all the elements are the
-// correct type too)
+    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperMultiREF =
+                    AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
+                                                           IdentityMap.class,
+                                                           "subsSuperSingle");
 
     public
-    SubscriptionManager(final int numberOfThreads, final ErrorHandlingSupport errorHandler) {
-        this.errorHandler = errorHandler;
-
+    SubscriptionManager(final int numberOfThreads) {
         if (MessageBus.useAsmForDispatch) {
             this.subMaker = new SubMakerAsm();
         }
@@ -130,12 +122,15 @@ class SubscriptionManager {
 
 
         subsSuperSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
+        subsSuperMulti = new IdentityMap<MultiClass, Subscription[]>(32, LOAD_FACTOR);
 
 
         classTree = new ClassTree<Class<?>>();
-        subUtils = new SubscriptionUtils(classUtils, LOAD_FACTOR, numberOfThreads);
     }
 
+    /**
+     * Shuts down and clears all memory usage by the subscriptions
+     */
     public
     void shutdown() {
 
@@ -164,6 +159,15 @@ class SubscriptionManager {
         this.classUtils.shutdown();
     }
 
+    /**
+     * Subscribes a specific listener. The infrastructure for subscription never "shrinks", meaning that when a listener is un-subscribed,
+     * the listeners are only removed from the internal map -- the map itself is not cleaned up until a 'shutdown' is called.
+     *
+     * This method uses the "single-writer-principle" for lock-free publication. Since there are only 2
+     * methods to guarantee this method can only be called one-at-a-time (either it is only called by one thread, or only one thread can
+     * access it at a time) -- we chose the 2nd option -- and use a 'synchronized' block to make sure that only one thread can access
+     * this method at a time.
+     */
     public
     void subscribe(final Object listener) {
         final Class<?> listenerClass = listener.getClass();
@@ -340,6 +344,18 @@ class SubscriptionManager {
                 // activates this sub for sub/unsub (only used by the subscription writer thread)
                 subsPerListener.put(listenerClass, subscriptions);
 
+
+                // dump the super subscriptions
+                IdentityMap<Class<?>, Subscription[]> superSingleSubs = subsSuperSingleREF.get(this);
+                superSingleSubs.clear();
+                subsSuperSingleREF.lazySet((this), superSingleSubs);
+
+                IdentityMap<MultiClass, Subscription[]> superMultiSubs = subsSuperMultiREF.get(this);
+                superMultiSubs.clear();
+                subsSuperMultiREF.lazySet((this), superMultiSubs);
+
+
+
                 // save this snapshot back to the original (single writer principle)
                 subsSingleREF.lazySet(this, singleSubs);
                 subsMultiREF.lazySet(this, multiSubs);
@@ -362,6 +378,16 @@ class SubscriptionManager {
         }
     }
 
+
+    /**
+     * Un-subscribes a specific listener. The infrastructure for subscription never "shrinks", meaning that when a listener is un-subscribed,
+     * the listeners are only removed from the internal map -- the map itself is not cleaned up until a 'shutdown' is called.
+     *
+     * This method uses the "single-writer-principle" for lock-free publication. Since there are only 2
+     * methods to guarantee this method can only be called one-at-a-time (either it is only called by one thread, or only one thread can
+     * access it at a time) -- we chose the 2nd option -- and use a 'synchronized' block to make sure that only one thread can access
+     * this method at a time.
+     */
     public
     void unsubscribe(final Object listener) {
         final Class<?> listenerClass = listener.getClass();
@@ -387,75 +413,19 @@ class SubscriptionManager {
         }
     }
 
-    private
-    void registerExtraSubs(final Class<?> clazz,
-                           final IdentityMap<Class<?>, Subscription[]> subsPerMessageSingle,
-                           final IdentityMap<Class<?>, Subscription[]> subsPerSuperMessageSingle,
-                           final IdentityMap<Class<?>, Subscription[]> subsPerVarityMessageSingle) {
 
-//        final Class<?> arrayVersion = this.classUtils.getArrayClass(clazz);  // never returns null, cached response
-        final Class<?>[] superClasses = this.classUtils.getSuperClasses(clazz);  // never returns null, cached response
-
-        Subscription sub;
-//
-//        // Register Varity (Var-Arg) subscriptions
-//        final Subscription[] arraySubs = subsPerMessageSingle.get(arrayVersion);
-//        if (arraySubs != null) {
-//            final int length = arraySubs.length;
-//            final ArrayList<Subscription> varArgSubsAsList = new ArrayList<Subscription>(length);
-//
-//            for (int i = 0; i < length; i++) {
-//                sub = arraySubs[i];
-//
-//                if (sub.getHandlerAccess().acceptsVarArgs()) {
-//                    varArgSubsAsList.add(sub);
-//                }
-//            }
-//
-//            if (!varArgSubsAsList.isEmpty()) {
-//                subsPerVarityMessageSingle.put(clazz, varArgSubsAsList.toArray(new Subscription[0]));
-//            }
-//        }
-
-
-//
-//        // Register SuperClass subscriptions
-//        final int length = superClasses.length;
-//        final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
-//
-//        // walks through all of the subscriptions that might exist for super types, and if applicable, save them
-//        for (int i = 0; i < length; i++) {
-//            final Class<?> superClass = superClasses[i];
-//            final Subscription[]  superSubs = subsPerMessageSingle.get(superClass);
-//
-//            if (superSubs != null) {
-//                int superSubLength = superSubs.length;
-//                for (int j = 0; j < superSubLength; j++) {
-//                    sub = superSubs[j];
-//
-//                    if (sub.getHandlerAccess().acceptsSubtypes()) {
-//                        subsAsList.add(sub);
-//                    }
-//                }
-//            }
-//        }
-//
-//        if (!subsAsList.isEmpty()) {
-//            // save the subscriptions
-//            subsPerSuperMessageSingle.put(clazz, subsAsList.toArray(new Subscription[0]));
-//        }
-    }
-
-
-
-
-    // can return null
+    /**
+     * @return can return null
+     */
     public
     Subscription[] getSubs(final Class<?> messageClass) {
         return (Subscription[]) subsSingleREF.get(this).get(messageClass);
     }
 
-    // can return null
+
+    /**
+     * @return can return null
+     */
     public
     Subscription[] getSubs(final Class<?> messageClass1, final Class<?> messageClass2) {
         // never returns null
@@ -464,7 +434,9 @@ class SubscriptionManager {
         return (Subscription[]) subsMultiREF.get(this).get(multiClass);
     }
 
-    // can return null
+    /**
+     * @return can return null
+     */
     public
     Subscription[] getSubs(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
         // never returns null
@@ -474,17 +446,9 @@ class SubscriptionManager {
         return (Subscription[]) subsMultiREF.get(this).get(multiClass);
     }
 
-    // can return null
-    public
-    Subscription[] getSubs(final Class<?>[] messageClasses) {
-        // never returns null
-        final MultiClass multiClass = classTree.get(messageClasses);
-
-        return (Subscription[]) subsMultiREF.get(this).get(multiClass);
-    }
-
-
-    // can NOT return null
+    /**
+     * @return can NOT return null
+     */
     public
     Subscription[] getSuperSubs(final Class<?> messageClass) {
         // The subscriptions that are remembered here DO NOT CHANGE (only the listeners inside them change).
@@ -494,7 +458,7 @@ class SubscriptionManager {
 
         Subscription[] subscriptions = localSuperSubs.get(messageClass);
         // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
-        // calculated and do not exist - this will be an empty array.
+        // calculated and if they do not exist - this will be an empty array.
         if (subscriptions == null) {
             final Class<?>[] superClasses = this.classUtils.getSuperClasses(messageClass);  // never returns null, cached response
 
@@ -525,7 +489,7 @@ class SubscriptionManager {
             }
 
             // subsAsList now contains ALL of the super-class subscriptions.
-            subscriptions = subsAsList.toArray(new Subscription[0]);
+            subscriptions = subsAsList.toArray(EMPTY_SUBS);
             localSuperSubs.put(messageClass, subscriptions);
 
             subsSuperSingleREF.lazySet(this, localSuperSubs);
@@ -534,133 +498,165 @@ class SubscriptionManager {
         return subscriptions;
     }
 
-    // can return null
+    /**
+     * @return can NOT return null
+     */
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2) {
         // save the subscriptions
         final Class<?>[] superClasses1 = this.classUtils.getSuperClasses(messageClass1);  // never returns null, cached response
         final Class<?>[] superClasses2 = this.classUtils.getSuperClasses(messageClass2);  // never returns null, cached response
 
-        final IdentityMap<MultiClass, Subscription[]> localSubs = subsMultiREF.get(this);
+        final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2);
 
-        Class<?> superClass1;
-        Class<?> superClass2;
-        Subscription sub;
-        Subscription[] superSubs;
-        boolean hasSubs = false;
+        IdentityMap<MultiClass, Subscription[]> localSuperSubs = subsSuperMultiREF.get(this);
+        Subscription[] subscriptions = localSuperSubs.get(origMultiClass);
+        // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
+        // calculated and if they do not exist - this will be an empty array.
+        if (subscriptions == null) {
+            final IdentityMap<MultiClass, Subscription[]> localSubs = subsMultiREF.get(this);
+
+            Class<?> superClass1;
+            Class<?> superClass2;
+            Subscription sub;
+            Subscription[] superSubs;
 
 
-        final int length1 = superClasses1.length;
-        final int length2 = superClasses2.length;
+            final int length1 = superClasses1.length;
+            final int length2 = superClasses2.length;
 
-        ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length1 + length2);
+            ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length1 + length2);
 
-        for (int i = 0; i < length1; i++) {
-            superClass1 = superClasses1[i];
-
-            // only go over subtypes
-            if (superClass1 == messageClass1) {
-                continue;
-            }
-
-            for (int j = 0; j < length2; j++) {
-                superClass2 = superClasses2[j];
+            for (int i = 0; i < length1; i++) {
+                superClass1 = superClasses1[i];
 
                 // only go over subtypes
-                if (superClass2 == messageClass2) {
+                if (superClass1 == messageClass1) {
                     continue;
                 }
 
-                // never returns null
-                final MultiClass multiClass = classTree.get(superClass1,
-                                                            superClass2);
-                superSubs = localSubs.get(multiClass);
-                if (superSubs != null) {
-                    for (int k = 0; k < superSubs.length; k++) {
-                        sub = superSubs[k];
+                for (int j = 0; j < length2; j++) {
+                    superClass2 = superClasses2[j];
 
-                        if (sub.getHandler().acceptsSubtypes()) {
-                            subsAsList.add(sub);
-                            hasSubs = true;
+                    // only go over subtypes
+                    if (superClass2 == messageClass2) {
+                        continue;
+                    }
+
+                    // never returns null
+                    MultiClass multiClass = classTree.get(superClass1,
+                                                          superClass2);
+
+                    superSubs = localSubs.get(multiClass);
+
+                    //noinspection Duplicates
+                    if (superSubs != null) {
+                        for (int k = 0; k < superSubs.length; k++) {
+                            sub = superSubs[k];
+
+                            if (sub.getHandler().acceptsSubtypes()) {
+                                subsAsList.add(sub);
+                            }
                         }
                     }
                 }
             }
+
+            // subsAsList now contains ALL of the super-class subscriptions.
+            subscriptions = subsAsList.toArray(EMPTY_SUBS);
+            localSuperSubs.put(origMultiClass, subscriptions);
+
+            subsSuperMultiREF.lazySet(this, localSuperSubs);
         }
 
-        // subsAsList now contains ALL of the super-class subscriptions.
-        if (hasSubs) {
-            return subsAsList.toArray(new Subscription[0]);
-        }
-        else {
-            // TODO: shortcut out if there are no handlers that accept subtypes
-            return null;
-        }
+        return subscriptions;
     }
 
-
-
-
-    // can return null
-    public
-    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2) {
-//        ArrayList<Subscription> collection = getSubs(messageClass1, messageClass2); // can return null
-//
-//        // now publish superClasses
-//        final ArrayList<Subscription> superSubs = this.subUtils.getSuperSubscriptions(messageClass1, messageClass2,
-//                                                                                      this); // NOT return null
-//
-//        if (collection != null) {
-//            collection = new ArrayList<Subscription>(collection);
-//
-//            if (!superSubs.isEmpty()) {
-//                collection.addAll(superSubs);
-//            }
-//        }
-//        else if (!superSubs.isEmpty()) {
-//            collection = superSubs;
-//        }
-//
-//        if (collection != null) {
-//            return collection.toArray(new Subscription[0]);
-//        }
-//        else {
-            return null;
-//        }
-    }
-
-    // can return null
-    public
-    Subscription[] getExactAndSuper(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
-//
-//        ArrayList<Subscription> collection = getExactAsArray(messageClass1, messageClass2, messageClass3); // can return null
-//
-//        // now publish superClasses
-//        final ArrayList<Subscription> superSubs = this.subUtils.getSuperSubscriptions(messageClass1, messageClass2, messageClass3,
-//                                                                                      this); // NOT return null
-//
-//        if (collection != null) {
-//            collection = new ArrayList<Subscription>(collection);
-//
-//            if (!superSubs.isEmpty()) {
-//                collection.addAll(superSubs);
-//            }
-//        }
-//        else if (!superSubs.isEmpty()) {
-//            collection = superSubs;
-//        }
-//
-//        if (collection != null) {
-//            return collection.toArray(new Subscription[0]);
-//        }
-//        else {
-            return null;
-//        }
-    }
-
-
+    /**
+     * @return can NOT return null
+     */
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
-        return null;
+        // save the subscriptions
+        final Class<?>[] superClasses1 = this.classUtils.getSuperClasses(messageClass1);  // never returns null, cached response
+        final Class<?>[] superClasses2 = this.classUtils.getSuperClasses(messageClass2);  // never returns null, cached response
+        final Class<?>[] superClasses3 = this.classUtils.getSuperClasses(messageClass3);  // never returns null, cached response
+
+        final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2, messageClass3);
+
+        IdentityMap<MultiClass, Subscription[]> localSuperSubs = subsSuperMultiREF.get(this);
+        Subscription[] subscriptions = localSuperSubs.get(origMultiClass);
+        // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
+        // calculated and if they do not exist - this will be an empty array.
+        if (subscriptions == null) {
+            final IdentityMap<MultiClass, Subscription[]> localSubs = subsMultiREF.get(this);
+
+
+
+            Class<?> superClass1;
+            Class<?> superClass2;
+            Class<?> superClass3;
+            Subscription sub;
+            Subscription[] superSubs;
+
+            final int length1 = superClasses1.length;
+            final int length2 = superClasses2.length;
+            final int length3 = superClasses3.length;
+
+            ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length1 + length2);
+
+            for (int i = 0; i < length1; i++) {
+                superClass1 = superClasses1[i];
+
+                // only go over subtypes
+                if (superClass1 == messageClass1) {
+                    continue;
+                }
+
+                for (int j = 0; j < length2; j++) {
+                    superClass2 = superClasses2[j];
+
+                    // only go over subtypes
+                    if (superClass2 == messageClass2) {
+                        continue;
+                    }
+
+                    for (int k = 0; k < length3; k++) {
+                        superClass3 = superClasses3[j];
+
+                        // only go over subtypes
+                        if (superClass3 == messageClass3) {
+                            continue;
+                        }
+
+                        // never returns null
+                        MultiClass multiClass = classTree.get(superClass1,
+                                                              superClass2,
+                                                              superClass3);
+
+                        superSubs = localSubs.get(multiClass);
+
+                        //noinspection Duplicates
+                        if (superSubs != null) {
+                            for (int m = 0; m < superSubs.length; m++) {
+                                sub = superSubs[m];
+
+                                if (sub.getHandler().acceptsSubtypes()) {
+                                    subsAsList.add(sub);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // subsAsList now contains ALL of the super-class subscriptions.
+            subscriptions = subsAsList.toArray(EMPTY_SUBS);
+            localSuperSubs.put(origMultiClass, subscriptions);
+
+            subsSuperMultiREF.lazySet(this, localSuperSubs);
+        }
+
+        return subscriptions;
     }
 }

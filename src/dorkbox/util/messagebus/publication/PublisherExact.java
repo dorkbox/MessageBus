@@ -44,12 +44,13 @@ class PublisherExact implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 synchrony.publish(subscriptions, message1);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }
@@ -72,12 +73,13 @@ class PublisherExact implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 synchrony.publish(subscriptions, message1, message2);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2));
                 }
@@ -101,12 +103,13 @@ class PublisherExact implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
+                // this can only tell if we have subscribed at some point -- but not if we currently have anything (because of the async
+                // nature of publication
                 synchrony.publish(subscriptions, message1, message2, message3);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-
                 if (deadSubscriptions != null) {
                     synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2, message3));
                 }
