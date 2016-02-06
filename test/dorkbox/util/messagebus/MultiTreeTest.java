@@ -32,8 +32,6 @@ public class MultiTreeTest extends AssertSupport {
         final MultiClass d = tree.get(Object.class, Object.class);
         final MultiClass e = tree.get(String.class, String.class, String.class);
 
-        final MultiClass f = tree.get(String.class, String.class, String.class, String.class);
-        final MultiClass g = tree.get(Object.class, Object.class, String.class, Integer.class, Float.class);
 
         // we never can remove elements, unless we CLEAR the entire thing (usually at shutdown)
         assertNotNull(a);
@@ -41,7 +39,5 @@ public class MultiTreeTest extends AssertSupport {
         assertNotNull(c);
         assertNotNull(d);
         assertNotNull(e);
-        assertNotNull(f);
-        assertNotNull(g);
     }
 }

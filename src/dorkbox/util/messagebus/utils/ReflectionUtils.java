@@ -56,6 +56,9 @@ import java.util.Collection;
 public final
 class ReflectionUtils {
 
+    private static final Method[] EMPTY_METHODS = new Method[0];
+    private static final Class<?>[] EMPTY_CLASSES = new Class<?>[0];
+
     private
     ReflectionUtils() {
     }
@@ -65,7 +68,7 @@ class ReflectionUtils {
         ArrayList<Method> methods = new ArrayList<Method>();
 
         getMethods(target, methods);
-        return methods.toArray(new Method[0]);
+        return methods.toArray(EMPTY_METHODS);
     }
 
     private static
@@ -111,7 +114,7 @@ class ReflectionUtils {
      * @return A set of classes, each representing a super type of the root class
      */
     public static
-    Class<?>[] getSuperTypes2(Class<?> from) {
+    Class<?>[] getSuperTypes(Class<?> from) {
         ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
 
         collectInterfaces(from, superclasses);
@@ -122,25 +125,10 @@ class ReflectionUtils {
             collectInterfaces(from, superclasses);
         }
 
-        return superclasses.toArray(new Class<?>[0]);
+        return superclasses.toArray(EMPTY_CLASSES);
     }
 
-    public static Class[] getSuperTypes(Class from) {
-        ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
-
-        collectInterfaces( from, superclasses );
-        while ( !from.equals( Object.class ) && !from.isInterface() ) {
-            superclasses.add( from.getSuperclass() );
-            from = from.getSuperclass();
-            collectInterfaces( from, superclasses );
-        }
-
-        return superclasses.toArray(new Class[0]);
-    }
-
-
-
-    public static
+    private static
     void collectInterfaces(Class<?> from, Collection<Class<?>> accumulator) {
         for (Class<?> intface : from.getInterfaces()) {
             accumulator.add(intface);
@@ -193,8 +181,7 @@ class ReflectionUtils {
 
     public static
     <A extends Annotation> A getAnnotation(AnnotatedElement from, Class<A> annotationType) {
-        A annotation = getAnnotation(from, annotationType, new IdentityMap<AnnotatedElement, Boolean>());
-        return annotation;
+        return getAnnotation(from, annotationType, new IdentityMap<AnnotatedElement, Boolean>());
     }
 
     //

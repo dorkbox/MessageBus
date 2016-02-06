@@ -43,7 +43,7 @@ package dorkbox.util.messagebus;
  * Listeners can be subscribed and unsubscribed using the corresponding methods. When a listener is subscribed its
  * handlers will be registered and start to receive matching message publications.
  *
- * @Author bennidi
+ * @author bennidi
  * @author dorkbox, llc
  *         Date: 2/2/15
  */

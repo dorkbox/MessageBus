@@ -62,7 +62,7 @@ class AsyncABQ_noGc implements Synchrony {
 
         // each thread will run forever and process incoming message publication requests
         Runnable runnable = new Runnable() {
-            @SuppressWarnings("ConstantConditions")
+            @SuppressWarnings({"ConstantConditions", "UnnecessaryLocalVariable"})
             @Override
             public
             void run() {

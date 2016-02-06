@@ -93,7 +93,7 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
  * NOTE: Generic type parameters of messages will not be taken into account, e.g. a List<Long> will
  * publish dispatched to all message handlers that take an instance of List as their parameter
  *
- * @Author bennidi
+ * @author bennidi
  *         Date: 2/8/12
  * @author dorkbox, llc
  *         Date: 2/2/15

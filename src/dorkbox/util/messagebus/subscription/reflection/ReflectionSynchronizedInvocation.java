@@ -50,7 +50,7 @@ import java.lang.reflect.Method;
 public
 class ReflectionSynchronizedInvocation implements ReflectionInvocation {
 
-    private ReflectionInvocation delegate;
+    private final ReflectionInvocation delegate;
 
     public
     ReflectionSynchronizedInvocation(ReflectionInvocation delegate) {

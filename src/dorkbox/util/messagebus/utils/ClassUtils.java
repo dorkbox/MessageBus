@@ -16,6 +16,7 @@
 package dorkbox.util.messagebus.utils;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
+import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -43,9 +44,9 @@ class ClassUtils {
      * principle" for storing data, EVEN THOUGH it's not accessed by a single writer. This DOES NOT MATTER because duplicates DO NOT matter
      */
     public
-    ClassUtils(final float loadFactor) {
-        this.arrayCache = new IdentityMap<Class<?>, Class<?>>(32, loadFactor);
-        this.superClassesCache = new IdentityMap<Class<?>, Class<?>[]>(32, loadFactor);
+    ClassUtils() {
+        this.arrayCache = new IdentityMap<Class<?>, Class<?>>(32, SubscriptionManager.LOAD_FACTOR);
+        this.superClassesCache = new IdentityMap<Class<?>, Class<?>[]>(32, SubscriptionManager.LOAD_FACTOR);
     }
 
     /**
@@ -58,7 +59,7 @@ class ClassUtils {
     public
     Class<?>[] getSuperClasses(final Class<?> clazz) {
         // access a snapshot of the subscriptions (single-writer-principle)
-        final IdentityMap<Class<?>, Class<?>[]> cache = superClassesREF.get(this);
+        final IdentityMap<Class<?>, Class<?>[]> cache = cast(superClassesREF.get(this));
 
         Class<?>[] classes = cache.get(clazz);
 
@@ -115,7 +116,7 @@ class ClassUtils {
     public
     Class<?> getArrayClass(final Class<?> c) {
         // access a snapshot of the subscriptions (single-writer-principle)
-        final IdentityMap<Class<?>, Class<?>> cache = arrayREF.get(this);
+        final IdentityMap<Class<?>, Class<?>> cache = cast(arrayREF.get(this));
 
         Class<?> clazz = cache.get(c);
 
@@ -140,5 +141,11 @@ class ClassUtils {
     void shutdown() {
         this.arrayCache.clear();
         this.superClassesCache.clear();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static
+    <T> T cast(Object obj) {
+        return (T) obj;
     }
 }

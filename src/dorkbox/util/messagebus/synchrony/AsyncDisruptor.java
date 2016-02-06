@@ -35,10 +35,10 @@ import java.util.concurrent.locks.LockSupport;
 public final
 class AsyncDisruptor implements Synchrony {
 
-    private WorkProcessor[] workProcessors;
-    private MessageHandler[] handlers;
-    private RingBuffer<MessageHolder> ringBuffer;
-    private Sequence workSequence;
+    private final WorkProcessor[] workProcessors;
+    private final MessageHandler[] handlers;
+    private final RingBuffer<MessageHolder> ringBuffer;
+    private final Sequence workSequence;
 
     public
     AsyncDisruptor(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {

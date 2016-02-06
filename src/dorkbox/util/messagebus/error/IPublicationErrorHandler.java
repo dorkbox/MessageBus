@@ -23,10 +23,10 @@
 package dorkbox.util.messagebus.error;
 
 /**
- * Publication error handlers are provided with a publication error every time an
- * error occurs during message publication.
- * A handler might fail with an exception, not be accessible because of the presence
- * of a security manager or other reasons might lead to failures during the message publication process.
+ * Publication error handlers are provided with a publication error every time an error occurs during message publication.
+ * <p/>
+ * A handler might fail with an exception, not be accessible because of the presence of a security manager or other reasons might
+ * lead to failures during the message publication process.
  * <p/>
  *
  * @author bennidi
@@ -46,14 +46,13 @@ interface IPublicationErrorHandler {
      * Handle the given publication error.
      *
      * @param error         The PublicationError to handle.
-     * @param listenerClass
+     * @param listenerClass The class that caused the error to occur
      */
     void handleError(String error, final Class<?> listenerClass);
 
 
     /**
-     * The default error handler will simply log to standard out and
-     * print the stack trace if available.
+     * The default error handler will simply log to standard out and print the stack trace if available.
      */
     final
     class ConsoleLogger implements IPublicationErrorHandler {

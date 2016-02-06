@@ -54,7 +54,7 @@ import java.lang.reflect.Method;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public interface ReflectionInvocation {
+interface ReflectionInvocation {
 
     /**
      * Invoke the message delivery logic of this handler

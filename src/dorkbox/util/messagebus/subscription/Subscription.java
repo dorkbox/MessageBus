@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 public abstract
 class Subscription {
     private static final AtomicInteger ID_COUNTER = new AtomicInteger();
-    public final int ID = ID_COUNTER.getAndIncrement();
+    private final int ID = ID_COUNTER.getAndIncrement();
 
 
     // this is the listener class that created this subscription
@@ -58,7 +58,8 @@ class Subscription {
     private final IdentityMap<Object, Entry> entries; // maintain a map of entries for FAST lookup during unsubscribe.
 
     // this is still inside the single-writer, and can use the same techniques as subscription manager (for thread safe publication)
-    public volatile Entry head; // reference to the first element
+    // accessed from within SYNCHRONIZE
+    private Entry head; // reference to the first element
 
     protected
     Subscription(final Class<?> listenerClass, final MessageHandler handler) {
@@ -90,6 +91,7 @@ class Subscription {
     public final
     void subscribe(final Object listener) {
         // single writer principle!
+        // called from within SYNCHRONIZE
         Entry head = headREF.get(this);
 
         if (!entries.containsKey(listener)) {
@@ -100,18 +102,13 @@ class Subscription {
         }
     }
 
-    /**
-     * @return TRUE if the element was removed
-     */
     public final
-    boolean unsubscribe(final Object listener) {
+    void unsubscribe(final Object listener) {
         Entry entry = entries.get(listener);
-        if (entry == null || entry.getValue() == null) {
-            // fast exit
-            return false;
-        }
-        else {
+
+        if (entry != null && entry.getValue() != null) {
             // single writer principle!
+            // called from within SYNCHRONIZE
             Entry head = headREF.get(this);
 
             if (entry != head) {
@@ -125,7 +122,6 @@ class Subscription {
 
             this.entries.remove(listener);
             headREF.lazySet(this, head);
-            return true;
         }
     }
 

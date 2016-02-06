@@ -101,7 +101,7 @@ class NamedThreadFactory implements ThreadFactory {
         return newThread(stringBuilder.toString(), r);
     }
 
-    public
+    private
     Thread newThread(String name, Runnable r) {
         // stack size is arbitrary based on JVM implementation. Default is 0
         // 8k is the size of the android stack. Depending on the version of android, this can either change, or will always be 8k

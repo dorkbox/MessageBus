@@ -32,29 +32,4 @@ class MessageHolder {
 
     public
     MessageHolder() {}
-
-    public
-    MessageHolder(Subscription[] subscriptions, Object message1) {
-        this.subscriptions = subscriptions;
-        this.message1 = message1;
-    }
-
-    public
-    MessageHolder(Subscription[] subscriptions, Object message1, Object message2) {
-        type = MessageType.TWO;
-
-        this.subscriptions = subscriptions;
-        this.message1 = message1;
-        this.message2 = message2;
-    }
-
-    public
-    MessageHolder(Subscription[] subscriptions, Object message1, Object message2, Object message3) {
-        type = MessageType.THREE;
-
-        this.subscriptions = subscriptions;
-        this.message1 = message1;
-        this.message2 = message2;
-        this.message3 = message3;
-    }
 }

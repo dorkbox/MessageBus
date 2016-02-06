@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 public final
 class SubscriptionManager {
     public static final float LOAD_FACTOR = 0.8F;
-    public static final Subscription[] EMPTY_SUBS = new Subscription[0];
+    private static final Subscription[] EMPTY_SUBS = new Subscription[0];
 
     // controls if we use java reflection or ASM to access methods during publication
     private final SubMaker subMaker;
@@ -112,7 +112,7 @@ class SubscriptionManager {
             this.subMaker = new SubMakerReflection();
         }
 
-        classUtils = new ClassUtils(SubscriptionManager.LOAD_FACTOR);
+        classUtils = new ClassUtils();
         classTree = new ClassTree<Class<?>>();
 
 
@@ -321,25 +321,7 @@ class SubscriptionManager {
                         }
 
                         default: {
-                            multiClass = classTree.get(messageHandlerTypes);
-
-                            // makes this subscription visible for publication
-                            final Subscription[] newSubs;
-                            Subscription[] currentSubs = multiSubs.get(multiClass);
-
-                            if (currentSubs != null) {
-                                final int currentLength = currentSubs.length;
-
-                                // add the new subscription to the array
-                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-                                newSubs[currentLength] = subscription;
-                            } else {
-                                newSubs = new Subscription[1];
-                                newSubs[0] = subscription;
-                            }
-
-                            multiSubs.put(multiClass, newSubs);
-                            break;
+                            throw new RuntimeException("Unsupported number of parameters during subscribe. Acceptable max is 3");
                         }
                     }
                 }

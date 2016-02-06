@@ -17,7 +17,7 @@ package dorkbox.util.messagebus.common;
 
 // not thread-safe! must be synchronized in enclosing context
 public class Entry {
-    private Object value;
+    private final Object value;
     private Entry next;
     private Entry prev;
 

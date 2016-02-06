@@ -64,6 +64,9 @@ import java.util.ArrayList;
  */
 public
 class MessageHandler {
+
+    private static final MessageHandler[] EMPTY_MESSAGEHANDLERS = new MessageHandler[0];
+
     // publish all listeners defined by the given class (includes listeners defined in super classes)
     public static
     MessageHandler[] get(final Class<?> messageClass) {
@@ -99,7 +102,7 @@ class MessageHandler {
             }
         }
 
-        return finalMethods.toArray(new MessageHandler[0]);
+        return finalMethods.toArray(EMPTY_MESSAGEHANDLERS);
     }
 
     private final Method method;

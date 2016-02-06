@@ -56,7 +56,8 @@ public class ClassTree<KEY> {
 
 
     @SuppressWarnings("unchecked")
-    public static <KEY> IdentityMap<KEY, ClassTree<KEY>> cast(Object o) {
+    private static
+    <KEY> IdentityMap<KEY, ClassTree<KEY>> cast(Object o) {
         return (IdentityMap<KEY, ClassTree<KEY>>) o;
     }
 
@@ -109,28 +110,11 @@ public class ClassTree<KEY> {
         return getOrCreateValue(leaf);
     }
 
-    public final
-    MultiClass get(KEY... keys) {
-        if (keys == null) {
-            throw new NullPointerException("keys");
-        }
-
-        int length = keys.length;
-
-        // have to put value into our children
-        ClassTree<KEY> leaf = getOrCreateLeaf(keys[0]);
-        for (int i=1;i<length;i++) {
-            leaf = leaf.getOrCreateLeaf(keys[i]);
-        }
-
-        return getOrCreateValue(leaf);
-    }
-
     /**
      * creates a child (if necessary) in an atomic way. The tree returned will either be the current one, or a new one.
      *
      * @param key the key for the new child
-     * @return
+     * @return the existing (or new) leaf
      */
     @SuppressWarnings("unchecked")
     private

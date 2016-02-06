@@ -86,9 +86,6 @@ class SubscriptionAsm extends Subscription {
     }
 
 
-    /**
-     * @return true if messages were published
-     */
     public
     void publish(final Object message) throws Throwable {
         final MethodAccess handler = this.handlerAccess;
@@ -105,9 +102,6 @@ class SubscriptionAsm extends Subscription {
         }
     }
 
-    /**
-     * @return true if messages were published
-     */
     public
     void publish(final Object message1, final Object message2) throws Throwable {
         final MethodAccess handler = this.handlerAccess;
@@ -124,9 +118,6 @@ class SubscriptionAsm extends Subscription {
         }
     }
 
-    /**
-     * @return true if messages were published
-     */
     public
     void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
         final MethodAccess handler = this.handlerAccess;

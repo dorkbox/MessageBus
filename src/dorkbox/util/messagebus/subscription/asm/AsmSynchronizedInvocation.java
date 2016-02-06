@@ -50,7 +50,7 @@ import com.esotericsoftware.reflectasm.MethodAccess;
 public
 class AsmSynchronizedInvocation implements AsmInvocation {
 
-    private AsmInvocation delegate;
+    private final AsmInvocation delegate;
 
     public
     AsmSynchronizedInvocation(AsmInvocation delegate) {
