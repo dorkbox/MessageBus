@@ -118,7 +118,7 @@ class MessageBus implements IMessageBus {
         /**
          * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
          */
-        this.subscriptionManager = new SubscriptionManager(numberOfThreads);
+        this.subscriptionManager = new SubscriptionManager();
 
         switch (publishMode) {
             case Exact:

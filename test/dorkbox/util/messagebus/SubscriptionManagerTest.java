@@ -220,7 +220,7 @@ public class SubscriptionManagerTest extends AssertSupport {
         ListenerFactory listeners = listeners(Overloading.ListenerBase.class, Overloading.ListenerSub.class);
 
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(1);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager();
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
@@ -247,7 +247,7 @@ public class SubscriptionManagerTest extends AssertSupport {
 
     private void runTestWith(final ListenerFactory listeners, final SubscriptionValidator validator) {
         final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(1);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager();
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
