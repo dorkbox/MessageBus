@@ -44,24 +44,14 @@ class PublisherExact implements Publisher {
 
             // Run subscriptions
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1);
-                }
+                synchrony.publish(subscriptions, message1);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
 
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1));
                 }
             }
         } catch (Throwable e) {
@@ -78,33 +68,18 @@ class PublisherExact implements Publisher {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
 
-//            final StampedLock lock = this.lock;
-//            long stamp = lock.readLock();
             final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2); // can return null
-//            lock.unlockRead(stamp);
 
             // Run subscriptions
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1, message2);
-                }
+                synchrony.publish(subscriptions, message1, message2);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-//                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-//                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2));
                 }
             }
         } catch (Throwable e) {
@@ -122,33 +97,18 @@ class PublisherExact implements Publisher {
             final Class<?> messageClass2 = message2.getClass();
             final Class<?> messageClass3 = message3.getClass();
 
-//            final StampedLock lock = this.lock;
-//            long stamp = lock.readLock();
             final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2, messageClass3); // can return null
-//            lock.unlockRead(stamp);
 
             // Run subscriptions
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1, message2, message3);
-                }
+                synchrony.publish(subscriptions, message1, message2, message3);
             }
             else {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-//                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-//                lock.unlockRead(stamp);
 
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2, message3));
                 }
             }
         } catch (Throwable e) {
@@ -156,11 +116,5 @@ class PublisherExact implements Publisher {
                                                                       .setCause(e)
                                                                       .setPublishedObject(message1, message2, message3));
         }
-    }
-
-    @Override
-    public
-    void publish(final Synchrony synchrony, final Object[] messages) {
-        publish(synchrony, (Object) messages);
     }
 }

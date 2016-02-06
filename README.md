@@ -1,7 +1,7 @@
 MessageBus
 ==========
 
-The MessageBus is a fork from MBassador, and it is a high-performance, very-low GC, custom distribution that supports method signature
+The MessageBus is a fork from MBassador, and it is a high-performance, zero GC, custom distribution that supports method signature
 parameters > 1 & varity arguments.
 
 *Many* features from the original MBassador have been removed, specifically the ONLY things to remain for a handler are  
@@ -10,7 +10,8 @@ parameters > 1 & varity arguments.
 
 Additionally, the bus *must* explicitly be started now (because of errorhandling when starting the disruptor), 
 ie: ```.start()```, and conversely ```.shutdown()``` is necessary to shutdown the disruptor/thread pool. During the distillation
-process, the API has changed, and the only way to publish now is to actually call ```bus.publish()``` or ```bus.publishAsync()```.
+process, the API has changed, and the only way to publish now is to actually call ```bus.publish()``` or ```bus.publishAsync()```, of 
+note, the asynchronous publication of messages is not in a guaranteed order.
   
   
 The largest change however, is the ability to publish N-number of objects. A single object (or all-matching-types, when more than one)

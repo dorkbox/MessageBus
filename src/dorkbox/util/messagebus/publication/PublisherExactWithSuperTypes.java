@@ -51,9 +51,9 @@ class PublisherExactWithSuperTypes implements Publisher {
                 synchrony.publish(subscriptions, message1);
             }
 
-            // Run superClasses
-            final Subscription[] superSubscriptions = subManager.getSuperSubs(message1Class); // can return null
-            if (superSubscriptions != null) {
+            // Run superSubscriptions
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(message1Class); // NOT return null
+            if (superSubscriptions.length > 0) {
                 hasSubs = true;
                 synchrony.publish(superSubscriptions, message1);
             }
@@ -80,34 +80,31 @@ class PublisherExactWithSuperTypes implements Publisher {
         try {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
+            boolean hasSubs = false;
 
-//            final StampedLock lock = this.lock;
-//            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass1, messageClass2); // can return null
-//            lock.unlockRead(stamp);
 
             // Run subscriptions
+            final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2); // can return null
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1, message2);
-                }
+                hasSubs = true;
+                synchrony.publish(subscriptions, message1, message2);
             }
-            else {
+
+
+            // Run superSubscriptions
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2); // can return null
+            if (superSubscriptions != null) {
+                hasSubs = true;
+                synchrony.publish(superSubscriptions, message1, message2);
+            }
+
+
+            // Run dead message subscriptions
+            if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-//                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-//                lock.unlockRead(stamp);
-
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2));
                 }
             }
         } catch (Throwable e) {
@@ -124,36 +121,31 @@ class PublisherExactWithSuperTypes implements Publisher {
             final Class<?> messageClass1 = message1.getClass();
             final Class<?> messageClass2 = message2.getClass();
             final Class<?> messageClass3 = message3.getClass();
+            boolean hasSubs = false;
 
-
-//            final StampedLock lock = this.lock;
-//            long stamp = lock.readLock();
-            final Subscription[] subscriptions = subManager.getExactAndSuper(messageClass1, messageClass2,
-                                                                             messageClass3); // can return null
-//            lock.unlockRead(stamp);
 
             // Run subscriptions
+            final Subscription[] subscriptions = subManager.getSubs(messageClass1, messageClass2, messageClass3); // can return null
             if (subscriptions != null) {
-                Subscription sub;
-                for (int i = 0; i < subscriptions.length; i++) {
-                    sub = subscriptions[i];
-                    sub.publish(message1, message2, message3);
-                }
+                hasSubs = true;
+                synchrony.publish(subscriptions, message1, message2, message3);
             }
-            else {
+
+
+            // Run superSubscriptions
+            final Subscription[] superSubscriptions = subManager.getSuperSubs(messageClass1, messageClass2, messageClass3); // can return null
+            if (superSubscriptions != null) {
+                hasSubs = true;
+                synchrony.publish(superSubscriptions, message1, message2, message3);
+            }
+
+
+            // Run dead message subscriptions
+            if (!hasSubs) {
                 // Dead Event must EXACTLY MATCH (no subclasses)
-//                stamp = lock.readLock();
                 final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-//                lock.unlockRead(stamp);
-
                 if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
-
-                    Subscription sub;
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(deadMessage);
-                    }
+                    synchrony.publish(deadSubscriptions, new DeadMessage(message1, message2, message3));
                 }
             }
         } catch (Throwable e) {
@@ -161,11 +153,5 @@ class PublisherExactWithSuperTypes implements Publisher {
                                                                       .setCause(e)
                                                                       .setPublishedObject(message1, message2, message3));
         }
-    }
-
-    @Override
-    public
-    void publish(final Synchrony synchrony, final Object[] messages) {
-        publish(synchrony, (Object) messages);
     }
 }

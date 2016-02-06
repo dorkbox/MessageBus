@@ -109,12 +109,6 @@ public interface IMessageBus extends PubSubSupport {
          * Will publish to listeners with this exact message signature, as well as listeners that match the super class types signatures.
          */
         ExactWithSuperTypes,
-
-        /**
-         * Will publish to listeners with this exact message signature, as well as listeners that match the super class types signatures.
-         * and to listeners that have matching varity arguments. (ie: a listener that matches Object[], will accept messages of type Object)
-         */
-        ExactWithSuperTypesAndVarity,
     }
 
     /**

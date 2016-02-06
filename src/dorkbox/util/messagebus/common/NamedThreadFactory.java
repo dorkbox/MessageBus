@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.common.thread;
+package dorkbox.util.messagebus.common;
 
 import java.lang.management.RuntimeMXBean;
 import java.util.List;
@@ -68,7 +68,7 @@ class NamedThreadFactory implements ThreadFactory {
             else {
                 try {
                     value = Integer.parseInt(stackSize.substring(4));
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                 }
             }
 

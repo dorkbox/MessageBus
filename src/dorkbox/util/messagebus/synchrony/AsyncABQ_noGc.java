@@ -27,17 +27,22 @@ import java.util.Collection;
 import java.util.concurrent.ArrayBlockingQueue;
 
 /**
- * This is similar to the disruptor, however the downside of this implementation is that, while faster than the no-gc version, it
- * generates garbage (while the disruptor version does not).
+ * This is similar in behavior to the disruptor in that it does not generate garbage, however the downside of this implementation is it is
+ * slow, but faster than other messagebus implementations.
  *
  * Basically, the disruptor is fast + noGC.
  *
  * @author dorkbox, llc Date: 2/3/16
  */
 public
-class AsyncABQ implements Synchrony {
+class AsyncABQ_noGc implements Synchrony {
 
     private final ArrayBlockingQueue<MessageHolder> dispatchQueue;
+
+    // have two queues to prevent garbage, So we pull off one queue to add to another queue and when done, we put it back
+    private final ArrayBlockingQueue<MessageHolder> gcQueue;
+
+
     private final Collection<Thread> threads;
 
     /**
@@ -47,12 +52,18 @@ class AsyncABQ implements Synchrony {
 
 
     public
-    AsyncABQ(final int numberOfThreads,
-             final ErrorHandlingSupport errorHandler,
-             final Publisher publisher,
-             final Synchrony syncPublication) {
+    AsyncABQ_noGc(final int numberOfThreads,
+                  final ErrorHandlingSupport errorHandler,
+                  final Publisher publisher,
+                  final Synchrony syncPublication) {
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
+        this.gcQueue = new ArrayBlockingQueue<MessageHolder>(1024);
+
+        // this is how we prevent garbage
+        for (int i = 0; i < 1024; i++) {
+            gcQueue.add(new MessageHolder());
+        }
 
         this.threads = new ArrayDeque<Thread>(numberOfThreads);
         final NamedThreadFactory threadFactory = new NamedThreadFactory("MessageBus");
@@ -63,7 +74,8 @@ class AsyncABQ implements Synchrony {
                 @Override
                 public
                 void run() {
-                    final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ.this.dispatchQueue;
+                    final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ_noGc.this.dispatchQueue;
+                    final ArrayBlockingQueue<MessageHolder> OUT_QUEUE = AsyncABQ_noGc.this.gcQueue;
                     final Publisher publisher1 = publisher;
                     final Synchrony syncPublication1 = syncPublication;
                     final ErrorHandlingSupport errorHandler1 = errorHandler;
@@ -74,13 +86,16 @@ class AsyncABQ implements Synchrony {
                     Object message2 = null;
                     Object message3 = null;
 
-                    while (!AsyncABQ.this.shuttingDown) {
+                    while (!AsyncABQ_noGc.this.shuttingDown) {
                         try {
                             event = IN_QUEUE.take();
                             messageType = event.type;
                             message1 = event.message1;
                             message2 = event.message2;
                             message3 = event.message3;
+
+                            OUT_QUEUE.put(event);
+
 
                             switch (messageType) {
                                 case MessageType.ONE: {
@@ -97,7 +112,7 @@ class AsyncABQ implements Synchrony {
                                 }
                             }
                         } catch (InterruptedException e) {
-                            if (!AsyncABQ.this.shuttingDown) {
+                            if (!AsyncABQ_noGc.this.shuttingDown) {
                                 switch (messageType) {
                                     case MessageType.ONE: {
                                         PublicationError publicationError = new PublicationError()
@@ -151,7 +166,7 @@ class AsyncABQ implements Synchrony {
 
     public
     void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
-        MessageHolder take = new MessageHolder();
+        MessageHolder take = gcQueue.take();
         take.type = MessageType.ONE;
         take.subscriptions = subscriptions;
         take.message1 = message1;

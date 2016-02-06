@@ -16,22 +16,23 @@
 package dorkbox.util.messagebus.subscription;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
+import dorkbox.util.messagebus.MessageBus;
 import dorkbox.util.messagebus.common.ClassTree;
 import dorkbox.util.messagebus.common.MessageHandler;
 import dorkbox.util.messagebus.common.MultiClass;
 import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import dorkbox.util.messagebus.subscription.asm.SubMakerAsm;
+import dorkbox.util.messagebus.subscription.reflection.SubMakerReflection;
 import dorkbox.util.messagebus.utils.ClassUtils;
 import dorkbox.util.messagebus.utils.SubscriptionUtils;
-import dorkbox.util.messagebus.utils.VarArgUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
- */
-/**
+ *
+ *
  * The subscription managers responsibility is to consistently handle and synchronize the message listener subscription process.
  * It provides fast lookup of existing subscriptions when another instance of an already known
  * listener is subscribed and takes care of creating new set of subscriptions for any unknown class that defines
@@ -44,9 +45,11 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 public final
 class SubscriptionManager {
     public static final float LOAD_FACTOR = 0.8F;
-    public static final Subscription[] SUBSCRIPTIONS = new Subscription[0];
 
     // TODO: during startup, pre-calculate the number of subscription listeners and x2 to save as subsPerListener expected max size
+
+    // controls if we use java reflection or ASM to access methods during publication
+    private final SubMaker subMaker;
 
 
     // ONLY used by SUB/UNSUB
@@ -59,7 +62,6 @@ class SubscriptionManager {
     // once a collection of subscriptions is stored it does not change
     private final IdentityMap<Class<?>, Subscription[]> subsPerListener;
 
-
     // We perpetually KEEP the types registered here, and just change what is sub/unsub
 
     // all subscriptions of a message type.
@@ -68,12 +70,6 @@ class SubscriptionManager {
 
     // keeps track of all subscriptions of the super classes of a message type.
     private volatile IdentityMap<Class<?>, Subscription[]> subsSuperSingle;
-
-    // keeps track of all subscriptions of varity (var-arg) classes of a message type
-    private volatile IdentityMap<Class<?>, Subscription[]> subsVaritySingle;
-
-    // keeps track of all subscriptions of super-class varity (var-arg) classes of a message type
-    private volatile IdentityMap<Class<?>, Subscription[]> subsSuperVaritySingle;
 
     // In order to force the "Single writer principle" on subscribe & unsubscribe, they are within WRITE LOCKS. They could be dispatched
     // to another thread, however we do NOT want them asynchronous - as publish() should ALWAYS succeed if a correct subscribe() is
@@ -86,12 +82,8 @@ class SubscriptionManager {
     private final ErrorHandlingSupport errorHandler;
 
     private final SubscriptionUtils subUtils;
-    private final VarArgUtils varArgUtils;
 
     private final ClassTree<Class<?>> classTree;
-
-    // shortcut publication if we know there is no possibility of varArg (ie: a method that has an array as arguments)
-    private final AtomicBoolean varArgPossibility = new AtomicBoolean(false);
 
     private final ClassUtils classUtils;
 
@@ -113,16 +105,6 @@ class SubscriptionManager {
                                                            IdentityMap.class,
                                                            "subsSuperSingle");
 
-    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsVaritySingleREF =
-                    AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
-                                                           IdentityMap.class,
-                                                           "subsVaritySingle");
-
-    private static final AtomicReferenceFieldUpdater<SubscriptionManager, IdentityMap> subsSuperVaritySingleREF =
-                    AtomicReferenceFieldUpdater.newUpdater(SubscriptionManager.class,
-                                                           IdentityMap.class,
-                                                           "subsSuperVaritySingle");
-
 //NOTE for multiArg, can use the memory address concatenated with other ones and then just put it in the 'single" map (convert single to
 // use this too). it would likely have to be longs  no idea what to do for arrays?? (arrays should verify all the elements are the
 // correct type too)
@@ -131,30 +113,27 @@ class SubscriptionManager {
     SubscriptionManager(final int numberOfThreads, final ErrorHandlingSupport errorHandler) {
         this.errorHandler = errorHandler;
 
+        if (MessageBus.useAsmForDispatch) {
+            this.subMaker = new SubMakerAsm();
+        }
+        else {
+            this.subMaker = new SubMakerReflection();
+        }
+
         classUtils = new ClassUtils(SubscriptionManager.LOAD_FACTOR);
 
         // modified ONLY during SUB/UNSUB
         nonListeners = new IdentityMap<Class<?>, Boolean>(16, LOAD_FACTOR);
-        subsPerListener = new IdentityMap<>(32, LOAD_FACTOR);
+        subsPerListener = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
         subsSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
         subsMulti = new IdentityMap<MultiClass, Subscription[]>(32, LOAD_FACTOR);
 
 
         subsSuperSingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
-        subsVaritySingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
-        subsSuperVaritySingle = new IdentityMap<Class<?>, Subscription[]>(32, LOAD_FACTOR);
 
 
-
-        this.classTree = new ClassTree<Class<?>>();
-
-        this.subUtils = new SubscriptionUtils(classUtils, LOAD_FACTOR, numberOfThreads);
-
-        // var arg subscriptions keep track of which subscriptions can handle varArgs. SUB/UNSUB dumps it, so it is recreated dynamically.
-        // it's a hit on SUB/UNSUB, but improves performance of handlers
-        this.varArgUtils = new VarArgUtils(classUtils, LOAD_FACTOR, numberOfThreads);
-
-
+        classTree = new ClassTree<Class<?>>();
+        subUtils = new SubscriptionUtils(classUtils, LOAD_FACTOR, numberOfThreads);
     }
 
     public
@@ -174,18 +153,14 @@ class SubscriptionManager {
             }
         }
 
-
         this.nonListeners.clear();
 
         this.subsPerListener.clear();
 
         this.subsSingle.clear();
         this.subsSuperSingle.clear();
-        this.subsVaritySingle.clear();
-        this.subsSuperVaritySingle.clear();
 
         this.classTree.clear();
-
         this.classUtils.shutdown();
     }
 
@@ -223,201 +198,158 @@ class SubscriptionManager {
 
                 // access a snapshot of the subscriptions (single-writer-principle)
                 final IdentityMap<Class<?>, Subscription[]> singleSubs = subsSingleREF.get(this);
-//                final IdentityMap<MultiClass, Subscription[]> multiSubs = subsMultiREF.get(this);
-
-//            final IdentityMap<Class<?>, Subscription[]> localSuperSubs = subsSuperSingleREF.get(this);
-//            final IdentityMap<Class<?>, Subscription[]> localVaritySubs = subsVaritySingleREF.get(this);
-//            final IdentityMap<Class<?>, Subscription[]> localSuperVaritySubs = subsSuperVaritySingleREF.get(this);
+                final IdentityMap<MultiClass, Subscription[]> multiSubs = subsMultiREF.get(this);
 
                 Subscription subscription;
 
                 MessageHandler messageHandler;
                 Class<?>[] messageHandlerTypes;
+                int messageHandlerTypesSize;
+
+                MultiClass multiClass;
                 Class<?> handlerType;
 
 
-                // Prepare all of the subscriptions
+                // Prepare all of the subscriptions and add for publication AND subscribe since the data structures are consistent
                 for (int i = 0; i < handlersSize; i++) {
-                    // THE HANDLER IS THE SAME FOR ALL SUBSCRIPTIONS OF THE SAME TYPE!
                     messageHandler = messageHandlers[i];
 
-                    // is this handler able to accept var args?
-//                    if (messageHandler.getVarArgClass() != null) {
-//                        varArgPossibility.lazySet(true);
-//                    }
+                    subscription = subMaker.create(listenerClass, messageHandler);
+                    subscription.subscribe(listener);  // register this callback listener to this subscription
+                    subscriptions[i] = subscription;
 
-                    // now create a list of subscriptions for this specific handlerType (but don't add anything yet).
-                    // we only store things based on the FIRST type (for lookup) then parse the rest of the types during publication
+                    // register for publication
                     messageHandlerTypes = messageHandler.getHandledMessages();
-//                    final int handlerSize = messageHandlerTypes.length;
-//                    switch (handlerSize) {
-//                        case 0: {
-//                            // if a publisher publishes VOID, it calls a method with 0 parameters (that's been subscribed)
-//                            // This is the SAME THING as having Void as a parameter!!
-//                            handlerType = Void.class;
-//
-//                            if (!singleSubs.containsKey(handlerType)) {
-//                                // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
-//                                singleSubs.put(handlerType, SUBSCRIPTIONS);
-//                            }
-//                            break;
-//                        }
-//                        case 1: {
+                    messageHandlerTypesSize = messageHandlerTypes.length;
+
+                    switch (messageHandlerTypesSize) {
+                        case 0: {
+                            // if a publisher publishes VOID, it calls a method with 0 parameters (that's been subscribed)
+                            // This is the SAME THING as having Void as a parameter!!
+                            handlerType = Void.class;
+
+
+                            // makes this subscription visible for publication
+                            final Subscription[] newSubs;
+                            Subscription[] currentSubs = singleSubs.get(handlerType);
+                            if (currentSubs != null) {
+                                final int currentLength = currentSubs.length;
+
+                                // add the new subscription to the array
+                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                                newSubs[currentLength] = subscription;
+                            } else {
+                                newSubs = new Subscription[1];
+                                newSubs[0] = subscription;
+                            }
+
+                            singleSubs.put(handlerType, newSubs);
+                            break;
+                        }
+
+                        case 1: {
                             handlerType = messageHandlerTypes[0];
 
-                            if (!singleSubs.containsKey(handlerType)) {
-                                // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
-                                singleSubs.put(handlerType, SUBSCRIPTIONS);
+                            // makes this subscription visible for publication
+                            final Subscription[] newSubs;
+                            Subscription[] currentSubs = singleSubs.get(handlerType);
+                            if (currentSubs != null) {
+                                final int currentLength = currentSubs.length;
+
+                                // add the new subscription to the array
+                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                                newSubs[currentLength] = subscription;
+                            } else {
+                                newSubs = new Subscription[1];
+                                newSubs[0] = subscription;
                             }
-//                            break;
-//                        }
-//                        case 2: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes[0],
-//                                                                        messageHandlerTypes[1]);
-//
-//                            if (!multiSubs.containsKey(multiClass)) {
-//                                // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
-//                                multiSubs.put(multiClass, SUBSCRIPTIONS);
-//                            }
-//                            break;
-//                        }
-//                        case 3: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes[0],
-//                                                                        messageHandlerTypes[1],
-//                                                                        messageHandlerTypes[2]);
-//
-//                            if (!multiSubs.containsKey(multiClass)) {
-//                                // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
-//                                multiSubs.put(multiClass, SUBSCRIPTIONS);
-//                            }
-//                            break;
-//                        }
-//                        default: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes);
-//
-//                            if (!multiSubs.containsKey(multiClass)) {
-//                                // this is copied to a larger array if necessary, but needs to be SOMETHING before subsPerListener is added
-//                                multiSubs.put(multiClass, SUBSCRIPTIONS);
-//                            }
-//                            break;
-//                        }
-//                    }
 
-                    // create the subscription. This can be thrown away if the subscription succeeds in another thread
-                    subscription = new Subscription(listenerClass, messageHandler);
-                    subscriptions[i] = subscription;
+                            singleSubs.put(handlerType, newSubs);
+
+                            break;
+                        }
+
+                        case 2: {
+                            multiClass = classTree.get(messageHandlerTypes[0], messageHandlerTypes[1]);
+
+                            // makes this subscription visible for publication
+                            final Subscription[] newSubs;
+                            Subscription[] currentSubs = multiSubs.get(multiClass);
+
+                            if (currentSubs != null) {
+                                final int currentLength = currentSubs.length;
+
+                                // add the new subscription to the array
+                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                                newSubs[currentLength] = subscription;
+                            } else {
+                                newSubs = new Subscription[1];
+                                newSubs[0] = subscription;
+                            }
+
+                            multiSubs.put(multiClass, newSubs);
+                            break;
+                        }
+
+                        case 3: {
+                            multiClass = classTree.get(messageHandlerTypes[0], messageHandlerTypes[1], messageHandlerTypes[2]);
+
+                            // makes this subscription visible for publication
+                            final Subscription[] newSubs;
+                            Subscription[] currentSubs = multiSubs.get(multiClass);
+
+                            if (currentSubs != null) {
+                                final int currentLength = currentSubs.length;
+
+                                // add the new subscription to the array
+                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                                newSubs[currentLength] = subscription;
+                            } else {
+                                newSubs = new Subscription[1];
+                                newSubs[0] = subscription;
+                            }
+
+                            multiSubs.put(multiClass, newSubs);
+                            break;
+                        }
+
+                        default: {
+                            multiClass = classTree.get(messageHandlerTypes);
+
+                            // makes this subscription visible for publication
+                            final Subscription[] newSubs;
+                            Subscription[] currentSubs = multiSubs.get(multiClass);
+
+                            if (currentSubs != null) {
+                                final int currentLength = currentSubs.length;
+
+                                // add the new subscription to the array
+                                newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
+                                newSubs[currentLength] = subscription;
+                            } else {
+                                newSubs = new Subscription[1];
+                                newSubs[0] = subscription;
+                            }
+
+                            multiSubs.put(multiClass, newSubs);
+                            break;
+                        }
+                    }
                 }
-
-                // now subsPerMessageSingle has a unique list of subscriptions for a specific handlerType, and MAY already have subscriptions
 
                 // activates this sub for sub/unsub (only used by the subscription writer thread)
                 subsPerListener.put(listenerClass, subscriptions);
 
-
-                // add for publication AND subscribe since the data structures are consistent
-                for (int i = 0; i < handlersSize; i++) {
-                    subscription = subscriptions[i];
-                    subscription.subscribe(listener);  // register this callback listener to this subscription
-
-                    // THE HANDLER IS THE SAME FOR ALL SUBSCRIPTIONS OF THE SAME TYPE!
-                    messageHandler = messageHandlers[i];
-
-                    // register for publication
-                    messageHandlerTypes = messageHandler.getHandledMessages();
-//                    final int handlerSize = messageHandlerTypes.length;
-//
-//                    switch (handlerSize) {
-//                        case 0: {
-//                            handlerType = Void.class;
-//
-//                            // makes this subscription visible for publication
-//                            final Subscription[] currentSubs = singleSubs.get(handlerType);
-//                            final int currentLength = currentSubs.length;
-//
-//                            // add the new subscription to the array
-//                            final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-//                            newSubs[currentLength] = subscription;
-//                            singleSubs.put(handlerType, newSubs);
-//                            break;
-//                        }
-//
-//                        case 1: {
-                            handlerType = messageHandlerTypes[0];
-
-                            // makes this subscription visible for publication
-                            final Subscription[] currentSubs = singleSubs.get(handlerType);
-                            final int currentLength = currentSubs.length;
-
-                            // add the new subscription to the array
-                            final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-                            newSubs[currentLength] = subscription;
-                            singleSubs.put(handlerType, newSubs);
-
-
-                            // update the varity/super types
-                            // registerExtraSubs(handlerType, singleSubs, localSuperSubs, localVaritySubs);
-
-//                            break;
-//                        }
-//
-//                        case 2: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes[0],
-//                                                                        messageHandlerTypes[1]);
-//                            // makes this subscription visible for publication
-//                            final Subscription[] currentSubs = multiSubs.get(multiClass);
-//                            final int currentLength = currentSubs.length;
-//
-//                            // add the new subscription to the array
-//                            final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-//                            newSubs[currentLength] = subscription;
-//                            multiSubs.put(multiClass, newSubs);
-//
-//                            break;
-//                        }
-//
-//                        case 3: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes[0],
-//                                                                        messageHandlerTypes[1],
-//                                                                        messageHandlerTypes[2]);
-//                            // makes this subscription visible for publication
-//                            final Subscription[] currentSubs = multiSubs.get(multiClass);
-//                            final int currentLength = currentSubs.length;
-//
-//                            // add the new subscription to the array
-//                            final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-//                            newSubs[currentLength] = subscription;
-//                            multiSubs.put(multiClass, newSubs);
-//
-//                            break;
-//                        }
-//
-//                        default: {
-//                            final MultiClass multiClass = classTree.get(messageHandlerTypes);
-//                            // makes this subscription visible for publication
-//                            final Subscription[] currentSubs = multiSubs.get(multiClass);
-//                            final int currentLength = currentSubs.length;
-//
-//                            // add the new subscription to the array
-//                            final Subscription[] newSubs = Arrays.copyOf(currentSubs, currentLength + 1, Subscription[].class);
-//                            newSubs[currentLength] = subscription;
-//                            multiSubs.put(multiClass, newSubs);
-//
-//                            break;
-//                        }
-//                    }
-                }
-
                 // save this snapshot back to the original (single writer principle)
                 subsSingleREF.lazySet(this, singleSubs);
-//                subsMultiREF.lazySet(this, multiSubs);
-//            subsSuperSingleREF.lazySet(this, localSuperSubs);
-//            subsVaritySingleREF.lazySet(this, localVaritySubs);
-//            subsSuperVaritySingleREF.lazySet(this, localSuperVaritySubs);
+                subsMultiREF.lazySet(this, multiSubs);
 
 
-                // only dump the super subscritions if it is a COMPLETELY NEW subscription. If it's not new, then the heirarchy isn't
-                // changing for super subscriptions
-                subsSuperSingleREF.lazySet(this, new IdentityMap(32));
+                // only dump the super subscriptions if it is a COMPLETELY NEW subscription.
+                // If it's not new, then the hierarchy isn't changing for super subscriptions
+                final IdentityMap<Class<?>, Subscription[]> localSuperSubs = subsSuperSingleREF.get(this);
+                localSuperSubs.clear();
+                subsSuperSingleREF.lazySet(this, localSuperSubs);
             }
             else {
                 // subscriptions already exist and must only be updated
@@ -475,7 +407,7 @@ class SubscriptionManager {
 //            for (int i = 0; i < length; i++) {
 //                sub = arraySubs[i];
 //
-//                if (sub.getHandler().acceptsVarArgs()) {
+//                if (sub.getHandlerAccess().acceptsVarArgs()) {
 //                    varArgSubsAsList.add(sub);
 //                }
 //            }
@@ -501,7 +433,7 @@ class SubscriptionManager {
 //                for (int j = 0; j < superSubLength; j++) {
 //                    sub = superSubs[j];
 //
-//                    if (sub.getHandler().acceptsSubtypes()) {
+//                    if (sub.getHandlerAccess().acceptsSubtypes()) {
 //                        subsAsList.add(sub);
 //                    }
 //                }
@@ -516,28 +448,6 @@ class SubscriptionManager {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    public
-    AtomicBoolean getVarArgPossibility() {
-        return varArgPossibility;
-    }
-
-    public
-    VarArgUtils getVarArgUtils() {
-        return varArgUtils;
-    }
 
     // can return null
     public
@@ -574,57 +484,54 @@ class SubscriptionManager {
     }
 
 
-
-
-
-    // can return null
+    // can NOT return null
     public
     Subscription[] getSuperSubs(final Class<?> messageClass) {
-        final Class<?>[] superClasses = this.classUtils.getSuperClasses(messageClass);  // never returns null, cached response
+        // The subscriptions that are remembered here DO NOT CHANGE (only the listeners inside them change).
+        // if we subscribe a NEW LISTENER super/child class -- THEN these subscriptions change!
+        // we also DO NOT care about duplicates (since they will be the same anyways)
+        final IdentityMap<Class<?>, Subscription[]> localSuperSubs = subsSuperSingleREF.get(this);
 
-        final int length = superClasses.length;
-        final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
+        Subscription[] subscriptions = localSuperSubs.get(messageClass);
+        // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
+        // calculated and do not exist - this will be an empty array.
+        if (subscriptions == null) {
+            final Class<?>[] superClasses = this.classUtils.getSuperClasses(messageClass);  // never returns null, cached response
 
-        final IdentityMap<Class<?>, Subscription[]> localSubs = subsSingleREF.get(this);
+            final int length = superClasses.length;
+            final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
 
-        Class<?> superClass;
-        Subscription sub;
-        Subscription[] superSubs;
-        boolean hasSubs = false;
+            final IdentityMap<Class<?>, Subscription[]> localSubs = subsSingleREF.get(this);
 
-        // walks through all of the subscriptions that might exist for super types, and if applicable, save them
-        for (int i = 0; i < length; i++) {
-            superClass = superClasses[i];
-            superSubs = localSubs.get(superClass);
+            Class<?> superClass;
+            Subscription sub;
+            Subscription[] superSubs;
 
-            if (superSubs != null) {
-                int superSubLength = superSubs.length;
-                for (int j = 0; j < superSubLength; j++) {
-                    sub = superSubs[j];
+            // walks through all of the subscriptions that might exist for super types, and if applicable, save them
+            for (int i = 0; i < length; i++) {
+                superClass = superClasses[i];
+                superSubs = localSubs.get(superClass);
 
-                    if (sub.getHandler().acceptsSubtypes()) {
-                        subsAsList.add(sub);
-                        hasSubs = true;
+                if (superSubs != null) {
+                    int superSubLength = superSubs.length;
+                    for (int j = 0; j < superSubLength; j++) {
+                        sub = superSubs[j];
+
+                        if (sub.getHandler().acceptsSubtypes()) {
+                            subsAsList.add(sub);
+                        }
                     }
                 }
             }
+
+            // subsAsList now contains ALL of the super-class subscriptions.
+            subscriptions = subsAsList.toArray(new Subscription[0]);
+            localSuperSubs.put(messageClass, subscriptions);
+
+            subsSuperSingleREF.lazySet(this, localSuperSubs);
         }
 
-
-        // subsAsList now contains ALL of the super-class subscriptions.
-        if (hasSubs) {
-            return subsAsList.toArray(new Subscription[0]);
-        }
-        else {
-            // TODO: shortcut out if there are no handlers that accept subtypes
-            return null;
-        }
-
-
-// IT IS CRITICAL TO REMEMBER: The subscriptions that are remembered here DO NOT CHANGE (only the listeners inside them change). if we
-// subscribe a super/child class -- THEN these subscriptions change!
-
-//        return (Subscription[]) subsSuperSingleREF.get(this).get(messageClass);
+        return subscriptions;
     }
 
     // can return null

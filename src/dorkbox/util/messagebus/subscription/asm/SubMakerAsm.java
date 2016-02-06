@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 dorkbox, llc
+ * Copyright 2016 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.publication;
+package dorkbox.util.messagebus.subscription.asm;
 
-import dorkbox.util.messagebus.synchrony.Synchrony;
+import dorkbox.util.messagebus.common.MessageHandler;
+import dorkbox.util.messagebus.subscription.SubMaker;
+import dorkbox.util.messagebus.subscription.Subscription;
 
-public interface Publisher {
-    void publish(final Synchrony synchrony, Object message1);
-    void publish(final Synchrony synchrony, Object message1, Object message2);
-    void publish(final Synchrony synchrony, Object message1, Object message2, Object message3);
+/**
+ * @author dorkbox, llc Date: 2/3/16
+ */
+public
+class SubMakerAsm implements SubMaker {
+
+    public
+    SubMakerAsm() {
+    }
+
+    @Override
+    public
+    Subscription create(final Class<?> listenerClass, final MessageHandler handler) {
+        return new SubscriptionAsm(listenerClass, handler);
+    }
 }

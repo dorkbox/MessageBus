@@ -35,35 +35,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.annotations;
+package dorkbox.util.messagebus.subscription.asm;
 
-import java.lang.annotation.*;
+import com.esotericsoftware.reflectasm.MethodAccess;
 
 /**
- * Mark any method of any class(=listener) as a message handler and configure the handler
- * using different properties.
+ * Synchronizes message handler invocations for all handlers that specify @Synchronized
  *
  * @author bennidi
- *         Date: 2/8/12
- * @author dorkbox
+ *         Date: 3/31/13
+ * @author dorkbox, llc
  *         Date: 2/2/15
  */
-@Retention(value = RetentionPolicy.RUNTIME)
-@Inherited
-@Target(value = {ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public
-@interface Handler {
+class AsmSynchronizedInvocation implements AsmInvocation {
 
-    /**
-     * Define whether or not the handler accepts sub types of the message type it declares in its
-     * signature.
-     */
-    boolean acceptSubtypes() default true;
+    private AsmInvocation delegate;
 
-    /**
-     * Enable or disable the handler. Disabled handlers do not receive any messages.
-     * This property is useful for quick changes in configuration and necessary to disable
-     * handlers that have been declared by a superclass but do not apply to the subclass
-     */
-    boolean enabled() default true;
+    public
+    AsmSynchronizedInvocation(AsmInvocation delegate) {
+        this.delegate = delegate;
+    }
+
+    @Override
+    public
+    void invoke(final Object listener, final MethodAccess handler, final int methodIndex, final Object message) throws Throwable {
+        synchronized (listener) {
+            this.delegate.invoke(listener, handler, methodIndex, message);
+        }
+    }
+
+    @Override
+    public
+    void invoke(final Object listener, final MethodAccess handler, int methodIndex, final Object message1, final Object message2) throws Throwable {
+        synchronized (listener) {
+            this.delegate.invoke(listener, handler, methodIndex, message1, message2);
+        }
+    }
+
+    @Override
+    public
+    void invoke(final Object listener, final MethodAccess handler, final int methodIndex, final Object message1, final Object message2, final Object message3) throws Throwable {
+        synchronized (listener) {
+            this.delegate.invoke(listener, handler, methodIndex, message1, message2, message3);
+        }
+    }
 }

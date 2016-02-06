@@ -16,7 +16,7 @@
 package dorkbox.util.messagebus.utils;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
-import dorkbox.util.messagebus.common.HashMapTree;
+import dorkbox.util.messagebus.common.ClassTree;
 import dorkbox.util.messagebus.subscription.Subscription;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
 
@@ -32,7 +32,7 @@ class SubscriptionUtils {
 
     // keeps track of all subscriptions of the super classes of a message type.
     private volatile IdentityMap<Class<?>, Subscription[]> superClassSubscriptions;
-    private final HashMapTree<Class<?>, ArrayList<Subscription>> superClassSubscriptionsMulti;
+    private final ClassTree<Class<?>> superClassSubscriptionsMulti;
 
 
     public
@@ -43,7 +43,7 @@ class SubscriptionUtils {
         // superClassSubscriptions keeps track of all subscriptions of super classes. SUB/UNSUB dumps it, so it is recreated dynamically.
         // it's a hit on SUB/UNSUB, but improves performance of handlers
         this.superClassSubscriptions = new IdentityMap<Class<?>, Subscription[]>(8, loadFactor);
-        this.superClassSubscriptionsMulti = new HashMapTree<Class<?>, ArrayList<Subscription>>();
+        this.superClassSubscriptionsMulti = new ClassTree<Class<?>>();
     }
 
     public
@@ -80,7 +80,7 @@ class SubscriptionUtils {
 //                for (int j = 0; j < superSubLength; j++) {
 //                    sub = superSubs[j];
 //
-//                    if (sub.getHandler().acceptsSubtypes()) {
+//                    if (sub.getHandlerAccess().acceptsSubtypes()) {
 //                        subsAsList.add(sub);
 //                    }
 //                }
@@ -123,61 +123,62 @@ class SubscriptionUtils {
      */
     public
     ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final SubscriptionManager subManager) {
-        // whenever our subscriptions change, this map is cleared.
-        final HashMapTree<Class<?>, ArrayList<Subscription>> cached = this.superClassSubscriptionsMulti;
+//        // whenever our subscriptions change, this map is cleared.
+//        final MapTree<Class<?>, ArrayList<Subscription>> cached = this.superClassSubscriptionsMulti;
+//
+//        ArrayList<Subscription> subs = cached.get(clazz1, clazz2);
+//
+//        if (subs == null) {
+//            // types was not empty, so collect subscriptions for each type and collate them
+//
+//            // save the subscriptions
+//            final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
+//            final Class<?>[] superClasses2 = this.superClass.getSuperClasses(clazz2);  // never returns null, cached response
+//
+//            Class<?> superClass1;
+//            Class<?> superClass2;
+//            ArrayList<Subscription> superSubs;
+//            Subscription sub;
+//
+//            final int length1 = superClasses1.length;
+//            final int length2 = superClasses2.length;
+//
+//            subs = new ArrayList<Subscription>(length1 + length2);
+//
+//            for (int i = 0; i < length1; i++) {
+//                superClass1 = superClasses1[i];
+//
+//                // only go over subtypes
+//                if (superClass1 == clazz1) {
+//                    continue;
+//                }
+//
+//                for (int j = 0; j < length2; j++) {
+//                    superClass2 = superClasses2[j];
+//
+//                    // only go over subtypes
+//                    if (superClass2 == clazz2) {
+//                        continue;
+//                    }
+//
+//                    superSubs = subManager.getExactAsArray(superClass1, superClass2);
+//                    if (superSubs != null) {
+//                        for (int k = 0; k < superSubs.size(); k++) {
+//                            sub = superSubs.get(k);
+//
+//                            if (sub.getHandlerAccess().acceptsSubtypes()) {
+//                                subs.add(sub);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            subs.trimToSize();
+//            cached.put(subs, clazz1, clazz2);
+//        }
 
-        ArrayList<Subscription> subs = cached.get(clazz1, clazz2);
-
-        if (subs == null) {
-            // types was not empty, so collect subscriptions for each type and collate them
-
-            // save the subscriptions
-            final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
-            final Class<?>[] superClasses2 = this.superClass.getSuperClasses(clazz2);  // never returns null, cached response
-
-            Class<?> superClass1;
-            Class<?> superClass2;
-            ArrayList<Subscription> superSubs;
-            Subscription sub;
-
-            final int length1 = superClasses1.length;
-            final int length2 = superClasses2.length;
-
-            subs = new ArrayList<Subscription>(length1 + length2);
-
-            for (int i = 0; i < length1; i++) {
-                superClass1 = superClasses1[i];
-
-                // only go over subtypes
-                if (superClass1 == clazz1) {
-                    continue;
-                }
-
-                for (int j = 0; j < length2; j++) {
-                    superClass2 = superClasses2[j];
-
-                    // only go over subtypes
-                    if (superClass2 == clazz2) {
-                        continue;
-                    }
-
-                    superSubs = subManager.getExactAsArray(superClass1, superClass2);
-                    if (superSubs != null) {
-                        for (int k = 0; k < superSubs.size(); k++) {
-                            sub = superSubs.get(k);
-
-                            if (sub.getHandler().acceptsSubtypes()) {
-                                subs.add(sub);
-                            }
-                        }
-                    }
-                }
-            }
-            subs.trimToSize();
-            cached.put(subs, clazz1, clazz2);
-        }
-
-        return subs;
+//        return subs;
+        return null;
     }
 
     /**
@@ -190,72 +191,73 @@ class SubscriptionUtils {
     public
     ArrayList<Subscription> getSuperSubscriptions(final Class<?> clazz1, final Class<?> clazz2, final Class<?> clazz3,
                                                   final SubscriptionManager subManager) {
-        // whenever our subscriptions change, this map is cleared.
-        final HashMapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
-
-        ArrayList<Subscription> subs = local.get(clazz1, clazz2, clazz3);
-
-        if (subs == null) {
-            // types was not empty, so collect subscriptions for each type and collate them
-
-            // save the subscriptions
-            final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
-            final Class<?>[] superClasses2 = this.superClass.getSuperClasses(clazz2);  // never returns null, cached response
-            final Class<?>[] superClasses3 = this.superClass.getSuperClasses(clazz3);  // never returns null, cached response
-
-            Class<?> superClass1;
-            Class<?> superClass2;
-            Class<?> superClass3;
-            ArrayList<Subscription> superSubs;
-            Subscription sub;
-
-            final int length1 = superClasses1.length;
-            final int length2 = superClasses2.length;
-            final int length3 = superClasses3.length;
-
-            subs = new ArrayList<Subscription>(length1 + length2 + length3);
-
-            for (int i = 0; i < length1; i++) {
-                superClass1 = superClasses1[i];
-
-                // only go over subtypes
-                if (superClass1 == clazz1) {
-                    continue;
-                }
-
-                for (int j = 0; j < length2; j++) {
-                    superClass2 = superClasses2[j];
-
-                    // only go over subtypes
-                    if (superClass2 == clazz2) {
-                        continue;
-                    }
-
-                    for (int k = 0; k < length3; k++) {
-                        superClass3 = superClasses3[j];
-
-                        // only go over subtypes
-                        if (superClass3 == clazz3) {
-                            continue;
-                        }
-
-                        superSubs = subManager.getExactAsArray(superClass1, superClass2, superClass3);
-                        if (superSubs != null) {
-                            for (int m = 0; m < superSubs.size(); m++) {
-                                sub = superSubs.get(m);
-
-                                if (sub.getHandler().acceptsSubtypes()) {
-                                    subs.add(sub);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            subs.trimToSize();
-            local.put(subs, clazz1, clazz2, clazz3);
-        }
-
-        return subs;
+//        // whenever our subscriptions change, this map is cleared.
+//        final MapTree<Class<?>, ArrayList<Subscription>> local = this.superClassSubscriptionsMulti;
+//
+//        ArrayList<Subscription> subs = local.get(clazz1, clazz2, clazz3);
+//
+//        if (subs == null) {
+//            // types was not empty, so collect subscriptions for each type and collate them
+//
+//            // save the subscriptions
+//            final Class<?>[] superClasses1 = this.superClass.getSuperClasses(clazz1);  // never returns null, cached response
+//            final Class<?>[] superClasses2 = this.superClass.getSuperClasses(clazz2);  // never returns null, cached response
+//            final Class<?>[] superClasses3 = this.superClass.getSuperClasses(clazz3);  // never returns null, cached response
+//
+//            Class<?> superClass1;
+//            Class<?> superClass2;
+//            Class<?> superClass3;
+//            ArrayList<Subscription> superSubs;
+//            Subscription sub;
+//
+//            final int length1 = superClasses1.length;
+//            final int length2 = superClasses2.length;
+//            final int length3 = superClasses3.length;
+//
+//            subs = new ArrayList<Subscription>(length1 + length2 + length3);
+//
+//            for (int i = 0; i < length1; i++) {
+//                superClass1 = superClasses1[i];
+//
+//                // only go over subtypes
+//                if (superClass1 == clazz1) {
+//                    continue;
+//                }
+//
+//                for (int j = 0; j < length2; j++) {
+//                    superClass2 = superClasses2[j];
+//
+//                    // only go over subtypes
+//                    if (superClass2 == clazz2) {
+//                        continue;
+//                    }
+//
+//                    for (int k = 0; k < length3; k++) {
+//                        superClass3 = superClasses3[j];
+//
+//                        // only go over subtypes
+//                        if (superClass3 == clazz3) {
+//                            continue;
+//                        }
+//
+//                        superSubs = subManager.getExactAsArray(superClass1, superClass2, superClass3);
+//                        if (superSubs != null) {
+//                            for (int m = 0; m < superSubs.size(); m++) {
+//                                sub = superSubs.get(m);
+//
+//                                if (sub.getHandlerAccess().acceptsSubtypes()) {
+//                                    subs.add(sub);
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            subs.trimToSize();
+//            local.put(subs, clazz1, clazz2, clazz3);
+//        }
+//
+//        return subs;
+        return null;
     }
 }

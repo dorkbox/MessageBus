@@ -35,35 +35,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.annotations;
+package dorkbox.util.messagebus.subscription.reflection;
 
-import java.lang.annotation.*;
+import java.lang.reflect.Method;
 
 /**
- * Mark any method of any class(=listener) as a message handler and configure the handler
- * using different properties.
+ * Uses reflection to invoke a message handler for a given message.
  *
  * @author bennidi
- *         Date: 2/8/12
- * @author dorkbox
+ *         Date: 11/23/12
+ * @author dorkbox, llc
  *         Date: 2/2/15
  */
-@Retention(value = RetentionPolicy.RUNTIME)
-@Inherited
-@Target(value = {ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public
-@interface Handler {
+class ReflectionReflectiveInvocation implements ReflectionInvocation {
 
-    /**
-     * Define whether or not the handler accepts sub types of the message type it declares in its
-     * signature.
-     */
-    boolean acceptSubtypes() default true;
+    public
+    ReflectionReflectiveInvocation() {
+        super();
+    }
 
-    /**
-     * Enable or disable the handler. Disabled handlers do not receive any messages.
-     * This property is useful for quick changes in configuration and necessary to disable
-     * handlers that have been declared by a superclass but do not apply to the subclass
-     */
-    boolean enabled() default true;
+    @Override
+    public
+    void invoke(final Object listener, final Method handler, final Object message) throws Throwable {
+        handler.invoke(listener, message);
+    }
+
+    @Override
+    public
+    void invoke(final Object listener, final Method handler, final Object message1, final Object message2) throws Throwable {
+        handler.invoke(listener, message1, message2);
+    }
+
+    @Override
+    public
+    void invoke(final Object listener, final Method handler, final Object message1, final Object message2, final Object message3) throws Throwable {
+        handler.invoke(listener, message1, message2, message3);
+    }
 }

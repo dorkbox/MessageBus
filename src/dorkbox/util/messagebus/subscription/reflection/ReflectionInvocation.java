@@ -35,9 +35,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.dispatch;
+package dorkbox.util.messagebus.subscription.reflection;
 
-import com.esotericsoftware.reflectasm.MethodAccess;
+import java.lang.reflect.Method;
 
 /**
  * A handler invocation encapsulates the logic that is used to invoke a single
@@ -54,7 +54,7 @@ import com.esotericsoftware.reflectasm.MethodAccess;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-public interface IHandlerInvocation {
+public interface ReflectionInvocation {
 
     /**
      * Invoke the message delivery logic of this handler
@@ -65,7 +65,7 @@ public interface IHandlerInvocation {
      *                 type that the handler consumes
      * @param handler  The handler (method) that will be called via reflection
      */
-    void invoke(Object listener, MethodAccess handler, int methodIndex, Object message) throws Throwable;
+    void invoke(Object listener, Method handler, Object message) throws Throwable;
 
     /**
      * Invoke the message delivery logic of this handler
@@ -76,7 +76,7 @@ public interface IHandlerInvocation {
      *                 type that the handler consumes
      * @param handler  The handler (method) that will be called via reflection
      */
-    void invoke(Object listener, MethodAccess handler, int methodIndex, Object message1, Object message2) throws Throwable;
+    void invoke(Object listener, Method handler, Object message1, Object message2) throws Throwable;
 
     /**
      * Invoke the message delivery logic of this handler
@@ -87,16 +87,5 @@ public interface IHandlerInvocation {
      *                 type that the handler consumes
      * @param handler  The handler (method) that will be called via reflection
      */
-    void invoke(Object listener, MethodAccess handler, int methodIndex, Object message1, Object message2, Object message3) throws Throwable;
-
-    /**
-     * Invoke the message delivery logic of this handler
-     *
-     * @param listener The listener that will receive the message. This can be a reference to a method object
-     *                 from the java reflection api or any other wrapper that can be used to invoke the handler
-     * @param messages  The message to be delivered to the handler. This can be any object compatible with the object
-     *                 type that the handler consumes
-     * @param handler  The handler (method) that will be called via reflection
-     */
-    void invoke(Object listener, MethodAccess handler, int methodIndex, Object... messages) throws Throwable;
+    void invoke(Object listener, Method handler, Object message1, Object message2, Object message3) throws Throwable;
 }

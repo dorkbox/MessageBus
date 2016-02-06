@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.publication.disruptor;
+package dorkbox.util.messagebus.synchrony.disruptor;
 
+/**
+ * @author dorkbox, llc Date: 2/2/15
+ */
 public final class MessageType {
     public static final int ONE = 1;
     public static final int TWO = 2;
     public static final int THREE = 3;
-    public static final int ARRAY = 4;
 
     private MessageType() {
     }

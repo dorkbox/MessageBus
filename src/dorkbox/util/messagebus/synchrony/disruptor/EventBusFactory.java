@@ -13,12 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.util.messagebus.publication;
+package dorkbox.util.messagebus.synchrony.disruptor;
 
-import dorkbox.util.messagebus.synchrony.Synchrony;
+import com.lmax.disruptor.EventFactory;
+import dorkbox.util.messagebus.synchrony.MessageHolder;
 
-public interface Publisher {
-    void publish(final Synchrony synchrony, Object message1);
-    void publish(final Synchrony synchrony, Object message1, Object message2);
-    void publish(final Synchrony synchrony, Object message1, Object message2, Object message3);
+/**
+ * @author dorkbox, llc
+ *         Date: 2/2/15
+ */
+public class EventBusFactory implements EventFactory<MessageHolder> {
+
+    public EventBusFactory() {
+    }
+
+    @Override
+    public
+    MessageHolder newInstance() {
+        return new MessageHolder();
+    }
 }

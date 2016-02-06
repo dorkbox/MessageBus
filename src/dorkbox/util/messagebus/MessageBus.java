@@ -20,8 +20,9 @@ import dorkbox.util.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.publication.Publisher;
 import dorkbox.util.messagebus.publication.PublisherExact;
 import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypes;
-import dorkbox.util.messagebus.publication.PublisherExactWithSuperTypesAndVarity;
 import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.util.messagebus.synchrony.AsyncABQ;
+import dorkbox.util.messagebus.synchrony.AsyncABQ_noGc;
 import dorkbox.util.messagebus.synchrony.AsyncDisruptor;
 import dorkbox.util.messagebus.synchrony.Sync;
 import dorkbox.util.messagebus.synchrony.Synchrony;
@@ -37,6 +38,36 @@ import dorkbox.util.messagebus.synchrony.Synchrony;
  */
 public
 class MessageBus implements IMessageBus {
+
+    public static boolean useDisruptorForAsyncPublish = true;
+    public static boolean useAsmForDispatch = true;
+
+    public static boolean useNoGarbageVersionOfABQ = true;
+
+    static {
+        // check to see if we can use ASM for method access (it's a LOT faster than reflection). By default, we use ASM.
+        if (useAsmForDispatch) {
+            // only bother checking if we are different that the defaults
+            try {
+                Class.forName("com.esotericsoftware.reflectasm.MethodAccess");
+            } catch (Exception e) {
+                useAsmForDispatch = false;
+            }
+        }
+
+
+        // check to see if we can use the disruptor for publication (otherwise, we use native java). The disruptor is a lot faster, but
+        // not available on all platforms/JRE's because of it's use of UNSAFE.
+        if (useDisruptorForAsyncPublish) {
+            // only bother checking if we are different that the defaults
+            try {
+                Class.forName("com.lmax.disruptor.RingBuffer");
+            } catch (Exception e) {
+                useDisruptorForAsyncPublish = false;
+            }
+        }
+    }
+
     private final ErrorHandlingSupport errorHandler;
 
     private final SubscriptionManager subscriptionManager;
@@ -47,7 +78,7 @@ class MessageBus implements IMessageBus {
 
 
     /**
-     * By default, will permit subTypes and Varity Argument matching, and will use half of CPUs available for dispatching async messages
+     * By default, will permit subType matching, and will use half of CPUs available for dispatching async messages
      */
     public
     MessageBus() {
@@ -55,7 +86,7 @@ class MessageBus implements IMessageBus {
     }
 
     /**
-     * By default, will permit subTypes and Varity Argument matching
+     * By default, will permit subType matching
      *
      * @param numberOfThreads how many threads to use for dispatching async messages
      */
@@ -74,6 +105,7 @@ class MessageBus implements IMessageBus {
     MessageBus(final PublishMode publishMode) {
         this(publishMode, Runtime.getRuntime().availableProcessors());
     }
+
     /**
      * @param publishMode     Specifies which publishMode to operate the publication of messages.
      * @param numberOfThreads how many threads to use for dispatching async messages
@@ -96,17 +128,26 @@ class MessageBus implements IMessageBus {
                 break;
 
             case ExactWithSuperTypes:
+            default:
                 publisher = new PublisherExactWithSuperTypes(errorHandler, subscriptionManager);
                 break;
-
-            case ExactWithSuperTypesAndVarity:
-            default:
-                publisher = new PublisherExactWithSuperTypesAndVarity(errorHandler, subscriptionManager);
         }
 
         syncPublication = new Sync();
-//        asyncPublication = new PubAsync(numberOfThreads, errorHandler, publisher, syncPublication);
-        asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, publisher, syncPublication);
+
+        // the disruptor is preferred, but if it cannot be loaded -- we want to try to continue working, hence the use of ArrayBlockingQueue
+        if (useDisruptorForAsyncPublish) {
+            asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, publisher, syncPublication);
+        } else {
+            if (useNoGarbageVersionOfABQ) {
+                // no garbage is created, but this is slow (but faster than other messagebus implementations)
+                asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler, publisher, syncPublication);
+            }
+            else {
+                // garbage is created, but this is fast
+                asyncPublication = new AsyncABQ(numberOfThreads, errorHandler, publisher, syncPublication);
+            }
+        }
     }
 
     /**
@@ -162,12 +203,6 @@ class MessageBus implements IMessageBus {
 
     @Override
     public
-    void publish(final Object[] messages) {
-        publisher.publish(syncPublication, messages);
-    }
-
-    @Override
-    public
     void publishAsync(final Object message) {
         publisher.publish(asyncPublication, message);
     }
@@ -201,22 +236,6 @@ class MessageBus implements IMessageBus {
 //        }
 //        else {
 //            throw new NullPointerException("Messages cannot be null.");
-//        }
-    }
-
-    @Override
-    public
-    void publishAsync(final Object[] messages) {
-//        if (messages != null) {
-//            try {
-//                this.dispatchQueue.transfer(messages, MessageType.ARRAY);
-//            } catch (Exception e) {
-//                errorHandler.handlePublicationError(new PublicationError().setMessage(
-//                                "Error while adding an asynchronous message").setCause(e).setPublishedObject(messages));
-//            }
-//        }
-//        else {
-//            throw new NullPointerException("Message cannot be null.");
 //        }
     }
 

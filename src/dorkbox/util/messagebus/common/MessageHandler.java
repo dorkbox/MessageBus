@@ -37,14 +37,12 @@
  */
 package dorkbox.util.messagebus.common;
 
-import com.esotericsoftware.reflectasm.MethodAccess;
 import dorkbox.util.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.annotations.Synchronized;
 import dorkbox.util.messagebus.utils.ReflectionUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
@@ -104,38 +102,24 @@ class MessageHandler {
         return finalMethods.toArray(new MessageHandler[0]);
     }
 
-    private final MethodAccess handler;
-    private final int methodIndex;
+    private final Method method;
+
 
     private final Class<?>[] handledMessages;
     private final boolean acceptsSubtypes;
-    private final Class<?> varArgClass;
 
     private final boolean isSynchronized;
 
-    public
-    MessageHandler(Method handler, Handler handlerConfig) {
-        super();
-
-        if (handler == null) {
-            throw new IllegalArgumentException("The message handler configuration may not be null");
+    private
+    MessageHandler(final Method method, final Handler config) {
+        if (method == null) {
+            throw new IllegalArgumentException("The message method configuration may not be null");
         }
 
-        Class<?>[] handledMessages = handler.getParameterTypes();
-
-        this.handler = MethodAccess.get(handler.getDeclaringClass());
-        this.methodIndex = this.handler.getIndex(handler.getName(), handledMessages);
-
-        this.acceptsSubtypes = handlerConfig.acceptSubtypes();
-        this.isSynchronized = ReflectionUtils.getAnnotation(handler, Synchronized.class) != null;
-        this.handledMessages = handledMessages;
-
-        if (handledMessages.length == 1 && handledMessages[0].isArray() && handlerConfig.acceptVarargs()) {
-            this.varArgClass = handledMessages[0].getComponentType();
-        }
-        else {
-            this.varArgClass = null;
-        }
+        this.method = method;
+        this.acceptsSubtypes = config.acceptSubtypes();
+        this.handledMessages = method.getParameterTypes();
+        this.isSynchronized = ReflectionUtils.getAnnotation(method, Synchronized.class) != null;
     }
 
     public final
@@ -143,14 +127,11 @@ class MessageHandler {
         return this.isSynchronized;
     }
 
-    public final
-    MethodAccess getHandler() {
-        return this.handler;
-    }
+
 
     public final
-    int getMethodIndex() {
-        return this.methodIndex;
+    Method getMethod() {
+        return this.method;
     }
 
     public final
@@ -159,30 +140,14 @@ class MessageHandler {
     }
 
     public final
-    Class<?> getVarArgClass() {
-        return this.varArgClass;
-    }
-
-    public final
     boolean acceptsSubtypes() {
         return this.acceptsSubtypes;
-    }
-
-    public final
-    boolean acceptsVarArgs() {
-        return this.varArgClass != null;
     }
 
     @Override
     public final
     int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (this.acceptsSubtypes ? 1231 : 1237);
-        result = prime * result + Arrays.hashCode(this.handledMessages);
-        result = prime * result + (this.handler == null ? 0 : this.handler.hashCode());
-        result = prime * result + (this.isSynchronized ? 1231 : 1237);
-        return result;
+        return this.method.hashCode();
     }
 
     @Override
@@ -197,24 +162,8 @@ class MessageHandler {
         if (getClass() != obj.getClass()) {
             return false;
         }
+
         MessageHandler other = (MessageHandler) obj;
-        if (this.acceptsSubtypes != other.acceptsSubtypes) {
-            return false;
-        }
-        if (!Arrays.equals(this.handledMessages, other.handledMessages)) {
-            return false;
-        }
-        if (this.handler == null) {
-            if (other.handler != null) {
-                return false;
-            }
-        }
-        else if (!this.handler.equals(other.handler)) {
-            return false;
-        }
-        if (this.isSynchronized != other.isSynchronized) {
-            return false;
-        }
-        return true;
+        return this.method.equals(other.method);
     }
 }
