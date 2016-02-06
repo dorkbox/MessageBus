@@ -33,11 +33,13 @@ public abstract class BenchmarkReflection {
 
     abstract int run(int iterations) throws Throwable;
 
-    private BigDecimal time() {
+    private
+    BigDecimal time() {
         try {
             int nextI = 1;
             int i;
             long duration;
+
             do {
                 i = nextI;
                 long start = System.nanoTime();
@@ -45,6 +47,8 @@ public abstract class BenchmarkReflection {
                 duration = System.nanoTime() - start;
                 nextI = i << 1 | 1;
             } while (duration < 100000000 && nextI > 0);
+
+            
             return new BigDecimal(duration * 1000 / i).movePointLeft(3);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -75,20 +79,22 @@ public abstract class BenchmarkReflection {
 
     public static void main(String[] args) throws Exception {
         final C invocationTarget = new C();
-        final Method m = C.class.getMethod("foo");
-        final Method am = C.class.getMethod("foo");
-        am.setAccessible(true);
-        final MethodHandle mh = sfmh;
+        final Method m_normal = C.class.getMethod("foo");
 
-        final MethodAccess ma = MethodAccess.get(C.class);
-        final int mi = ma.getIndex("foo");
+        final Method m_setAccessible = C.class.getMethod("foo");
+        m_setAccessible.setAccessible(true);
+
+        final MethodAccess m_asm = MethodAccess.get(C.class);
+        final int mi = m_asm.getIndex("foo");
+
+        final MethodHandle mh = sfmh;
 
         BenchmarkReflection[] marks = {
             new BenchmarkReflection("reflective invocation (without setAccessible)") {
                 @Override int run(int iterations) throws Throwable {
                     int x = 0;
                     for (int i = 0; i < iterations; i++) {
-                        x += (Integer) m.invoke(invocationTarget);
+                        x += (Integer) m_normal.invoke(invocationTarget);
                     }
                     return x;
                 }
@@ -97,7 +103,7 @@ public abstract class BenchmarkReflection {
                 @Override int run(int iterations) throws Throwable {
                     int x = 0;
                     for (int i = 0; i < iterations; i++) {
-                        x += (Integer) am.invoke(invocationTarget);
+                        x += (Integer) m_setAccessible.invoke(invocationTarget);
                     }
                     return x;
                 }
@@ -107,12 +113,12 @@ public abstract class BenchmarkReflection {
                 @Override int run(int iterations) throws Throwable {
                     int x = 0;
                     for (int i = 0; i < iterations; i++) {
-                        x += (Integer) ma.invoke(invocationTarget, mi, (Object)null);
+                        x += (Integer) m_asm.invoke(invocationTarget, mi, (Object)null);
                     }
                     return x;
                 }
             },
-            new BenchmarkReflection("methodhandle invocation") {
+            new BenchmarkReflection("methodhandle (local) invocation") {
 
                 @Override int run(int iterations) throws Throwable {
                     int x = 0;
