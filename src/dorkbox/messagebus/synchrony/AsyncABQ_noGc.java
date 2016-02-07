@@ -28,6 +28,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.locks.LockSupport;
 
 /**
+ * By default, it is the calling thread that has to get the subscriptions, which the sync/async logic then uses.
+ *
+ * The exception to this rule is when checking/calling DeadMessage publication.
+ *
  * This is similar in behavior to the disruptor in that it does not generate garbage, however the downside of this implementation is it is
  * slow, but faster than other messagebus implementations.
  *
@@ -45,6 +49,7 @@ class AsyncABQ_noGc implements Synchrony {
 
     private final Collection<Thread> threads;
     private final Collection<Boolean> shutdown;
+    private final ErrorHandler errorHandler;
 
     /**
      * Notifies the consumers during shutdown that it's on purpose.
@@ -54,6 +59,7 @@ class AsyncABQ_noGc implements Synchrony {
 
     public
     AsyncABQ_noGc(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
+        this.errorHandler = errorHandler;
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
         this.gcQueue = new ArrayBlockingQueue<MessageHolder>(1024);
@@ -103,17 +109,21 @@ class AsyncABQ_noGc implements Synchrony {
                  final Synchrony sync,
                  final ErrorHandler errorHandler) {
 
-        MessageHolder event = null;
+        MessageHolder event;
+
         int messageType = MessageType.ONE;
-        Subscription[] subscriptions;
+        Subscription[] subs;
+        Subscription[] superSubs;
         Object message1 = null;
         Object message2 = null;
         Object message3 = null;
 
         try {
             event = queue.take();
+
             messageType = event.type;
-            subscriptions = event.subscriptions;
+            subs = event.subs;
+            superSubs = event.superSubs;
             message1 = event.message1;
             message2 = event.message2;
             message3 = event.message3;
@@ -122,36 +132,36 @@ class AsyncABQ_noGc implements Synchrony {
 
             switch (messageType) {
                 case MessageType.ONE: {
-                    sync.publish(subscriptions, message1);
+                    sync.publish(subs, superSubs, message1);
                     return;
                 }
                 case MessageType.TWO: {
-                    sync.publish(subscriptions, message1, message2);
+                    sync.publish(subs, superSubs, message1, message2);
                     return;
                 }
                 case MessageType.THREE: {
-                    sync.publish(subscriptions, message1, message2, message3);
+                    sync.publish(subs, superSubs, message1, message2, message3);
                     //noinspection UnnecessaryReturnStatement
                     return;
                 }
             }
-        } catch (Throwable e) {
-            if (event != null && !this.shuttingDown) {
+        } catch (InterruptedException e) {
+            if (!this.shuttingDown) {
                 switch (messageType) {
                     case MessageType.ONE: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
                                                                                   .setCause(e)
                                                                                   .setPublishedObject(message1));
                         return;
                     }
                     case MessageType.TWO: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
                                                                                   .setCause(e)
                                                                                   .setPublishedObject(message1, message2));
                         return;
                     }
                     case MessageType.THREE: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
                                                                                   .setCause(e)
                                                                                   .setPublishedObject(message1, message2, message3));
                         //noinspection UnnecessaryReturnStatement
@@ -164,41 +174,61 @@ class AsyncABQ_noGc implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
-        MessageHolder take = gcQueue.take();
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1) {
+        try {
+            MessageHolder take = gcQueue.take();
 
-        take.type = MessageType.ONE;
-        take.subscriptions = subscriptions;
-        take.message1 = message1;
+            take.type = MessageType.ONE;
+            take.subs = subscriptions;
+            take.message1 = message1;
 
-        this.dispatchQueue.put(take);
+            this.dispatchQueue.put(take);
+        } catch (InterruptedException e) {
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1));
+        }
     }
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable {
-        MessageHolder take = gcQueue.take();
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2) {
+        try {
+            MessageHolder take = gcQueue.take();
 
-        take.type = MessageType.TWO;
-        take.subscriptions = subscriptions;
-        take.message1 = message1;
-        take.message2 = message2;
+            take.type = MessageType.TWO;
+            take.subs = subscriptions;
+            take.superSubs = superSubscriptions;
+            take.message1 = message1;
+            take.message2 = message2;
 
-        this.dispatchQueue.put(take);
+            this.dispatchQueue.put(take);
+        } catch (InterruptedException e) {
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2));
+        }
     }
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable {
-        MessageHolder take = gcQueue.take();
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2, final Object message3) {
+        try {
+            MessageHolder take = gcQueue.take();
 
-        take.type = MessageType.THREE;
-        take.subscriptions = subscriptions;
-        take.message1 = message1;
-        take.message2 = message2;
-        take.message3 = message3;
+            take.type = MessageType.THREE;
+            take.subs = subscriptions;
+            take.superSubs = superSubscriptions;
+            take.message1 = message1;
+            take.message2 = message2;
+            take.message3 = message3;
 
-        this.dispatchQueue.put(take);
+            this.dispatchQueue.put(take);
+        } catch (InterruptedException e) {
+            errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
+                                                                      .setCause(e)
+                                                                      .setPublishedObject(message1, message2, message3));
+        }
     }
 
     @Override

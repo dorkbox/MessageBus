@@ -17,6 +17,7 @@ package dorkbox.messagebus.subscription;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.error.ErrorHandler;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -84,7 +85,7 @@ class Subscription<T> {
     }
 
     public abstract
-    Entry<T> createEntry(final Object listener, final Entry head);
+    Entry<T> createEntry(final Object listener, final Entry<T> head);
 
     /**
      * single writer principle!
@@ -151,13 +152,13 @@ class Subscription<T> {
     }
 
     public abstract
-    void publish(final Object message) throws Throwable;
+    boolean publish(final ErrorHandler errorHandler, final Object message);
 
     public abstract
-    void publish(final Object message1, final Object message2) throws Throwable;
+    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2);
 
     public abstract
-    void publish(final Object message1, final Object message2, final Object message3) throws Throwable;
+    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3);
 
 
     @Override

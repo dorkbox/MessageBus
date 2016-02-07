@@ -38,6 +38,8 @@
 package dorkbox.messagebus.subscription.reflection;
 
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.error.ErrorHandler;
+import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Entry;
 import dorkbox.messagebus.subscription.Subscription;
 
@@ -80,55 +82,82 @@ class SubscriptionReflectionStrong extends Subscription<Object> {
 
     @Override
     public
-    Entry createEntry(final Object listener, final Entry head) {
-        return new Entry(listener, (Entry)head);
+    Entry<Object> createEntry(final Object listener, final Entry<Object> head) {
+        return new Entry<Object>(listener, head);
     }
 
     @Override
     public
-    void publish(final Object message) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler,final Object message) {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
-        Entry current = headREF.get(this);
+        Entry head = headREF.get(this);
+        Entry current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue();
             current = current.next();
 
-            invocation.invoke(listener, method, message);
+            try {
+                invocation.invoke(listener, method, message);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message));
+            }
         }
+
+        return head != null;  // true if we have something to publish to, otherwise false
     }
 
     @Override
     public
-    void publish(final Object message1, final Object message2) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2) {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
-        Entry current = headREF.get(this);
+        Entry head = headREF.get(this);
+        Entry current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue();
             current = current.next();
 
-            invocation.invoke(listener, method, message1, message2);
+            try {
+                invocation.invoke(listener, method, message1, message2);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message1, message2));
+            }
         }
+
+        return head != null;  // true if we have something to publish to, otherwise false
     }
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3) {
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
-        Entry current = headREF.get(this);
+        Entry head = headREF.get(this);
+        Entry current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue();
             current = current.next();
 
-            invocation.invoke(listener, method, message1, message2, message3);
+            try {
+                invocation.invoke(listener, method, message1, message2, message3);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message1, message2, message3));
+            }
         }
+
+        return head != null;  // true if we have something to publish to, otherwise false
     }
 }

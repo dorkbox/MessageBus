@@ -156,7 +156,7 @@ class MessageBus implements IMessageBus {
 
         switch (publishMode) {
             case Exact:
-                publisher = new PublisherExact(errorHandler, subscriptionManager);
+                publisher = new PublisherExact(subscriptionManager);
                 break;
 
             case ExactWithSuperTypes:
@@ -165,7 +165,7 @@ class MessageBus implements IMessageBus {
                 break;
         }
 
-        syncPublication = new Sync();
+        syncPublication = new Sync(errorHandler, subscriptionManager);
 
         // the disruptor is preferred, but if it cannot be loaded -- we want to try to continue working, hence the use of ArrayBlockingQueue
         if (useDisruptorForAsyncPublish) {

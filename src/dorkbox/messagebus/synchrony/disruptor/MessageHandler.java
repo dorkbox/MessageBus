@@ -17,8 +17,6 @@ package dorkbox.messagebus.synchrony.disruptor;
 
 import com.lmax.disruptor.LifecycleAware;
 import com.lmax.disruptor.WorkHandler;
-import dorkbox.messagebus.error.ErrorHandler;
-import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.synchrony.MessageHolder;
 import dorkbox.messagebus.synchrony.Synchrony;
@@ -32,14 +30,12 @@ public
 class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
 
     private final Synchrony syncPublication;
-    private final ErrorHandler errorHandler;
 
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     public
-    MessageHandler(final Synchrony syncPublication, final ErrorHandler errorHandler) {
+    MessageHandler(final Synchrony syncPublication) {
         this.syncPublication = syncPublication;
-        this.errorHandler = errorHandler;
     }
 
     @SuppressWarnings("Duplicates")
@@ -47,47 +43,22 @@ class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
     public
     void onEvent(final MessageHolder event) throws Exception {
         final int messageType = event.type;
-        final Subscription[] subscriptions = event.subscriptions;
+        final Subscription[] subs = event.subs;
+        final Subscription[] superSubs = event.superSubs;
 
-        try {
-            switch (messageType) {
-                case MessageType.ONE: {
-                    syncPublication.publish(subscriptions, event.message1);
-                    return;
-                }
-                case MessageType.TWO: {
-                    syncPublication.publish(subscriptions, event.message1, event.message2);
-                    return;
-                }
-                case MessageType.THREE: {
-                    syncPublication.publish(subscriptions, event.message1, event.message2, event.message3);
-                    //noinspection UnnecessaryReturnStatement
-                    return;
-                }
+        switch (messageType) {
+            case MessageType.ONE: {
+                syncPublication.publish(subs, superSubs, event.message1);
+                return;
             }
-        } catch (Throwable e) {
-            switch (messageType) {
-                case MessageType.ONE: {
-                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
-                                                                              .setCause(e)
-                                                                              .setPublishedObject(event.message1));
-                    return;
-                }
-                case MessageType.TWO: {
-                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
-                                                                              .setCause(e)
-                                                                              .setPublishedObject(event.message1, event.message2));
-                    return;
-                }
-                case MessageType.THREE: {
-                    errorHandler.handlePublicationError(new PublicationError().setMessage("Error during invocation of message handler.")
-                                                                              .setCause(e)
-                                                                              .setPublishedObject(event.message1,
-                                                                                                  event.message2,
-                                                                                                  event.message3));
-                    //noinspection UnnecessaryReturnStatement
-                    return;
-                }
+            case MessageType.TWO: {
+                syncPublication.publish(subs, superSubs, event.message1, event.message2);
+                return;
+            }
+            case MessageType.THREE: {
+                syncPublication.publish(subs, superSubs, event.message1, event.message2, event.message3);
+                //noinspection UnnecessaryReturnStatement
+                return;
             }
         }
     }

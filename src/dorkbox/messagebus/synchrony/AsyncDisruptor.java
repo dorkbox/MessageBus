@@ -37,6 +37,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 /**
+ * By default, it is the calling thread that has to get the subscriptions, which the sync/async logic then uses.
+ *
+ * The exception to this rule is when checking/calling DeadMessage publication.
+ *
+ *
  * @author dorkbox, llc Date: 2/3/16
  */
 public final
@@ -62,7 +67,7 @@ class AsyncDisruptor implements Synchrony {
         // setup the work handlers
         handlers = new MessageHandler[numberOfThreads];
         for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new MessageHandler(syncPublication, errorHandler);  // exactly one per thread is used
+            handlers[i] = new MessageHandler(syncPublication);  // exactly one per thread is used
         }
 
 
@@ -121,12 +126,13 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1) throws Throwable {
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
         job.type = MessageType.ONE;
-        job.subscriptions = subscriptions;
+        job.subs = subscriptions;
+        job.superSubs = superSubscriptions;
         job.message1 = message1;
 
         ringBuffer.publish(seq);
@@ -134,12 +140,13 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2) throws Throwable  {
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
         job.type = MessageType.TWO;
-        job.subscriptions = subscriptions;
+        job.subs = subscriptions;
+        job.superSubs = superSubscriptions;
         job.message1 = message1;
         job.message2 = message2;
 
@@ -148,12 +155,13 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Object message1, final Object message2, final Object message3) throws Throwable  {
+    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2, final Object message3) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
         job.type = MessageType.THREE;
-        job.subscriptions = subscriptions;
+        job.subs = subscriptions;
+        job.superSubs = superSubscriptions;
         job.message1 = message1;
         job.message3 = message2;
         job.message2 = message3;

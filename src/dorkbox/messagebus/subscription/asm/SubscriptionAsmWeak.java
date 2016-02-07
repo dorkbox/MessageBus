@@ -39,6 +39,8 @@ package dorkbox.messagebus.subscription.asm;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.error.ErrorHandler;
+import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Entry;
 import dorkbox.messagebus.subscription.Subscription;
 
@@ -90,7 +92,7 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry head) {
+    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry<WeakReference<Object>> head) {
         return new Entry<WeakReference<Object>>(new WeakReference<Object>(listener), head);
     }
 
@@ -114,12 +116,13 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    void publish(final Object message) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler,final Object message) {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
 
-        Entry<WeakReference<Object>> current = cast(headREF.get(this));
+        Entry<WeakReference<Object>> head = cast(headREF.get(this));
+        Entry<WeakReference<Object>> current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue().get();
@@ -134,18 +137,28 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            invocation.invoke(listener, handler, handleIndex, message);
+            try {
+                invocation.invoke(listener, handler, handleIndex, message);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message));
+            }
         }
+
+        // because the value can be GC'd at any time, this is the best guess possible
+        return head != null && head.getValue() != null;  // true if we have something to publish to, otherwise false
     }
 
     @Override
     public
-    void publish(final Object message1, final Object message2) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler,final Object message1, final Object message2) {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
 
-        Entry<WeakReference<Object>> current = cast(headREF.get(this));
+        Entry<WeakReference<Object>> head = cast(headREF.get(this));
+        Entry<WeakReference<Object>> current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue().get();
@@ -160,18 +173,28 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            invocation.invoke(listener, handler, handleIndex, message1, message2);
+            try {
+                invocation.invoke(listener, handler, handleIndex, message1, message2);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message1, message2));
+            }
         }
+
+        // because the value can be GC'd at any time, this is the best guess possible
+        return head != null && head.getValue() != null;  // true if we have something to publish to, otherwise false
     }
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) throws Throwable {
+    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3) {
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
 
-        Entry<WeakReference<Object>> current = cast(headREF.get(this));
+        Entry<WeakReference<Object>> head = cast(headREF.get(this));
+        Entry<WeakReference<Object>> current = head;
         Object listener;
         while (current != null) {
             listener = current.getValue().get();
@@ -186,8 +209,17 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+            try {
+                invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+            } catch (Throwable e) {
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
+                                                                          .setCause(e)
+                                                                          .setPublishedObject(message1, message2, message3));
+            }
         }
+
+        // because the value can be GC'd at any time, this is the best guess possible
+        return head != null && head.getValue() != null;  // true if we have something to publish to, otherwise false
     }
 
     @SuppressWarnings("unchecked")
