@@ -18,15 +18,16 @@ package dorkbox.messagebus.subscription;
 //
 // not thread-safe!!!
 //
+
 public
 class Entry<T> {
     private final T value;
 
-    private Entry next;
-    private Entry prev;
+    private Entry<T> next;
+    private Entry<T> prev;
 
     public
-    Entry(T value, Entry next) {
+    Entry(T value, Entry<T> next) {
         if (next != null) {
             this.next = next;
             next.prev = this;
