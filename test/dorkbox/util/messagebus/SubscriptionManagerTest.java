@@ -27,8 +27,8 @@ import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
 import dorkbox.util.messagebus.common.SubscriptionValidator;
 import dorkbox.util.messagebus.common.TestUtil;
-import dorkbox.util.messagebus.error.DefaultErrorHandler;
-import dorkbox.util.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.DefaultErrorHandler;
+import dorkbox.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.listeners.AbstractMessageListener;
 import dorkbox.util.messagebus.listeners.ICountableListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
@@ -44,7 +44,7 @@ import dorkbox.util.messagebus.messages.IMultipartMessage;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
-import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.messagebus.subscription.SubscriptionManager;
 import org.junit.Test;
 
 /**

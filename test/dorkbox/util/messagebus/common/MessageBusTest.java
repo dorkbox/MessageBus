@@ -22,9 +22,9 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.MessageBus;
-import dorkbox.util.messagebus.error.IPublicationErrorHandler;
-import dorkbox.util.messagebus.error.PublicationError;
+import dorkbox.messagebus.MessageBus;
+import dorkbox.messagebus.error.IPublicationErrorHandler;
+import dorkbox.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import org.junit.Before;
 

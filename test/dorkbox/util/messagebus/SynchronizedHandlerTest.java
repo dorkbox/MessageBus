@@ -22,8 +22,9 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.annotations.Synchronized;
+import dorkbox.messagebus.IMessageBus;
+import dorkbox.messagebus.annotations.Handler;
+import dorkbox.messagebus.annotations.Synchronized;
 import dorkbox.util.messagebus.common.MessageBusTest;
 import org.junit.Test;
 

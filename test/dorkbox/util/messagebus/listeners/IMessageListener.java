@@ -22,7 +22,7 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.messages.IMessage;
 
 /**

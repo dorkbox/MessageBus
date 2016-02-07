@@ -22,9 +22,9 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.AssertSupport;
-import dorkbox.util.messagebus.common.MessageHandler;
+import dorkbox.messagebus.common.MessageHandler;
 import org.junit.Test;
 
 import java.io.BufferedReader;

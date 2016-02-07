@@ -3,7 +3,9 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.messagebus.IMessageBus;
+import dorkbox.messagebus.MessageBus;
+import dorkbox.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.MessageBusTest;
 import org.junit.Test;
 

@@ -22,9 +22,10 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.annotations.Handler;
+import dorkbox.messagebus.MessageBus;
+import dorkbox.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.*;
-import dorkbox.util.messagebus.error.DeadMessage;
+import dorkbox.messagebus.error.DeadMessage;
 import dorkbox.util.messagebus.listeners.IMessageListener;
 import dorkbox.util.messagebus.listeners.MessagesListener;
 import dorkbox.util.messagebus.listeners.ObjectListener;

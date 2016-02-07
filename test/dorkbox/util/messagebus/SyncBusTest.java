@@ -22,12 +22,14 @@
  */
 package dorkbox.util.messagebus;
 
+import dorkbox.messagebus.IMessageBus;
+import dorkbox.messagebus.MessageBus;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
 import dorkbox.util.messagebus.common.MessageBusTest;
 import dorkbox.util.messagebus.common.TestUtil;
-import dorkbox.util.messagebus.error.IPublicationErrorHandler;
-import dorkbox.util.messagebus.error.PublicationError;
+import dorkbox.messagebus.error.IPublicationErrorHandler;
+import dorkbox.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.listeners.ExceptionThrowingListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
 import dorkbox.util.messagebus.listeners.MessagesListener;

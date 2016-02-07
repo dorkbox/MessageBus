@@ -1,24 +1,24 @@
 MessageBus
 ==========
 
-The MessageBus is a fork from MBassador, and it is a high-performance, zero GC, custom distribution that supports method signature
-parameters > 1 & varity arguments.
+The MessageBus is a light-weight message/event bus implementation that follows the publish/subscribe pattern.  It is designed for ease of
+ use and simplicity, and aims for **maximum performance** and **zero garbage**. The core of this implementation is the use of the "single
+  writer principle" as described by [Martin Thompson]()
+
+
+fork from MBassador, and it is a high-performance, zero GC, custom distribution that supports method 
+signature parameters > 1.
 
 *Many* features from the original MBassador have been removed, specifically the ONLY things to remain for a handler are  
 - rejectSubtypes
 - enabled
 
-Additionally, the bus *must* explicitly be started now (because of errorhandling when starting the disruptor), 
+Additionally, the bus *must* explicitly be started now (because of how errorhandling is initialized), 
 ie: ```.start()```, and conversely ```.shutdown()``` is necessary to shutdown the disruptor/thread pool. During the distillation
 process, the API has changed, and the only way to publish now is to actually call ```bus.publish()``` or ```bus.publishAsync()```, of 
 note, the asynchronous publication of messages is not in a guaranteed order.
   
   
-The largest change however, is the ability to publish N-number of objects. A single object (or all-matching-types, when more than one)
-will ALSO be sent (VarArg style) to any handler that accepts an array of the correct type. It is important to note, that you
-cannot register a handler(String[] s), and ONLY have it accept objects of type String[]. This is because of how the JVM interprets VarArgs.   
-
-   
 In the following example, "s" will get published to the handler(String s) and to the handler(String[] s) and handler(String... s).
 ```
     bus.publish("s");

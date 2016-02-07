@@ -22,8 +22,8 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.subscription.Subscription;
-import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.messagebus.subscription.Subscription;
+import dorkbox.messagebus.subscription.SubscriptionManager;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;

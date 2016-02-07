@@ -22,9 +22,9 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.util.messagebus.MessageBus;
-import dorkbox.util.messagebus.PubSubSupport;
-import dorkbox.util.messagebus.subscription.SubscriptionManager;
+import dorkbox.messagebus.MessageBus;
+import dorkbox.messagebus.PubSubSupport;
+import dorkbox.messagebus.subscription.SubscriptionManager;
 
 import java.util.Iterator;
 import java.util.List;
