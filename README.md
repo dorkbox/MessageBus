@@ -3,7 +3,7 @@ MessageBus
 
 The MessageBus is a light-weight message/event bus implementation that follows the publish/subscribe pattern.  It is designed for ease of
  use and simplicity, and aims for **maximum performance** and **zero garbage**. The core of this implementation is the use of the "single
-  writer principle" as described by [Martin Thompson]()
+  writer principle" as described by [Nitsan Wakart](http://psy-lob-saw.blogspot.com/2012/12/atomiclazyset-is-performance-win-for.html)
 
 
 fork from MBassador, and it is a high-performance, zero GC, custom distribution that supports method 

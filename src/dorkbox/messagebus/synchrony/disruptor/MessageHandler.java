@@ -17,7 +17,7 @@ package dorkbox.messagebus.synchrony.disruptor;
 
 import com.lmax.disruptor.LifecycleAware;
 import com.lmax.disruptor.WorkHandler;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.synchrony.MessageHolder;
@@ -32,12 +32,12 @@ public
 class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
 
     private final Synchrony syncPublication;
-    private final ErrorHandlingSupport errorHandler;
+    private final ErrorHandler errorHandler;
 
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     public
-    MessageHandler(final Synchrony syncPublication, final ErrorHandlingSupport errorHandler) {
+    MessageHandler(final Synchrony syncPublication, final ErrorHandler errorHandler) {
         this.syncPublication = syncPublication;
         this.errorHandler = errorHandler;
     }

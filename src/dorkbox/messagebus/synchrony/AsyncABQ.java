@@ -15,10 +15,10 @@
  */
 package dorkbox.messagebus.synchrony;
 
+import dorkbox.messagebus.common.NamedThreadFactory;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Subscription;
-import dorkbox.messagebus.common.NamedThreadFactory;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
 
 import java.util.ArrayDeque;
@@ -49,7 +49,7 @@ class AsyncABQ implements Synchrony {
 
 
     public
-    AsyncABQ(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {
+    AsyncABQ(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
 
@@ -61,7 +61,7 @@ class AsyncABQ implements Synchrony {
             void run() {
                 final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ.this.dispatchQueue;
                 final Synchrony syncPublication1 = syncPublication;
-                final ErrorHandlingSupport errorHandler1 = errorHandler;
+                final ErrorHandler errorHandler1 = errorHandler;
 
                 while (!AsyncABQ.this.shuttingDown) {
                     process(IN_QUEUE, syncPublication1, errorHandler1);
@@ -86,7 +86,7 @@ class AsyncABQ implements Synchrony {
 
     @SuppressWarnings("Duplicates")
     private
-    void process(final ArrayBlockingQueue<MessageHolder> queue, final Synchrony sync, final ErrorHandlingSupport errorHandler) {
+    void process(final ArrayBlockingQueue<MessageHolder> queue, final Synchrony sync, final ErrorHandler errorHandler) {
         MessageHolder event = null;
         int messageType = MessageType.ONE;
         Subscription[] subscriptions;

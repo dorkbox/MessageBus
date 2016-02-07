@@ -31,7 +31,7 @@ import java.lang.annotation.*;
  * This feature will reduce performance of message publication. Try to avoid shared mutable state whenever possible
  * and use immutable data instead.
  * <p/>
- * Note: Unsynchronized handlers may still be invoked concurrently with synchronized ones
+ * Note: Unsynchronized handlers may be invoked concurrently with synchronized ones
  *
  * @author bennidi
  *         Date: 3/31/13

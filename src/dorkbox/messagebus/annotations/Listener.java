@@ -39,10 +39,12 @@ import java.lang.annotation.*;
 public
 @interface Listener {
     /**
-     * BY DEFAULT, REFERENCES to message listeners ARE WEAK to eliminate risks of memory leaks in managed environments (such as spring).
+     * By default, references to message listeners (these are the objects/methods that receive messages) are strong. This default can be
+     * changed via a static boolean (during startup, see MessageBus.useStrongReferencesByDefault).
      *
-     * It is possible to use strong references instead.
+     * The benefits to use WEAK references, is to eliminate risks of memory leaks in managed environments (such as spring).
+     *
+     * the default here "Undefined" here so that the static boolean (MessageBus.useStrongReferencesByDefault) takes priority
      */
-    References references() default References.Weak;
-
+    References references() default References.Undefined;
 }

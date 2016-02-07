@@ -15,9 +15,9 @@
  */
 package dorkbox.messagebus.subscription.asm;
 
+import dorkbox.messagebus.common.MessageHandler;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.subscription.SubscriptionFactory;
-import dorkbox.messagebus.common.MessageHandler;
 
 /**
  * @author dorkbox, llc Date: 2/3/16
@@ -25,14 +25,27 @@ import dorkbox.messagebus.common.MessageHandler;
 public
 class AsmFactory implements SubscriptionFactory {
 
+    private final boolean useStrongReferencesByDefault;
+
     public
-    AsmFactory() {
+    AsmFactory(final boolean useStrongReferencesByDefault) {
+        this.useStrongReferencesByDefault = useStrongReferencesByDefault;
     }
 
     @Override
     public
     Subscription create(final Class<?> listenerClass, final MessageHandler handler) {
-        if (handler.isWeakReference()) {
+        // figure out what kind of references we want to use by default, as specified by MessageBus.useStrongReferencesByDefault
+        final int referenceType = handler.getReferenceType();
+        if (referenceType == MessageHandler.UNDEFINED) {
+            if (useStrongReferencesByDefault) {
+                return new SubscriptionAsmStrong(listenerClass, handler);
+            }
+            else {
+                return new SubscriptionAsmWeak(listenerClass, handler);
+            }
+        }
+        else if (referenceType == MessageHandler.WEAK) {
             return new SubscriptionAsmWeak(listenerClass, handler);
         }
         else {

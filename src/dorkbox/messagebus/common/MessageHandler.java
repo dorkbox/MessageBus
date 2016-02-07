@@ -107,6 +107,10 @@ class MessageHandler {
         return finalMethods.toArray(EMPTY_MESSAGEHANDLERS);
     }
 
+    public static final int WEAK = -1;
+    public static final int UNDEFINED = 0;
+    public static final int STRONG = 1;
+
     private final Method method;
 
 
@@ -114,7 +118,7 @@ class MessageHandler {
     private final boolean acceptsSubtypes;
 
     private final boolean isSynchronized;
-    private final boolean isWeakReference;
+    private final int referenceType;
 
     private
     MessageHandler(final Class<?> clazz, final Method method, final Handler config) {
@@ -128,7 +132,17 @@ class MessageHandler {
         this.isSynchronized = ReflectionUtils.getAnnotation(method, Synchronized.class) != null;
 
         Listener annotation = ReflectionUtils.getAnnotation(clazz, Listener.class);
-        this.isWeakReference = annotation != null && annotation.references().equals(References.Weak);
+        if (annotation == null || annotation.references() == null || annotation.references()
+                                                                               .equals(References.Undefined)) {
+            this.referenceType = UNDEFINED;
+        }
+        else if (annotation.references()
+                           .equals(References.Weak)) {
+            this.referenceType = WEAK;
+        }
+        else {
+            this.referenceType = STRONG;
+        }
     }
 
     public final
@@ -137,9 +151,9 @@ class MessageHandler {
     }
 
     public final
-    boolean isWeakReference() {
+    int getReferenceType() {
         // this is checked every time a new subscription is created.
-        return isWeakReference;
+        return referenceType;
     }
 
     public final

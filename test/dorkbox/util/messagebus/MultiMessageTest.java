@@ -25,8 +25,6 @@ public class MultiMessageTest extends MessageBusTest {
         IMessageBus bus = new MessageBus(IMessageBus.PublishMode.Exact,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
-        bus.start();
-
         MultiListener listener1 = new MultiListener();
         bus.subscribe(listener1);
         bus.unsubscribe(listener1);
@@ -58,8 +56,6 @@ public class MultiMessageTest extends MessageBusTest {
         IMessageBus bus = new MessageBus(IMessageBus.PublishMode.ExactWithSuperTypes,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
-        bus.start();
-
         MultiListener listener1 = new MultiListener();
         bus.subscribe(listener1);
         bus.unsubscribe(listener1);

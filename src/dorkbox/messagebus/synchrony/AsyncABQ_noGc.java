@@ -16,7 +16,7 @@
 package dorkbox.messagebus.synchrony;
 
 import dorkbox.messagebus.common.NamedThreadFactory;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
@@ -53,7 +53,7 @@ class AsyncABQ_noGc implements Synchrony {
 
 
     public
-    AsyncABQ_noGc(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {
+    AsyncABQ_noGc(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
         this.gcQueue = new ArrayBlockingQueue<MessageHolder>(1024);
@@ -73,7 +73,7 @@ class AsyncABQ_noGc implements Synchrony {
                 final ArrayBlockingQueue<MessageHolder> OUT_QUEUE = AsyncABQ_noGc.this.gcQueue;
 
                 final Synchrony syncPublication1 = syncPublication;
-                final ErrorHandlingSupport errorHandler1 = errorHandler;
+                final ErrorHandler errorHandler1 = errorHandler;
 
                 while (!AsyncABQ_noGc.this.shuttingDown) {
                     process(IN_QUEUE, OUT_QUEUE, syncPublication1, errorHandler1);
@@ -101,7 +101,7 @@ class AsyncABQ_noGc implements Synchrony {
     void process(final ArrayBlockingQueue<MessageHolder> queue,
                  final ArrayBlockingQueue<MessageHolder> gcQueue,
                  final Synchrony sync,
-                 final ErrorHandlingSupport errorHandler) {
+                 final ErrorHandler errorHandler) {
 
         MessageHolder event = null;
         int messageType = MessageType.ONE;

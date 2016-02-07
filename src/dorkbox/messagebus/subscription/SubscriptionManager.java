@@ -103,13 +103,13 @@ class SubscriptionManager {
                                                            "subsSuperMulti");
 
     public
-    SubscriptionManager() {
+    SubscriptionManager(final boolean useStrongReferencesByDefault) {
         // not all platforms support ASM. ASM is our default, and is just-as-fast and directly invoking the method
         if (MessageBus.useAsmForDispatch) {
-            this.subscriptionFactory = new AsmFactory();
+            this.subscriptionFactory = new AsmFactory(useStrongReferencesByDefault);
         }
         else {
-            this.subscriptionFactory = new ReflectionFactory();
+            this.subscriptionFactory = new ReflectionFactory(useStrongReferencesByDefault);
         }
 
         classUtils = new ClassUtils();

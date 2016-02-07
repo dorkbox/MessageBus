@@ -15,21 +15,34 @@
  */
 package dorkbox.messagebus.subscription.reflection;
 
-import dorkbox.messagebus.subscription.SubscriptionFactory;
 import dorkbox.messagebus.common.MessageHandler;
 import dorkbox.messagebus.subscription.Subscription;
+import dorkbox.messagebus.subscription.SubscriptionFactory;
 
 public
 class ReflectionFactory implements SubscriptionFactory {
 
+    private final boolean useStrongReferencesByDefault;
+
     public
-    ReflectionFactory() {
+    ReflectionFactory(final boolean useStrongReferencesByDefault) {
+        this.useStrongReferencesByDefault = useStrongReferencesByDefault;
     }
 
     @Override
     public
     Subscription create(final Class<?> listenerClass, final MessageHandler handler) {
-        if (handler.isWeakReference()) {
+        // figure out what kind of references we want to use by default, as specified by MessageBus.useStrongReferencesByDefault
+        final int referenceType = handler.getReferenceType();
+        if (referenceType == MessageHandler.UNDEFINED) {
+            if (useStrongReferencesByDefault) {
+                return new SubscriptionReflectionStrong(listenerClass, handler);
+            }
+            else {
+                return new SubscriptionReflectionWeak(listenerClass, handler);
+            }
+        }
+        else if (referenceType == MessageHandler.WEAK) {
             return new SubscriptionReflectionWeak(listenerClass, handler);
         }
         else {

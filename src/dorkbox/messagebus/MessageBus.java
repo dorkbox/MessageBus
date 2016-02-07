@@ -15,9 +15,8 @@
  */
 package dorkbox.messagebus;
 
-import dorkbox.messagebus.error.DefaultErrorHandler;
-import dorkbox.messagebus.synchrony.Sync;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
+import dorkbox.messagebus.error.IPublicationErrorHandler;
 import dorkbox.messagebus.publication.Publisher;
 import dorkbox.messagebus.publication.PublisherExact;
 import dorkbox.messagebus.publication.PublisherExactWithSuperTypes;
@@ -25,6 +24,7 @@ import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.messagebus.synchrony.AsyncABQ;
 import dorkbox.messagebus.synchrony.AsyncABQ_noGc;
 import dorkbox.messagebus.synchrony.AsyncDisruptor;
+import dorkbox.messagebus.synchrony.Sync;
 import dorkbox.messagebus.synchrony.Synchrony;
 
 /**
@@ -39,10 +39,45 @@ import dorkbox.messagebus.synchrony.Synchrony;
 public
 class MessageBus implements IMessageBus {
 
-    public static boolean useDisruptorForAsyncPublish = true;
+    /**
+     * By default, we use ASM for accessing methods during the dispatch of messages. This is only available on certain platforms, and so
+     * it will gracefully 'fallback' to using standard java reflection to access the methods. "Standard java reflection" is not as fast
+     * as ASM, but only marginally.
+     *
+     * If you would like to use java reflection for accessing methods, set this value to false.
+     */
     public static boolean useAsmForDispatch = true;
 
-    public static boolean useNoGarbageVersionOfABQ = true;
+    /**
+     * 'useDisruptorForAsyncPublish' specifies to use the LMAX Disruptor for asynchronous dispatch of published messages. The benefit of
+     * such is that it is VERY high performance and generates zero garbage on the heap. The alternative (if this value is false), is to
+     * use an ArrayBlockingQueue, which has a "non-garbage" version (which is zero garbage, but slow-ish) and it's opposite (which
+     * generates garbage on the heap, but is faster).
+     *
+     * The disruptor is faster and better than either of these two, however because of it's use of unsafe, it is not available in all
+     * circumstances.
+     */
+    public static boolean useDisruptorForAsyncPublish = true;
+
+    /**
+     * When using the ArrayBlockingQueue for the asynchronous dispatch of published messages, there are two modes of operation. A
+     * "non-garbage" version (which is zero garbage, but slow-ish) and it's opposite (which generates garbage on the heap, but is faster).
+     *
+     * By default, we strive to prevent garbage on the heap, so we use the "non-garbage" version. If you don't care about generating
+     * garbage on the heap, set this value to false.
+     */
+    public static boolean useZeroGarbageVersionOfABQ = true;
+
+    /**
+     * By default, we use strong references when saving the subscribed listeners (these are the classes & methods that receive messages),
+     * however in certain environments (ie: spring), it is desirable to use weak references -- so that there are no memory leaks during
+     * the container lifecycle (or, more specifically, so one doesn't have to manually manage the memory).
+     *
+     * Using weak references is a tad slower than using strong references, since there are additional steps taken when there are orphaned
+     * references (when GC occurs) that have to be cleaned up. This cleanup occurs during message publication
+     */
+    public static boolean useStrongReferencesByDefault = true;
+
 
     static {
         // check to see if we can use ASM for method access (it's a LOT faster than reflection). By default, we use ASM.
@@ -67,14 +102,13 @@ class MessageBus implements IMessageBus {
         }
     }
 
-    private final ErrorHandlingSupport errorHandler;
+    private final ErrorHandler errorHandler;
 
     private final SubscriptionManager subscriptionManager;
 
     private final Publisher publisher;
     private final Synchrony syncPublication;
     private final Synchrony asyncPublication;
-
 
     /**
      * By default, will permit subType matching, and will use half of CPUs available for dispatching async messages
@@ -113,12 +147,12 @@ class MessageBus implements IMessageBus {
         // round to the nearest power of 2
         numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads) - 1));
 
-        this.errorHandler = new DefaultErrorHandler();
+        this.errorHandler = new ErrorHandler();
 
         /**
          * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
          */
-        this.subscriptionManager = new SubscriptionManager();
+        this.subscriptionManager = new SubscriptionManager(useStrongReferencesByDefault);
 
         switch (publishMode) {
             case Exact:
@@ -137,7 +171,7 @@ class MessageBus implements IMessageBus {
         if (useDisruptorForAsyncPublish) {
             asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, syncPublication);
         } else {
-            if (useNoGarbageVersionOfABQ) {
+            if (useZeroGarbageVersionOfABQ) {
                 // no garbage is created, but this is slow (but faster than other messagebus implementations)
                 asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler, syncPublication);
             }
@@ -159,6 +193,11 @@ class MessageBus implements IMessageBus {
         return numberOfThreads;
     }
 
+
+    /**
+     * Subscribe all handlers of the given listener. Any listener is only subscribed once and
+     * subsequent subscriptions of an already subscribed listener will be silently ignored
+     */
     @Override
     public
     void subscribe(final Object listener) {
@@ -170,6 +209,16 @@ class MessageBus implements IMessageBus {
         subscriptionManager.subscribe(listener);
     }
 
+
+    /**
+     * Immediately remove all registered message handlers (if any) of the given listener.
+     *
+     * When this call returns all handlers have effectively been removed and will not
+     * receive any messages (provided that running publications/iterators in other threads
+     * have not yet obtained a reference to the listener)
+     * <p>
+     * A call to this method passing any object that is not subscribed will not have any effect and is silently ignored.
+     */
     @Override
     public
     void unsubscribe(final Object listener) {
@@ -181,60 +230,114 @@ class MessageBus implements IMessageBus {
         subscriptionManager.unsubscribe(listener);
     }
 
+
+    /**
+     * Synchronously publish a message to all registered listeners. This includes listeners
+     * defined for super types of the given message type, provided they are not configured
+     * to reject valid subtypes. The call returns when all matching handlers of all registered
+     * listeners have been notified (invoked) of the message.
+     */
     @Override
     public
     void publish(final Object message) {
         publisher.publish(syncPublication, message);
     }
 
+
+    /**
+     * Synchronously publish <b>TWO</b> messages to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured
+     * to reject valid subtypes. The call returns when all matching handlers of all registered listeners have
+     * been notified (invoked) of the message.
+     */
     @Override
     public
     void publish(final Object message1, final Object message2) {
         publisher.publish(syncPublication, message1, message2);
     }
 
+
+    /**
+     * Synchronously publish <b>THREE</b> messages to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured
+     * to reject valid subtypes. The call returns when all matching handlers of all registered listeners have
+     * been notified (invoked) of the message.
+     */
     @Override
     public
     void publish(final Object message1, final Object message2, final Object message3) {
         publisher.publish(syncPublication, message1, message2, message3);
     }
 
+
+    /**
+     * Publish the message asynchronously to all registered listeners (that match the signature). This includes
+     * listeners defined for super types of the given message type, provided they are not configured to reject
+     * valid subtypes. This call returns immediately.
+     */
     @Override
     public
     void publishAsync(final Object message) {
         publisher.publish(asyncPublication, message);
     }
 
+
+    /**
+     * Publish <b>TWO</b> messages asynchronously to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured
+     * to reject valid subtypes. This call returns immediately.
+     */
     @Override
     public
     void publishAsync(final Object message1, final Object message2) {
         publisher.publish(asyncPublication, message1, message2);
     }
 
+
+    /**
+     * Publish <b>THREE</b> messages asynchronously to all registered listeners (that match the signature). This
+     * includes listeners defined for super types of the given message type, provided they are not configured to
+     * reject valid subtypes. This call returns immediately.
+     */
     @Override
     public
     void publishAsync(final Object message1, final Object message2, final Object message3) {
         publisher.publish(asyncPublication, message1, message2, message3);
     }
 
+
+    /**
+     * Publication errors may occur at various points of time during message delivery. A handler may throw an exception,
+     * may not be accessible due to security constraints or is not annotated properly.
+     *
+     * In any of all possible cases a publication error is created and passed to each of the registered error handlers.
+     * A call to this method will add the given error handler to the chain
+     */
+    @Override
+    public
+    void addErrorHandler(final IPublicationErrorHandler errorHandler) {
+        this.errorHandler.addErrorHandler(errorHandler);
+    }
+
+
+    /**
+     * Check whether any asynchronous message publications are pending to be processed
+     *
+     * @return true if any unfinished message publications are found
+     */
     @Override
     public final
     boolean hasPendingMessages() {
         return asyncPublication.hasPendingMessages();
     }
 
-    @Override
-    public final
-    ErrorHandlingSupport getErrorHandler() {
-        return errorHandler;
-    }
 
-    @Override
-    public
-    void start() {
-        errorHandler.init();
-    }
-
+    /**
+     * Shutdown the bus such that it will stop delivering asynchronous messages. Executor service and
+     * other internally used threads will be shutdown gracefully.
+     * <p>
+     * After calling shutdown it is not safe to further use the message bus.
+     */
     @Override
     public
     void shutdown() {

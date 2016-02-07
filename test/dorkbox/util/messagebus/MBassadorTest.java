@@ -130,8 +130,7 @@ public class MBassadorTest extends MessageBusTest {
         };
 
         final MessageBus bus = new MessageBus();
-        bus.getErrorHandler().addErrorHandler(ExceptionCounter);
-        bus.start();
+        bus.addErrorHandler(ExceptionCounter);
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);

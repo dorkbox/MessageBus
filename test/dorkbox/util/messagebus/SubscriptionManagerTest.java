@@ -22,13 +22,12 @@
  */
 package dorkbox.util.messagebus;
 
+import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
 import dorkbox.util.messagebus.common.SubscriptionValidator;
 import dorkbox.util.messagebus.common.TestUtil;
-import dorkbox.messagebus.error.DefaultErrorHandler;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
 import dorkbox.util.messagebus.listeners.AbstractMessageListener;
 import dorkbox.util.messagebus.listeners.ICountableListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
@@ -44,7 +43,6 @@ import dorkbox.util.messagebus.messages.IMultipartMessage;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
-import dorkbox.messagebus.subscription.SubscriptionManager;
 import org.junit.Test;
 
 /**
@@ -219,8 +217,7 @@ public class SubscriptionManagerTest extends AssertSupport {
     void testOverloadedMessageHandlers() {
         ListenerFactory listeners = listeners(Overloading.ListenerBase.class, Overloading.ListenerSub.class);
 
-        final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final SubscriptionManager subscriptionManager = new SubscriptionManager();
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(true);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
@@ -246,8 +243,7 @@ public class SubscriptionManagerTest extends AssertSupport {
     }
 
     private void runTestWith(final ListenerFactory listeners, final SubscriptionValidator validator) {
-        final ErrorHandlingSupport errorHandler = new DefaultErrorHandler();
-        final SubscriptionManager subscriptionManager = new SubscriptionManager();
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(true);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 

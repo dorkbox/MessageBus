@@ -15,9 +15,16 @@
  */
 package dorkbox.messagebus.synchrony;
 
-import com.lmax.disruptor.*;
+import com.lmax.disruptor.LiteBlockingWaitStrategy;
+import com.lmax.disruptor.PhasedBackoffWaitStrategy;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.Sequence;
+import com.lmax.disruptor.SequenceBarrier;
+import com.lmax.disruptor.Sequencer;
+import com.lmax.disruptor.WaitStrategy;
+import com.lmax.disruptor.WorkProcessor;
 import dorkbox.messagebus.common.NamedThreadFactory;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.synchrony.disruptor.EventBusFactory;
 import dorkbox.messagebus.synchrony.disruptor.MessageHandler;
@@ -41,7 +48,7 @@ class AsyncDisruptor implements Synchrony {
     private final Sequence workSequence;
 
     public
-    AsyncDisruptor(final int numberOfThreads, final ErrorHandlingSupport errorHandler, final Synchrony syncPublication) {
+    AsyncDisruptor(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
         // Now we setup the disruptor and work handlers
 
         ExecutorService executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,

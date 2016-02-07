@@ -73,19 +73,15 @@ class MessageBusTest extends AssertSupport {
     public
     MessageBus createBus() {
         MessageBus bus = new MessageBus();
-        bus.getErrorHandler()
-           .addErrorHandler(TestFailingHandler);
-        bus.start();
+        bus.addErrorHandler(TestFailingHandler);
         return bus;
     }
 
     public
     MessageBus createBus(ListenerFactory listeners) {
         MessageBus bus = new MessageBus();
-        bus.getErrorHandler()
-           .addErrorHandler(TestFailingHandler);
+        bus.addErrorHandler(TestFailingHandler);
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(bus, listeners), ConcurrentUnits);
-        bus.start();
         return bus;
     }
 }

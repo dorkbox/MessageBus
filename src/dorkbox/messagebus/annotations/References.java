@@ -28,11 +28,14 @@ package dorkbox.messagebus.annotations;
  */
 public enum References {
     /** This is the default */
+    Undefined,
+
+
     Strong,
 
     /**
      * This is provided so memory management in containers (such as spring) is easier. This is slower access than Strong refs because of
-     * the additional checks for orphan/GC'd objects in the subscription lists.
+     * the additional checks for orphan/GC'd objects in the subscription lists during publication.
      */
     Weak
 }

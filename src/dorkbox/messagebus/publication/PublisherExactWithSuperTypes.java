@@ -15,9 +15,9 @@
  */
 package dorkbox.messagebus.publication;
 
-import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.error.DeadMessage;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
+import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.messagebus.synchrony.Synchrony;
@@ -26,11 +26,11 @@ import dorkbox.messagebus.synchrony.Synchrony;
 public
 class PublisherExactWithSuperTypes implements Publisher {
 
-    private final ErrorHandlingSupport errorHandler;
+    private final ErrorHandler errorHandler;
     private final SubscriptionManager subManager;
 
     public
-    PublisherExactWithSuperTypes(final ErrorHandlingSupport errorHandler, final SubscriptionManager subManager) {
+    PublisherExactWithSuperTypes(final ErrorHandler errorHandler, final SubscriptionManager subManager) {
         this.errorHandler = errorHandler;
         this.subManager = subManager;
     }

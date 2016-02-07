@@ -37,7 +37,7 @@
  */
 package dorkbox.messagebus;
 
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.IPublicationErrorHandler;
 
 /**
  * A message bus offers facilities for publishing messages to the message handlers of registered listeners.
@@ -112,27 +112,25 @@ public interface IMessageBus extends PubSubSupport {
     }
 
     /**
+     * Publication errors may occur at various points of time during message delivery. A handler may throw an exception,
+     * may not be accessible due to security constraints or is not annotated properly.
+     * In any of all possible cases a publication error is created and passed to each of the registered error handlers.
+     * A call to this method will add the given error handler to the chain
+     */
+    void addErrorHandler(IPublicationErrorHandler errorHandler);
+
+    /**
      * Check whether any asynchronous message publications are pending to be processed
      *
      * @return true if any unfinished message publications are found
      */
     boolean hasPendingMessages();
 
-
-    /**
-     * @return the error handler responsible for handling publication and subscription errors
-     */
-    ErrorHandlingSupport getErrorHandler();
-
-    /**
-     * Starts the bus
-     */
-    void start();
-
     /**
      * Shutdown the bus such that it will stop delivering asynchronous messages. Executor service and
-     * other internally used threads will be shutdown gracefully. After calling shutdown it is not safe
-     * to further use the message bus.
+     * other internally used threads will be shutdown gracefully.
+     * <p>
+     * After calling shutdown it is not safe to further use the message bus.
      */
     void shutdown();
 }

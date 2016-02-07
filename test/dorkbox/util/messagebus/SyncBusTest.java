@@ -53,7 +53,6 @@ public class SyncBusTest extends MessageBusTest {
     public void testSynchronousMessagePublication() throws Exception {
 
         final IMessageBus bus = new MessageBus();
-        bus.start();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
@@ -113,8 +112,7 @@ public class SyncBusTest extends MessageBusTest {
         };
 
         final IMessageBus bus = new MessageBus();
-        bus.getErrorHandler().addErrorHandler(ExceptionCounter);
-        bus.start();
+        bus.addErrorHandler(ExceptionCounter);
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);
 

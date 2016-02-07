@@ -16,16 +16,16 @@
 package dorkbox.messagebus.synchrony.disruptor;
 
 import com.lmax.disruptor.ExceptionHandler;
-import dorkbox.messagebus.error.ErrorHandlingSupport;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 
 /**
  * @author dorkbox, llc Date: 2/3/16
  */
 public final class PublicationExceptionHandler<T> implements ExceptionHandler<T> {
-    private final ErrorHandlingSupport errorHandler;
+    private final ErrorHandler errorHandler;
 
-    public PublicationExceptionHandler(ErrorHandlingSupport errorHandler) {
+    public PublicationExceptionHandler(ErrorHandler errorHandler) {
         this.errorHandler = errorHandler;
     }
 

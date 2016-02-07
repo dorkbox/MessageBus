@@ -43,7 +43,6 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     public void testSingleThreadedSyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
         IMessageBus fifoBUs = new MessageBus();
-        fifoBUs.start();
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){
