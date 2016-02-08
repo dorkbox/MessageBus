@@ -20,6 +20,7 @@ import dorkbox.messagebus.subscription.SubscriptionManager;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 public final
@@ -66,17 +67,15 @@ class ClassUtils {
         // duplicates DO NOT MATTER
         if (classes == null) {
             // publish all super types of class
-            final Class<?>[] superTypes = ReflectionUtils.getSuperTypes(clazz);
-            final int length = superTypes.length;
-
-            final ArrayList<Class<?>> newList = new ArrayList<Class<?>>(length);
+            final Iterator<Class<?>> superTypesIterator = ReflectionUtils.getSuperTypes(clazz);
+            final ArrayList<Class<?>> newList = new ArrayList<Class<?>>(16);
 
             Class<?> c;
             final boolean isArray = clazz.isArray();
 
             if (isArray) {
-                for (int i = 0; i < length; i++) {
-                    c = superTypes[i];
+                while (superTypesIterator.hasNext()) {
+                    c = superTypesIterator.next();
                     c = getArrayClass(c);
 
                     if (c != clazz) {
@@ -85,8 +84,8 @@ class ClassUtils {
                 }
             }
             else {
-                for (int i = 0; i < length; i++) {
-                    c = superTypes[i];
+                while (superTypesIterator.hasNext()) {
+                    c = superTypesIterator.next();
 
                     if (c != clazz) {
                         newList.add(c);

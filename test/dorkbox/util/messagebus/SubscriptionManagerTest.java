@@ -32,7 +32,7 @@ import dorkbox.util.messagebus.listeners.AbstractMessageListener;
 import dorkbox.util.messagebus.listeners.ICountableListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
 import dorkbox.util.messagebus.listeners.IMultipartMessageListener;
-import dorkbox.util.messagebus.listeners.MessagesListener;
+import dorkbox.util.messagebus.listeners.MessageTypesListener;
 import dorkbox.util.messagebus.listeners.MultipartMessageListener;
 import dorkbox.util.messagebus.listeners.Overloading;
 import dorkbox.util.messagebus.listeners.StandardMessageListener;
@@ -65,6 +65,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               IMessageListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(IMessageListener.DefaultListener.class)
                              .handles(IMessage.class,
                                       AbstractMessage.class,
@@ -86,6 +87,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               AbstractMessageListener.NoSubtypesListener.class);
 
         final SubscriptionValidator subscriptionValidator = new SubscriptionValidator(listeners);
+
         subscriptionValidator.listener(AbstractMessageListener.NoSubtypesListener.class)
                              .handles(AbstractMessage.class);
 
@@ -98,15 +100,16 @@ public class SubscriptionManagerTest extends AssertSupport {
     @Test
     public
     void testMessagesListener() {
-        ListenerFactory listeners = listeners(MessagesListener.DefaultListener.class,
-                                              MessagesListener.DisabledListener.class,
-                                              MessagesListener.NoSubtypesListener.class);
+        ListenerFactory listeners = listeners(MessageTypesListener.DefaultListener.class,
+                                              MessageTypesListener.DisabledListener.class,
+                                              MessageTypesListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
-        expectedSubscriptions.listener(MessagesListener.NoSubtypesListener.class)
+
+        expectedSubscriptions.listener(MessageTypesListener.NoSubtypesListener.class)
                              .handles(MessageTypes.class);
 
-        expectedSubscriptions.listener(MessagesListener.DefaultListener.class)
+        expectedSubscriptions.listener(MessageTypesListener.DefaultListener.class)
                              .handles(MessageTypes.class);
 
         runTestWith(listeners, expectedSubscriptions);
@@ -120,6 +123,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               MultipartMessageListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(MultipartMessageListener.NoSubtypesListener.class)
                              .handles(MultipartMessage.class);
 
@@ -137,6 +141,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               IMultipartMessageListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(IMultipartMessageListener.NoSubtypesListener.class)
                              .handles(IMultipartMessage.class);
 
@@ -155,6 +160,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               StandardMessageListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(StandardMessageListener.NoSubtypesListener.class)
                              .handles(StandardMessage.class);
 
@@ -172,14 +178,15 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               ICountableListener.NoSubtypesListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
                              .handles(ICountable.class);
 
-//        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
-//                             .handles(MultipartMessage.class,
-//                                      IMultipartMessage.class,
-//                                      ICountable.class,
-//                                      StandardMessage.class);
+        expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
+                             .handles(MultipartMessage.class,
+                                      IMultipartMessage.class,
+                                      ICountable.class,
+                                      StandardMessage.class);
 
         runTestWith(listeners, expectedSubscriptions);
     }
@@ -191,10 +198,11 @@ public class SubscriptionManagerTest extends AssertSupport {
                                               ICountableListener.DisabledListener.class,
                                               IMultipartMessageListener.DefaultListener.class,
                                               IMultipartMessageListener.DisabledListener.class,
-                                              MessagesListener.DefaultListener.class,
-                                              MessagesListener.DisabledListener.class);
+                                              MessageTypesListener.DefaultListener.class,
+                                              MessageTypesListener.DisabledListener.class);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(ICountableListener.DefaultListener.class)
                              .handles(MultipartMessage.class,
                                       IMultipartMessage.class,
@@ -205,7 +213,7 @@ public class SubscriptionManagerTest extends AssertSupport {
                              .handles(MultipartMessage.class,
                                       IMultipartMessage.class);
 
-        expectedSubscriptions.listener(MessagesListener.DefaultListener.class)
+        expectedSubscriptions.listener(MessageTypesListener.DefaultListener.class)
                              .handles(MessageTypes.class);
 
         runTestWith(listeners, expectedSubscriptions);
@@ -215,13 +223,15 @@ public class SubscriptionManagerTest extends AssertSupport {
     @Test
     public
     void testOverloadedMessageHandlers() {
-        ListenerFactory listeners = listeners(Overloading.ListenerBase.class, Overloading.ListenerSub.class);
+        ListenerFactory listeners = listeners(Overloading.ListenerBase.class,
+                                              Overloading.ListenerSub.class);
 
         final SubscriptionManager subscriptionManager = new SubscriptionManager(true);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
         SubscriptionValidator expectedSubscriptions = new SubscriptionValidator(listeners);
+
         expectedSubscriptions.listener(Overloading.ListenerBase.class)
                              .handles(Overloading.TestMessageA.class,
                                       Overloading.TestMessageA.class);

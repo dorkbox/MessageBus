@@ -33,16 +33,13 @@ import dorkbox.util.messagebus.messages.IMultipartMessage;
 public class IMultipartMessageListener {
 
     private static abstract class BaseListener {
-
         @Handler
         public void handle(IMultipartMessage message){
             message.handled(this.getClass());
         }
-
     }
 
     public static class DefaultListener extends BaseListener {
-
         @Override
         public void handle(IMultipartMessage message){
             super.handle(message);
@@ -50,7 +47,6 @@ public class IMultipartMessageListener {
     }
 
     public static class NoSubtypesListener extends BaseListener {
-
         @Override
         @Handler(acceptSubtypes = false)
         public void handle(IMultipartMessage message){
@@ -58,16 +54,11 @@ public class IMultipartMessageListener {
         }
     }
 
-
     public static class DisabledListener extends BaseListener {
-
         @Override
         @Handler(enabled = false)
         public void handle(IMultipartMessage message){
             super.handle(message);
         }
-
     }
-
-
 }

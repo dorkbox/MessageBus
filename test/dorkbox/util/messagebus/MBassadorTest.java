@@ -29,7 +29,7 @@ import dorkbox.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.listeners.ExceptionThrowingListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
 import dorkbox.util.messagebus.listeners.Listeners;
-import dorkbox.util.messagebus.listeners.MessagesListener;
+import dorkbox.util.messagebus.listeners.MessageTypesListener;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
@@ -77,7 +77,7 @@ public class MBassadorTest extends MessageBusTest {
         MessageTypes.resetAll();
         ConcurrentExecutor.runConcurrent(publishAndCheck, ConcurrentUnits);
         assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(IMessageListener.DefaultListener.class));
-        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(MessagesListener.DefaultListener.class));
+        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(MessageTypesListener.DefaultListener.class));
     }
 
 

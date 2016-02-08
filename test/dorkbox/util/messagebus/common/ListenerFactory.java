@@ -36,6 +36,7 @@ import static org.junit.Assert.fail;
  * @author bennidi
  *         Date: 11/22/12
  */
+@SuppressWarnings("ALL")
 public
 class ListenerFactory {
 

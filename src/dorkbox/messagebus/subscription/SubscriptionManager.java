@@ -449,6 +449,11 @@ class SubscriptionManager {
             Subscription sub;
             Subscription[] superSubs;
 
+            MessageHandler handler;
+            Class<?>[] handledMessages;
+            boolean acceptsSubtypes;
+            Class<?> handledMessage;
+
             // walks through all of the subscriptions that might exist for super types, and if applicable, save them
             for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
@@ -459,7 +464,18 @@ class SubscriptionManager {
                     for (int j = 0; j < superSubLength; j++) {
                         sub = superSubs[j];
 
-                        if (sub.getHandler().acceptsSubtypes()) {
+                        handler = sub.getHandler();
+                        handledMessages = handler.getHandledMessages();
+                        acceptsSubtypes = handler.acceptsSubtypes();
+
+                        // check to see if our subscription can handle the superClass type. only 1 will exist for this subscription
+                        handledMessage = handledMessages[0];
+                        if (handledMessage.equals(messageClass)) {
+                            // exact type
+                            subsAsList.add(sub);
+                        }
+                        else if (acceptsSubtypes && handledMessage.isAssignableFrom(messageClass)) {
+                            // legit sub-type
                             subsAsList.add(sub);
                         }
                     }
@@ -499,6 +515,11 @@ class SubscriptionManager {
             Subscription sub;
             Subscription[] superSubs;
 
+            MessageHandler handler;
+            Class<?>[] handledMessages;
+            boolean acceptsSubtypes;
+            Class<?> handledMessage1;
+            Class<?> handledMessage2;
 
             final int length1 = superClasses1.length;
             final int length2 = superClasses2.length;
@@ -532,7 +553,20 @@ class SubscriptionManager {
                         for (int k = 0; k < superSubs.length; k++) {
                             sub = superSubs[k];
 
-                            if (sub.getHandler().acceptsSubtypes()) {
+                            handler = sub.getHandler();
+                            handledMessages = handler.getHandledMessages();
+                            acceptsSubtypes = handler.acceptsSubtypes();
+
+                            handledMessage1 = handledMessages[0];
+                            handledMessage2 = handledMessages[1];
+
+                            if (handledMessage1.equals(messageClass1) && handledMessage2.equals(messageClass2)) {
+                                // exact type
+                                subsAsList.add(sub);
+                            }
+                            else if (acceptsSubtypes && handledMessage1.isAssignableFrom(messageClass1) &&
+                                                        handledMessage2.isAssignableFrom(messageClass2)) {
+                                // legit sub-type
                                 subsAsList.add(sub);
                             }
                         }
@@ -569,13 +603,18 @@ class SubscriptionManager {
         if (subscriptions == null) {
             final IdentityMap<MultiClass, Subscription[]> localSubs = subsMultiREF.get(this);
 
-
-
             Class<?> superClass1;
             Class<?> superClass2;
             Class<?> superClass3;
             Subscription sub;
             Subscription[] superSubs;
+
+            MessageHandler handler;
+            Class<?>[] handledMessages;
+            boolean acceptsSubtypes;
+            Class<?> handledMessage1;
+            Class<?> handledMessage2;
+            Class<?> handledMessage3;
 
             final int length1 = superClasses1.length;
             final int length2 = superClasses2.length;
@@ -619,7 +658,24 @@ class SubscriptionManager {
                             for (int m = 0; m < superSubs.length; m++) {
                                 sub = superSubs[m];
 
-                                if (sub.getHandler().acceptsSubtypes()) {
+                                handler = sub.getHandler();
+                                handledMessages = handler.getHandledMessages();
+                                acceptsSubtypes = handler.acceptsSubtypes();
+
+                                handledMessage1 = handledMessages[0];
+                                handledMessage2 = handledMessages[1];
+                                handledMessage3 = handledMessages[2];
+
+                                if (handledMessage1.equals(messageClass1) &&
+                                    handledMessage2.equals(messageClass2) &&
+                                    handledMessage3.equals(messageClass3)) {
+                                    // exact type
+                                    subsAsList.add(sub);
+                                }
+                                else if (acceptsSubtypes && handledMessage1.isAssignableFrom(messageClass1) &&
+                                                            handledMessage2.isAssignableFrom(messageClass2) &&
+                                                            handledMessage3.isAssignableFrom(messageClass3)) {
+                                    // legit sub-type
                                     subsAsList.add(sub);
                                 }
                             }

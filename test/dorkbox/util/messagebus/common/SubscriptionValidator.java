@@ -39,6 +39,31 @@ import java.util.Set;
  */
 public class SubscriptionValidator extends AssertSupport {
 
+    public class Expectation {
+        private Class listener;
+
+        private Expectation(Class listener) {
+            this.listener = listener;
+        }
+
+        public SubscriptionValidator handles(Class... messages) {
+            for (Class message : messages) {
+                expect(this.listener, message);
+            }
+
+            return SubscriptionValidator.this;
+        }
+    }
+
+    private class ValidationEntry {
+        private Class subscriber;
+        private Class messageType;
+
+        private ValidationEntry(Class messageType, Class subscriber) {
+            this.messageType = messageType;
+            this.subscriber = subscriber;
+        }
+    }
 
     private List<ValidationEntry> validations = new LinkedList<ValidationEntry>();
     private Set<Class> messageTypes = new HashSet<Class>();
@@ -57,6 +82,17 @@ public class SubscriptionValidator extends AssertSupport {
         this.messageTypes.add(messageType);
 
         return this;
+    }
+
+    private Collection<ValidationEntry> getEntries(Class<?> messageType) {
+        Collection<ValidationEntry> matching = new LinkedList<ValidationEntry>();
+        for (ValidationEntry validationValidationEntry : this.validations) {
+
+            if (validationValidationEntry.messageType.equals(messageType)) {
+                matching.add(validationValidationEntry);
+            }
+        }
+        return matching;
     }
 
     // match subscriptions with existing validation entries
@@ -100,50 +136,5 @@ public class SubscriptionValidator extends AssertSupport {
     // only in unit test
     public boolean belongsTo(Subscription subscription, Class<?> listener) {
         return subscription.getListenerClass() == listener;
-    }
-
-
-    private Collection<ValidationEntry> getEntries(Class<?> messageType) {
-        Collection<ValidationEntry> matching = new LinkedList<ValidationEntry>();
-        for (ValidationEntry validationValidationEntry : this.validations) {
-
-            if (validationValidationEntry.messageType.equals(messageType)) {
-                matching.add(validationValidationEntry);
-            }
-        }
-        return matching;
-    }
-
-
-
-
-
-
-
-    public class Expectation {
-        private Class listener;
-
-        private Expectation(Class listener) {
-            this.listener = listener;
-        }
-
-        public SubscriptionValidator handles(Class... messages) {
-            for (Class message : messages) {
-                expect(this.listener, message);
-            }
-
-            return SubscriptionValidator.this;
-        }
-    }
-
-
-    private class ValidationEntry {
-        private Class subscriber;
-        private Class messageType;
-
-        private ValidationEntry(Class messageType, Class subscriber) {
-            this.messageType = messageType;
-            this.subscriber = subscriber;
-        }
     }
 }

@@ -32,7 +32,7 @@ import dorkbox.messagebus.error.IPublicationErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.util.messagebus.listeners.ExceptionThrowingListener;
 import dorkbox.util.messagebus.listeners.IMessageListener;
-import dorkbox.util.messagebus.listeners.MessagesListener;
+import dorkbox.util.messagebus.listeners.MessageTypesListener;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
@@ -56,8 +56,8 @@ public class SyncBusTest extends MessageBusTest {
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
-                .create(InstancesPerListener, MessagesListener.DefaultListener.class)
-                .create(InstancesPerListener, MessagesListener.DisabledListener.class)
+                .create(InstancesPerListener, MessageTypesListener.DefaultListener.class)
+                .create(InstancesPerListener, MessageTypesListener.DisabledListener.class)
                 .create(InstancesPerListener, Object.class);
 
 
@@ -87,8 +87,8 @@ public class SyncBusTest extends MessageBusTest {
         ConcurrentExecutor.runConcurrent(publishAndCheck, ConcurrentUnits);
         assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(IMessageListener.DefaultListener.class));
         assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Multipart.getTimesHandled(IMessageListener.DefaultListener.class));
-        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(MessagesListener.DefaultListener.class));
-        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Multipart.getTimesHandled(MessagesListener.DefaultListener.class));
+        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Simple.getTimesHandled(MessageTypesListener.DefaultListener.class));
+        assertEquals(InstancesPerListener * ConcurrentUnits, MessageTypes.Multipart.getTimesHandled(MessageTypesListener.DefaultListener.class));
 
         bus.shutdown();
     }

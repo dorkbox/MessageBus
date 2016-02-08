@@ -44,7 +44,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Iterator;
 
 /**
  * @author bennidi
@@ -57,7 +57,6 @@ public final
 class ReflectionUtils {
 
     private static final Method[] EMPTY_METHODS = new Method[0];
-    private static final Class<?>[] EMPTY_CLASSES = new Class<?>[0];
 
     private
     ReflectionUtils() {
@@ -107,31 +106,30 @@ class ReflectionUtils {
     }
 
     /**
-     * Collect all directly and indirectly related super types (classes and interfaces) of
-     * a given class.
+     * Collect all directly and indirectly related super types (classes and interfaces) of a given class.
      *
      * @param from The root class to start with
-     * @return A set of classes, each representing a super type of the root class
+     * @return An array of classes, each representing a super type of the root class
      */
     public static
-    Class<?>[] getSuperTypes(Class<?> from) {
-        ArrayList<Class<?>> superclasses = new ArrayList<Class<?>>();
-
+    Iterator<Class<?>> getSuperTypes(Class<?> from) {
+        // This must be a 'set' because there can be duplicates, depending on the object hierarchy
+        final IdentityMap<Class<?>, Boolean> superclasses = new IdentityMap<>();
         collectInterfaces(from, superclasses);
 
         while (!from.equals(Object.class) && !from.isInterface()) {
-            superclasses.add(from.getSuperclass());
+            superclasses.put(from.getSuperclass(), Boolean.TRUE);
             from = from.getSuperclass();
             collectInterfaces(from, superclasses);
         }
 
-        return superclasses.toArray(EMPTY_CLASSES);
+        return superclasses.keys();
     }
 
     private static
-    void collectInterfaces(Class<?> from, Collection<Class<?>> accumulator) {
+    void collectInterfaces(Class<?> from, IdentityMap<Class<?>, Boolean> accumulator) {
         for (Class<?> intface : from.getInterfaces()) {
-            accumulator.add(intface);
+            accumulator.put(intface, Boolean.TRUE);
             collectInterfaces(intface, accumulator);
         }
     }

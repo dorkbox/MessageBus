@@ -36,7 +36,7 @@ import java.util.Set;
 public class Listeners {
 
     private static final List<Class> Synchronous = Collections.unmodifiableList(Arrays.asList(new Class[]{
-            MessagesListener.DefaultListener.class,
+            MessageTypesListener.DefaultListener.class,
             IMessageListener.DefaultListener.class,
             StandardMessageListener.DefaultListener.class,
             MultipartMessageListener.DefaultListener.class,
@@ -44,7 +44,7 @@ public class Listeners {
             IMultipartMessageListener.DefaultListener.class}));
 
     private static final List<Class> SubtypeRejecting = Collections.unmodifiableList(Arrays.asList(new Class[]{
-            MessagesListener.NoSubtypesListener.class,
+            MessageTypesListener.NoSubtypesListener.class,
             IMessageListener.NoSubtypesListener.class,
             StandardMessageListener.NoSubtypesListener.class,
             MultipartMessageListener.NoSubtypesListener.class,
@@ -52,7 +52,7 @@ public class Listeners {
             IMultipartMessageListener.NoSubtypesListener.class}));
 
     private static final List<Class> NoHandlers = Collections.unmodifiableList(Arrays.asList(new Class[]{
-            MessagesListener.DisabledListener.class,
+            MessageTypesListener.DisabledListener.class,
             IMessageListener.DisabledListener.class,
             StandardMessageListener.DisabledListener.class,
             MultipartMessageListener.DisabledListener.class,
@@ -66,8 +66,8 @@ public class Listeners {
             IMessageListener.NoSubtypesListener.class,
             IMultipartMessageListener.DefaultListener.class,
             IMultipartMessageListener.NoSubtypesListener.class,
-            MessagesListener.DefaultListener.class,
-            MessagesListener.NoSubtypesListener.class,
+            MessageTypesListener.DefaultListener.class,
+            MessageTypesListener.NoSubtypesListener.class,
             StandardMessageListener.DefaultListener.class,
             StandardMessageListener.NoSubtypesListener.class,
             MultipartMessageListener.DefaultListener.class,

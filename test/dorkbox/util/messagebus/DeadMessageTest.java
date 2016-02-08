@@ -27,7 +27,7 @@ import dorkbox.messagebus.annotations.Handler;
 import dorkbox.util.messagebus.common.*;
 import dorkbox.messagebus.error.DeadMessage;
 import dorkbox.util.messagebus.listeners.IMessageListener;
-import dorkbox.util.messagebus.listeners.MessagesListener;
+import dorkbox.util.messagebus.listeners.MessageTypesListener;
 import dorkbox.util.messagebus.listeners.ObjectListener;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,8 +57,8 @@ public class DeadMessageTest extends MessageBusTest{
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
-                .create(InstancesPerListener, MessagesListener.DefaultListener.class)
-                .create(InstancesPerListener, MessagesListener.DisabledListener.class)
+                .create(InstancesPerListener, MessageTypesListener.DefaultListener.class)
+                .create(InstancesPerListener, MessageTypesListener.DisabledListener.class)
                 .create(InstancesPerListener, DeadMessagHandler.class)
                 .create(InstancesPerListener, Object.class);
 

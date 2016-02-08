@@ -39,14 +39,12 @@ public class ICountableListener {
         }
     }
 
-
     public static class DefaultListener extends BaseListener {
         @Override
         public void handle(ICountable message){
             super.handle(message);
         }
     }
-
 
     public static class NoSubtypesListener extends BaseListener {
         @Override
@@ -56,9 +54,7 @@ public class ICountableListener {
         }
     }
 
-
     public static class DisabledListener extends BaseListener {
-
         @Override
         @Handler(enabled = false)
         public void handle(ICountable message){
