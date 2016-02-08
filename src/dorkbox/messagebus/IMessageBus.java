@@ -100,7 +100,7 @@ import dorkbox.messagebus.error.IPublicationErrorHandler;
  */
 public interface IMessageBus extends PubSubSupport {
 
-    enum PublishMode {
+    enum DispatchMode {
         /**
          * Will only publish to listeners with this exact message signature. This is the fastest
          */

@@ -17,9 +17,9 @@ package dorkbox.messagebus;
 
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.IPublicationErrorHandler;
-import dorkbox.messagebus.publication.Publisher;
-import dorkbox.messagebus.publication.PublisherExact;
-import dorkbox.messagebus.publication.PublisherExactWithSuperTypes;
+import dorkbox.messagebus.dispatch.Dispatch;
+import dorkbox.messagebus.dispatch.DispatchExact;
+import dorkbox.messagebus.dispatch.DispatchExactWithSuperTypes;
 import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.messagebus.synchrony.AsyncABQ;
 import dorkbox.messagebus.synchrony.AsyncABQ_noGc;
@@ -106,7 +106,7 @@ class MessageBus implements IMessageBus {
 
     private final SubscriptionManager subscriptionManager;
 
-    private final Publisher publisher;
+    private final Dispatch dispatch;
     private final Synchrony syncPublication;
     private final Synchrony asyncPublication;
 
@@ -124,26 +124,26 @@ class MessageBus implements IMessageBus {
      * @param numberOfThreads how many threads to use for dispatching async messages
      */
     public
-    MessageBus(int numberOfThreads) {
-        this(PublishMode.ExactWithSuperTypes, numberOfThreads);
+    MessageBus(final int numberOfThreads) {
+        this(DispatchMode.ExactWithSuperTypes, numberOfThreads);
     }
 
     /**
      * By default, will use half of CPUs available for dispatching async messages
      *
-     * @param publishMode     Specifies which publishMode to operate the publication of messages.
+     * @param dispatchMode Specifies which publishMode to operate the publication of messages.
      */
     public
-    MessageBus(final PublishMode publishMode) {
-        this(publishMode, Runtime.getRuntime().availableProcessors());
+    MessageBus(final DispatchMode dispatchMode) {
+        this(dispatchMode, Runtime.getRuntime().availableProcessors());
     }
 
     /**
-     * @param publishMode     Specifies which publishMode to operate the publication of messages.
+     * @param dispatchMode     Specifies which publishMode to operate the publication of messages.
      * @param numberOfThreads how many threads to use for dispatching async messages
      */
     public
-    MessageBus(final PublishMode publishMode, int numberOfThreads) {
+    MessageBus(final DispatchMode dispatchMode, int numberOfThreads) {
         // round to the nearest power of 2
         numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads) - 1));
 
@@ -154,22 +154,22 @@ class MessageBus implements IMessageBus {
          */
         this.subscriptionManager = new SubscriptionManager(useStrongReferencesByDefault);
 
-        switch (publishMode) {
+        switch (dispatchMode) {
             case Exact:
-                publisher = new PublisherExact(subscriptionManager);
+                dispatch = new DispatchExact(errorHandler, subscriptionManager);
                 break;
 
             case ExactWithSuperTypes:
             default:
-                publisher = new PublisherExactWithSuperTypes(errorHandler, subscriptionManager);
+                dispatch = new DispatchExactWithSuperTypes(errorHandler, subscriptionManager);
                 break;
         }
 
-        syncPublication = new Sync(errorHandler, subscriptionManager);
+        syncPublication = new Sync();
 
         // the disruptor is preferred, but if it cannot be loaded -- we want to try to continue working, hence the use of ArrayBlockingQueue
         if (useDisruptorForAsyncPublish) {
-            asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, syncPublication);
+            asyncPublication = new AsyncDisruptor(numberOfThreads, errorHandler, syncPublication, subscriptionManager);
         } else {
             if (useZeroGarbageVersionOfABQ) {
                 // no garbage is created, but this is slow (but faster than other messagebus implementations)
@@ -239,8 +239,8 @@ class MessageBus implements IMessageBus {
      */
     @Override
     public
-    void publish(final Object message) {
-        publisher.publish(syncPublication, message);
+    void publish(final Object message1) {
+        syncPublication.publish(dispatch, message1);
     }
 
 
@@ -253,7 +253,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publish(final Object message1, final Object message2) {
-        publisher.publish(syncPublication, message1, message2);
+        syncPublication.publish(dispatch, message1, message2);
     }
 
 
@@ -266,7 +266,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publish(final Object message1, final Object message2, final Object message3) {
-        publisher.publish(syncPublication, message1, message2, message3);
+        syncPublication.publish(dispatch, message1, message2, message3);
     }
 
 
@@ -278,7 +278,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publishAsync(final Object message) {
-        publisher.publish(asyncPublication, message);
+        asyncPublication.publish(dispatch, message);
     }
 
 
@@ -290,7 +290,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publishAsync(final Object message1, final Object message2) {
-        publisher.publish(asyncPublication, message1, message2);
+        asyncPublication.publish(dispatch, message1, message2);
     }
 
 
@@ -302,7 +302,7 @@ class MessageBus implements IMessageBus {
     @Override
     public
     void publishAsync(final Object message1, final Object message2, final Object message3) {
-        publisher.publish(asyncPublication, message1, message2, message3);
+        asyncPublication.publish(dispatch, message1, message2, message3);
     }
 
 

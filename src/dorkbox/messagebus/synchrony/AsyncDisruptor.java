@@ -25,7 +25,8 @@ import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
 import dorkbox.messagebus.common.NamedThreadFactory;
 import dorkbox.messagebus.error.ErrorHandler;
-import dorkbox.messagebus.subscription.Subscription;
+import dorkbox.messagebus.dispatch.Dispatch;
+import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.messagebus.synchrony.disruptor.EventBusFactory;
 import dorkbox.messagebus.synchrony.disruptor.MessageHandler;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
@@ -53,7 +54,7 @@ class AsyncDisruptor implements Synchrony {
     private final Sequence workSequence;
 
     public
-    AsyncDisruptor(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
+    AsyncDisruptor(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication, final SubscriptionManager subManager) {
         // Now we setup the disruptor and work handlers
 
         ExecutorService executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
@@ -67,7 +68,7 @@ class AsyncDisruptor implements Synchrony {
         // setup the work handlers
         handlers = new MessageHandler[numberOfThreads];
         for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new MessageHandler(syncPublication);  // exactly one per thread is used
+            handlers[i] = new MessageHandler();  // exactly one per thread is used
         }
 
 
@@ -126,13 +127,14 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1) {
+    void publish(final Dispatch dispatch, final Object message1) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
+
         job.type = MessageType.ONE;
-        job.subs = subscriptions;
-        job.superSubs = superSubscriptions;
+        job.dispatch = dispatch;
+
         job.message1 = message1;
 
         ringBuffer.publish(seq);
@@ -140,13 +142,14 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2) {
+    void publish(final Dispatch dispatch, final Object message1, final Object message2) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
+
         job.type = MessageType.TWO;
-        job.subs = subscriptions;
-        job.superSubs = superSubscriptions;
+        job.dispatch = dispatch;
+
         job.message1 = message1;
         job.message2 = message2;
 
@@ -155,13 +158,14 @@ class AsyncDisruptor implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2, final Object message3) {
+    void publish(final Dispatch dispatch, final Object message1, final Object message2, final Object message3) {
         long seq = ringBuffer.next();
 
         MessageHolder job = ringBuffer.get(seq);
+
         job.type = MessageType.THREE;
-        job.subs = subscriptions;
-        job.superSubs = superSubscriptions;
+        job.dispatch = dispatch;
+
         job.message1 = message1;
         job.message3 = message2;
         job.message2 = message3;

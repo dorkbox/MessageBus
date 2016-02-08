@@ -17,9 +17,7 @@ package dorkbox.messagebus.synchrony.disruptor;
 
 import com.lmax.disruptor.LifecycleAware;
 import com.lmax.disruptor.WorkHandler;
-import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.synchrony.MessageHolder;
-import dorkbox.messagebus.synchrony.Synchrony;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -29,34 +27,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public
 class MessageHandler implements WorkHandler<MessageHolder>, LifecycleAware {
 
-    private final Synchrony syncPublication;
-
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     public
-    MessageHandler(final Synchrony syncPublication) {
-        this.syncPublication = syncPublication;
+    MessageHandler() {
     }
 
-    @SuppressWarnings("Duplicates")
     @Override
     public
     void onEvent(final MessageHolder event) throws Exception {
         final int messageType = event.type;
-        final Subscription[] subs = event.subs;
-        final Subscription[] superSubs = event.superSubs;
 
         switch (messageType) {
             case MessageType.ONE: {
-                syncPublication.publish(subs, superSubs, event.message1);
+                event.dispatch.publish(event.message1);
                 return;
             }
             case MessageType.TWO: {
-                syncPublication.publish(subs, superSubs, event.message1, event.message2);
+                event.dispatch.publish(event.message1, event.message2);
                 return;
             }
             case MessageType.THREE: {
-                syncPublication.publish(subs, superSubs, event.message1, event.message2, event.message3);
+                event.dispatch.publish(event.message1, event.message2, event.message3);
                 //noinspection UnnecessaryReturnStatement
                 return;
             }

@@ -22,7 +22,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExact() {
-        IMessageBus bus = new MessageBus(IMessageBus.PublishMode.Exact,
+        IMessageBus bus = new MessageBus(IMessageBus.DispatchMode.Exact,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();
@@ -53,7 +53,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExactAndSuper() {
-        IMessageBus bus = new MessageBus(IMessageBus.PublishMode.ExactWithSuperTypes,
+        IMessageBus bus = new MessageBus(IMessageBus.DispatchMode.ExactWithSuperTypes,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();

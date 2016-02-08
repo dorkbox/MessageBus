@@ -15,7 +15,7 @@
  */
 package dorkbox.messagebus.synchrony;
 
-import dorkbox.messagebus.subscription.Subscription;
+import dorkbox.messagebus.dispatch.Dispatch;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
 
 /**
@@ -24,8 +24,7 @@ import dorkbox.messagebus.synchrony.disruptor.MessageType;
 public
 class MessageHolder {
     public int type = MessageType.ONE;
-    public Subscription[] subs;
-    public Subscription[] superSubs;
+    public Dispatch dispatch = null;
 
     public Object message1 = null;
     public Object message2 = null;

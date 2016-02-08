@@ -18,7 +18,7 @@ package dorkbox.messagebus.synchrony;
 import dorkbox.messagebus.common.NamedThreadFactory;
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
-import dorkbox.messagebus.subscription.Subscription;
+import dorkbox.messagebus.dispatch.Dispatch;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
 
 import java.util.ArrayDeque;
@@ -82,7 +82,7 @@ class AsyncABQ_noGc implements Synchrony {
                 final ErrorHandler errorHandler1 = errorHandler;
 
                 while (!AsyncABQ_noGc.this.shuttingDown) {
-                    process(IN_QUEUE, OUT_QUEUE, syncPublication1, errorHandler1);
+                    process(IN_QUEUE, OUT_QUEUE, errorHandler1);
                 }
 
                 synchronized (shutdown) {
@@ -105,15 +105,12 @@ class AsyncABQ_noGc implements Synchrony {
     @SuppressWarnings("Duplicates")
     private
     void process(final ArrayBlockingQueue<MessageHolder> queue,
-                 final ArrayBlockingQueue<MessageHolder> gcQueue,
-                 final Synchrony sync,
-                 final ErrorHandler errorHandler) {
+                 final ArrayBlockingQueue<MessageHolder> gcQueue, final ErrorHandler errorHandler) {
 
         MessageHolder event;
 
         int messageType = MessageType.ONE;
-        Subscription[] subs;
-        Subscription[] superSubs;
+        Dispatch dispatch;
         Object message1 = null;
         Object message2 = null;
         Object message3 = null;
@@ -122,8 +119,7 @@ class AsyncABQ_noGc implements Synchrony {
             event = queue.take();
 
             messageType = event.type;
-            subs = event.subs;
-            superSubs = event.superSubs;
+            dispatch = event.dispatch;
             message1 = event.message1;
             message2 = event.message2;
             message3 = event.message3;
@@ -132,15 +128,15 @@ class AsyncABQ_noGc implements Synchrony {
 
             switch (messageType) {
                 case MessageType.ONE: {
-                    sync.publish(subs, superSubs, message1);
+                    dispatch.publish(message1);
                     return;
                 }
                 case MessageType.TWO: {
-                    sync.publish(subs, superSubs, message1, message2);
+                    dispatch.publish(message1, message2);
                     return;
                 }
                 case MessageType.THREE: {
-                    sync.publish(subs, superSubs, message1, message2, message3);
+                    dispatch.publish(message1, message2, message3);
                     //noinspection UnnecessaryReturnStatement
                     return;
                 }
@@ -174,15 +170,16 @@ class AsyncABQ_noGc implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1) {
+    void publish(final Dispatch dispatch, final Object message1) {
         try {
-            MessageHolder take = gcQueue.take();
+            MessageHolder job = gcQueue.take();
 
-            take.type = MessageType.ONE;
-            take.subs = subscriptions;
-            take.message1 = message1;
+            job.type = MessageType.ONE;
+            job.dispatch = dispatch;
 
-            this.dispatchQueue.put(take);
+            job.message1 = message1;
+
+            this.dispatchQueue.put(job);
         } catch (InterruptedException e) {
             errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
                                                                       .setCause(e)
@@ -192,17 +189,17 @@ class AsyncABQ_noGc implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2) {
+    void publish(final Dispatch dispatch, final Object message1, final Object message2) {
         try {
-            MessageHolder take = gcQueue.take();
+            MessageHolder job = gcQueue.take();
 
-            take.type = MessageType.TWO;
-            take.subs = subscriptions;
-            take.superSubs = superSubscriptions;
-            take.message1 = message1;
-            take.message2 = message2;
+            job.type = MessageType.TWO;
+            job.dispatch = dispatch;
 
-            this.dispatchQueue.put(take);
+            job.message1 = message1;
+            job.message2 = message2;
+
+            this.dispatchQueue.put(job);
         } catch (InterruptedException e) {
             errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
                                                                       .setCause(e)
@@ -212,18 +209,18 @@ class AsyncABQ_noGc implements Synchrony {
 
     @Override
     public
-    void publish(final Subscription[] subscriptions, final Subscription[] superSubscriptions, final Object message1, final Object message2, final Object message3) {
+    void publish(final Dispatch dispatch, final Object message1, final Object message2, final Object message3) {
         try {
-            MessageHolder take = gcQueue.take();
+            MessageHolder job = gcQueue.take();
 
-            take.type = MessageType.THREE;
-            take.subs = subscriptions;
-            take.superSubs = superSubscriptions;
-            take.message1 = message1;
-            take.message2 = message2;
-            take.message3 = message3;
+            job.type = MessageType.THREE;
+            job.dispatch = dispatch;
 
-            this.dispatchQueue.put(take);
+            job.message1 = message1;
+            job.message2 = message2;
+            job.message3 = message3;
+
+            this.dispatchQueue.put(job);
         } catch (InterruptedException e) {
             errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message queue.")
                                                                       .setCause(e)

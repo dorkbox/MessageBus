@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.messagebus.publication;
+package dorkbox.messagebus.dispatch;
 
-import dorkbox.messagebus.synchrony.Synchrony;
-
-public interface Publisher {
-    void publish(final Synchrony synchrony, Object message1);
-    void publish(final Synchrony synchrony, Object message1, Object message2);
-    void publish(final Synchrony synchrony, Object message1, Object message2, Object message3);
+public interface Dispatch {
+    void publish(Object message1);
+    void publish(Object message1, Object message2);
+    void publish(Object message1, Object message2, Object message3);
 }
