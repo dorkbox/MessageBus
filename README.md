@@ -132,7 +132,7 @@ The MessageBus is available from the Maven Central Repository using the followin
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.2</version>
+        <version>1.3</version>
     </dependency>
 ```
 
@@ -142,5 +142,6 @@ https://oss.sonatype.org/content/repositories/releases/com/dorkbox/MessageBus/
 <h2>License</h2>
 
 This project is distributed under the terms of the Apache v2.0 License. See file "LICENSE" for further references.
+
 
 
