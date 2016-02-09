@@ -62,7 +62,8 @@ public interface PubSubSupport {
      * receive any messages (provided that running publications/iterators in other threads
      * have not yet obtained a reference to the listener)
      * <p>
-     * A call to this method passing any object that is not subscribed will not have any effect and is silently ignored.
+     * A call to this method passing any object that is not subscribed will not have any effect and is
+     * silently ignored.
      */
     void unsubscribe(Object listener);
 
