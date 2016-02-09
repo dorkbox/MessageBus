@@ -31,6 +31,10 @@ public enum References {
     Undefined,
 
 
+    /**
+     * Strong references are faster than weak, as there are no extra steps necessary (to clean up the data structures) during
+     * mesasge publication.
+     */
     Strong,
 
     /**

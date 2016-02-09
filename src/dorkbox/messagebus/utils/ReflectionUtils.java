@@ -114,7 +114,7 @@ class ReflectionUtils {
     public static
     Iterator<Class<?>> getSuperTypes(Class<?> from) {
         // This must be a 'set' because there can be duplicates, depending on the object hierarchy
-        final IdentityMap<Class<?>, Boolean> superclasses = new IdentityMap<>();
+        final IdentityMap<Class<?>, Boolean> superclasses = new IdentityMap<Class<?>, Boolean>();
         collectInterfaces(from, superclasses);
 
         while (!from.equals(Object.class) && !from.isInterface()) {
