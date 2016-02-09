@@ -24,15 +24,15 @@ import com.lmax.disruptor.Sequencer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
 import dorkbox.messagebus.common.NamedThreadFactory;
-import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.dispatch.Dispatch;
-import dorkbox.messagebus.subscription.SubscriptionManager;
+import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.synchrony.disruptor.EventBusFactory;
 import dorkbox.messagebus.synchrony.disruptor.MessageHandler;
 import dorkbox.messagebus.synchrony.disruptor.MessageType;
 import dorkbox.messagebus.synchrony.disruptor.PublicationExceptionHandler;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -54,12 +54,12 @@ class AsyncDisruptor implements Synchrony {
     private final Sequence workSequence;
 
     public
-    AsyncDisruptor(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication, final SubscriptionManager subManager) {
+    AsyncDisruptor(final int numberOfThreads, final ErrorHandler errorHandler) {
         // Now we setup the disruptor and work handlers
 
         ExecutorService executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
                                                           0, TimeUnit.NANOSECONDS, // handlers are never idle, so this doesn't matter
-                                                          new java.util.concurrent.LinkedTransferQueue<Runnable>(),
+                                                          new LinkedBlockingQueue<Runnable>(),  // also, this doesn't matter
                                                           new NamedThreadFactory("MessageBus"));
 
         final PublicationExceptionHandler<MessageHolder> exceptionHandler = new PublicationExceptionHandler<MessageHolder>(errorHandler);

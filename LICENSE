@@ -1,5 +1,6 @@
-    - MBassador - MIT License
-      https://github.com/bennidi/mbassador
+    - Dorkbox MessageBus - Apache 2.0 License
+      https://github.com/dorkbox
+      Copyright 2015, dorkbox, llc
       Copyright 2012, Benjamin Diedrichsen
 
 
@@ -9,9 +10,20 @@
         Bytecode manipulation framework and utilities
 
 
-    - JCTools - Apache 2.0 License
-      https://github.com/JCTools/JCTools
-       Copyright 2013, JCTools, Nitsan Wakart
+    - Disruptor - Apache 2.0 License
+      https://github.com/LMAX-Exchange/disruptor/
+      Copyright 2011, LMAX Ltd/
+        A High Performance Inter-Thread Messaging Library
+
+
+    - Kryo - BSD 3-clause License
+      https://github.com/EsotericSoftware/kryo
+      Copyright 2008, Nathan Sweet
+
+
+    - MBassador - MIT License
+      https://github.com/bennidi/mbassador
+      Copyright 2012, Benjamin Diedrichsen
 
 
     - ReflectASM - BSD 3-clause License

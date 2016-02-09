@@ -108,7 +108,7 @@ class NamedThreadFactory implements ThreadFactory {
         // To be honest, 8k is pretty reasonable for an asynchronous/event based system (32bit) or 16k (64bit)
         // Setting the size MAY or MAY NOT have any effect!!!
         Thread t = new Thread(this.group, r, name, NamedThreadFactory.stackSizeForThreads);
-        t.setDaemon(true);// FORCE these threads to finish before allowing the JVM to exit
+        t.setDaemon(true);// don't let these threads keep the JVM running
         if (t.getPriority() != Thread.NORM_PRIORITY) {
             t.setPriority(Thread.NORM_PRIORITY);
         }
