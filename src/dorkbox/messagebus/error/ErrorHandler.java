@@ -18,6 +18,9 @@ package dorkbox.messagebus.error;
 import java.util.ArrayDeque;
 import java.util.Collection;
 
+/**
+ * @author bennidi
+ */
 @SuppressWarnings("Duplicates")
 public final
 class ErrorHandler {

@@ -20,6 +20,10 @@ import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.subscription.SubscriptionManager;
 
+/**
+ * @author dorkbox, llc
+ *         Date: 2/2/15
+ */
 @SuppressWarnings("Duplicates")
 public
 class DispatchExactWithSuperTypes implements Dispatch {

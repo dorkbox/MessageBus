@@ -20,7 +20,6 @@ import com.esotericsoftware.kryo.util.IdentityMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-
 /**
  * Simple tree structure that is a map that contains a chain of keys to publish to a value.
  *
@@ -29,7 +28,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * the "value" object is used to store/lookup in another map
  *
  * This data structure is used to keep track of multi-messages - where there is more that one parameter for publish().
- *
  *
  * @author dorkbox, llc
  *         Date: 2/2/15

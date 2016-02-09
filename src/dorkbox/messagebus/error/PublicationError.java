@@ -47,7 +47,6 @@ import java.util.Arrays;
  *
  * @author bennidi
  *         Date: 2/22/12
- *         Time: 4:59 PM
  * @author dorkbox, llc
  *         Date: 2/2/15
  */

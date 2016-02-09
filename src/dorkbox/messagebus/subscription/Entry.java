@@ -19,6 +19,11 @@ package dorkbox.messagebus.subscription;
 // not thread-safe!!!
 //
 
+
+/**
+ * @author bennidi
+ * @author dorkbox, llc Date: 2/3/16
+ */
 public
 class Entry<T> {
     private final T value;

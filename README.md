@@ -126,10 +126,6 @@ Message publication:
 
 
 
-
-
-
-
 <h2>Installation</h2>
 The MessageBus is available from the Maven Central Repository using the following coordinates:
 ```

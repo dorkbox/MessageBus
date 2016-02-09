@@ -31,7 +31,7 @@ import dorkbox.messagebus.synchrony.Synchrony;
  * The base class for all message bus implementations with support for asynchronous message dispatch.
  *
  * See this post for insight on how it operates:  http://psy-lob-saw.blogspot.com/2012/12/atomiclazyset-is-performance-win-for.html
- * tldr; we use single-writer-principle + lazySet/get
+ * TLDR: we use single-writer-principle + lazySet/get for major performance
  *
  * @author dorkbox, llc
  *         Date: 2/2/15

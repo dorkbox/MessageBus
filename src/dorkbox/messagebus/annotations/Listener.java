@@ -32,6 +32,8 @@ import java.lang.annotation.*;
  * depending on which reference type (@see References) is set
  *
  * @author bennidi
+ * @author dorkbox, llc
+ *         Date: 2/6/16
  */
 @Retention(value = RetentionPolicy.RUNTIME)
 @Target(value = {ElementType.TYPE, ElementType.ANNOTATION_TYPE})

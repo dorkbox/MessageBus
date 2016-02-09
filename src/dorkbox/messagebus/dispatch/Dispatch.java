@@ -15,6 +15,11 @@
  */
 package dorkbox.messagebus.dispatch;
 
+
+/**
+ * @author dorkbox, llc
+ *         Date: 2/2/15
+ */
 public interface Dispatch {
     void publish(Object message1);
     void publish(Object message1, Object message2);

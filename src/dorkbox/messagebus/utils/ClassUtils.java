@@ -23,6 +23,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
+/**
+ * @author dorkbox
+ *         Date: 4/1/15
+ */
 public final
 class ClassUtils {
 

@@ -19,6 +19,10 @@ import dorkbox.messagebus.common.MessageHandler;
 import dorkbox.messagebus.subscription.Subscription;
 import dorkbox.messagebus.subscription.SubscriptionFactory;
 
+/**
+ * @author dorkbox, llc
+ *         Date: 2/3/16
+ */
 public
 class ReflectionFactory implements SubscriptionFactory {
 

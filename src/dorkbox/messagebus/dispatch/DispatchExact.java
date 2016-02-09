@@ -24,6 +24,9 @@ import dorkbox.messagebus.subscription.SubscriptionManager;
  * By default, it is the calling thread that has to get the subscriptions, which the sync/async logic then uses.
  *
  * The exception to this rule is when checking/calling DeadMessage publication.
+ *
+ * @author dorkbox, llc
+ *         Date: 2/2/15
  */
 @SuppressWarnings("Duplicates")
 public
