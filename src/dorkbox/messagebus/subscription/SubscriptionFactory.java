@@ -22,5 +22,5 @@ import dorkbox.messagebus.common.MessageHandler;
  */
 public
 interface SubscriptionFactory {
-    Subscription create(final Class<?> listenerClass, final MessageHandler handler);
+    Subscription<?> create(final Class<?> listenerClass, final MessageHandler handler);
 }

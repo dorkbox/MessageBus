@@ -34,7 +34,7 @@ class AsmFactory implements SubscriptionFactory {
 
     @Override
     public
-    Subscription create(final Class<?> listenerClass, final MessageHandler handler) {
+    Subscription<?> create(final Class<?> listenerClass, final MessageHandler handler) {
         // figure out what kind of references we want to use by default, as specified by MessageBus.useStrongReferencesByDefault
         final int referenceType = handler.getReferenceType();
         if (referenceType == MessageHandler.UNDEFINED) {

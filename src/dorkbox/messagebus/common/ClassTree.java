@@ -114,7 +114,6 @@ public class ClassTree<KEY> {
      * @param key the key for the new child
      * @return the existing (or new) leaf
      */
-    @SuppressWarnings("unchecked")
     private
     ClassTree<KEY> getOrCreateLeaf(KEY key) {
         if (key == null) {

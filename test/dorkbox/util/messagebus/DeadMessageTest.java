@@ -125,7 +125,6 @@ public class DeadMessageTest extends MessageBusTest{
     }
 
     public static class DeadMessagHandler {
-        @SuppressWarnings("unused")
         @Handler
         public void handle(DeadMessage message){
             deadMessages.incrementAndGet();

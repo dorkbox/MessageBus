@@ -58,7 +58,7 @@ class AsyncABQ_noGc implements Synchrony {
 
 
     public
-    AsyncABQ_noGc(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
+    AsyncABQ_noGc(final int numberOfThreads, final ErrorHandler errorHandler) {
         this.errorHandler = errorHandler;
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
@@ -78,7 +78,6 @@ class AsyncABQ_noGc implements Synchrony {
                 final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ_noGc.this.dispatchQueue;
                 final ArrayBlockingQueue<MessageHolder> OUT_QUEUE = AsyncABQ_noGc.this.gcQueue;
 
-                final Synchrony syncPublication1 = syncPublication;
                 final ErrorHandler errorHandler1 = errorHandler;
 
                 while (!AsyncABQ_noGc.this.shuttingDown) {

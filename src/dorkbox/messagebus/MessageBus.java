@@ -173,11 +173,11 @@ class MessageBus implements IMessageBus {
         } else {
             if (useZeroGarbageVersionOfABQ) {
                 // no garbage is created, but this is slow (but faster than other messagebus implementations)
-                asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler, syncPublication);
+                asyncPublication = new AsyncABQ_noGc(numberOfThreads, errorHandler);
             }
             else {
                 // garbage is created, but this is fast
-                asyncPublication = new AsyncABQ(numberOfThreads, errorHandler, syncPublication);
+                asyncPublication = new AsyncABQ(numberOfThreads, errorHandler);
             }
         }
     }

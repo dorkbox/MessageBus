@@ -82,7 +82,6 @@ public class MultiMessageTest extends MessageBusTest {
         count.set(0);
     }
 
-    @SuppressWarnings("unused")
     public static class MultiListener {
         @Handler
         public void handleSync(Object o) {

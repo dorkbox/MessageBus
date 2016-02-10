@@ -164,7 +164,6 @@ public class MetadataReaderTest extends AssertSupport {
     }
 
     // a simple event listener
-    @SuppressWarnings("unused")
     public class MessageListener1 {
 
         @Handler(acceptSubtypes = false)
@@ -231,7 +230,6 @@ public class MetadataReaderTest extends AssertSupport {
         validator.check(allHandlers);
     }
 
-    @SuppressWarnings("unused")
     public class MultiMessageListener1 {
 
         @Handler public void handleString1(String s) {}

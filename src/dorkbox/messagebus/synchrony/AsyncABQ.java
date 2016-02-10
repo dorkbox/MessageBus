@@ -54,7 +54,7 @@ class AsyncABQ implements Synchrony {
 
 
     public
-    AsyncABQ(final int numberOfThreads, final ErrorHandler errorHandler, final Synchrony syncPublication) {
+    AsyncABQ(final int numberOfThreads, final ErrorHandler errorHandler) {
         this.errorHandler = errorHandler;
 
         this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
@@ -66,7 +66,6 @@ class AsyncABQ implements Synchrony {
             public
             void run() {
                 final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ.this.dispatchQueue;
-                final Synchrony syncPublication1 = syncPublication;
                 final ErrorHandler errorHandler1 = errorHandler;
 
                 while (!AsyncABQ.this.shuttingDown) {

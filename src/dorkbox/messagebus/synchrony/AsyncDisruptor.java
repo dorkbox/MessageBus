@@ -48,7 +48,7 @@ import java.util.concurrent.locks.LockSupport;
 public final
 class AsyncDisruptor implements Synchrony {
 
-    private final WorkProcessor[] workProcessors;
+    private final WorkProcessor<MessageHolder>[] workProcessors;
     private final MessageHandler[] handlers;
     private final RingBuffer<MessageHolder> ringBuffer;
     private final Sequence workSequence;
