@@ -107,7 +107,7 @@ class MessageBus implements IMessageBus {
      */
     public static
     String getVersion() {
-        return "1.7";
+        return "1.9";
     }
 
     private final ErrorHandler errorHandler;
@@ -354,5 +354,4 @@ class MessageBus implements IMessageBus {
         this.subscriptionManager.shutdown();
     }
 }
-
 
