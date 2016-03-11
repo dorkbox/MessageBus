@@ -107,7 +107,7 @@ class MessageBus implements IMessageBus {
      */
     public static
     String getVersion() {
-        return "1.9";
+        return "1.12";
     }
 
     private final ErrorHandler errorHandler;
