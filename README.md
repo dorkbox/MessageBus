@@ -132,12 +132,20 @@ The MessageBus is available from the Maven Central Repository using the followin
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.9</version>
+        <version>1.12</version>
     </dependency>
 ```
 
+
+Or if you don't want to use Maven, you can access the files directly here:  
 https://oss.sonatype.org/content/repositories/releases/com/dorkbox/MessageBus/
 
+https://repo1.maven.org/maven2/org/slf4j/slf4j-api/  
+https://repo1.maven.org/maven2/com/lmax/disruptor/  
+https://repo1.maven.org/maven2/asm/asm/  
+
+https://repo1.maven.org/maven2/com/esotericsoftware/kryo/  
+https://repo1.maven.org/maven2/com/esotericsoftware/reflectasm/  
 
 <h2>License</h2>
 
