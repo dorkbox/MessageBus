@@ -132,7 +132,7 @@ The MessageBus is available from the Maven Central Repository using the followin
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.12</version>
+        <version>1.13</version>
     </dependency>
 ```
 
