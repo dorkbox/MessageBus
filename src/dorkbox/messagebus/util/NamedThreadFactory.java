@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.messagebus.common;
+package dorkbox.messagebus.util;
 
 import java.lang.management.RuntimeMXBean;
 import java.util.List;

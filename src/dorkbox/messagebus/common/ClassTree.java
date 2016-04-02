@@ -16,6 +16,7 @@
 package dorkbox.messagebus.common;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
+import dorkbox.messagebus.util.FastThreadLocal;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,16 +38,16 @@ public class ClassTree<KEY> {
     public static float LOAD_FACTOR = 0.8F;
 
     private static
-    final ThreadLocal<IdentityMap> keyCache = new ThreadLocal<IdentityMap>() {
+    final FastThreadLocal<IdentityMap> keyCache = new FastThreadLocal<IdentityMap>() {
         @Override
-        protected
+        public
         IdentityMap initialValue() {
             return new IdentityMap(INITIAL_SIZE, LOAD_FACTOR);
         }
     };
 
     private static
-    final ThreadLocal<MultiClass> valueCache = new ThreadLocal<MultiClass>();
+    final FastThreadLocal<MultiClass> valueCache = new FastThreadLocal<MultiClass>();
 
     private AtomicReference<Object> children = new AtomicReference<Object>();
     private AtomicReference<MultiClass> value = new AtomicReference<MultiClass>();

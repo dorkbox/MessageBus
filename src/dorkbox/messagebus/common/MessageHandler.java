@@ -40,7 +40,7 @@ package dorkbox.messagebus.common;
 import dorkbox.messagebus.annotations.Handler;
 import dorkbox.messagebus.annotations.References;
 import dorkbox.messagebus.annotations.Synchronized;
-import dorkbox.messagebus.utils.ReflectionUtils;
+import dorkbox.messagebus.util.ReflectionUtils;
 import dorkbox.messagebus.annotations.Listener;
 
 import java.lang.reflect.Method;

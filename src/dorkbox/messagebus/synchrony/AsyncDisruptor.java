@@ -23,7 +23,7 @@ import com.lmax.disruptor.SequenceBarrier;
 import com.lmax.disruptor.Sequencer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
-import dorkbox.messagebus.common.NamedThreadFactory;
+import dorkbox.messagebus.util.NamedThreadFactory;
 import dorkbox.messagebus.dispatch.Dispatch;
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.synchrony.disruptor.EventBusFactory;

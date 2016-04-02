@@ -15,7 +15,7 @@
  */
 package dorkbox.messagebus.synchrony;
 
-import dorkbox.messagebus.common.NamedThreadFactory;
+import dorkbox.messagebus.util.NamedThreadFactory;
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.dispatch.Dispatch;

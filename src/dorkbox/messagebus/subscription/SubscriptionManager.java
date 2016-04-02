@@ -22,7 +22,7 @@ import dorkbox.messagebus.subscription.reflection.ReflectionFactory;
 import dorkbox.messagebus.common.ClassTree;
 import dorkbox.messagebus.common.MessageHandler;
 import dorkbox.messagebus.subscription.asm.AsmFactory;
-import dorkbox.messagebus.utils.ClassUtils;
+import dorkbox.messagebus.util.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;

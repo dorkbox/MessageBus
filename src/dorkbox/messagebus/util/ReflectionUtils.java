@@ -35,7 +35,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.messagebus.utils;
+package dorkbox.messagebus.util;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
 import dorkbox.messagebus.annotations.Handler;
