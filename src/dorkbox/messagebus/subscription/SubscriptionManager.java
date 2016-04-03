@@ -17,11 +17,11 @@ package dorkbox.messagebus.subscription;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
 import dorkbox.messagebus.MessageBus;
-import dorkbox.messagebus.common.MultiClass;
-import dorkbox.messagebus.subscription.reflection.ReflectionFactory;
 import dorkbox.messagebus.common.ClassTree;
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.common.MultiClass;
 import dorkbox.messagebus.subscription.asm.AsmFactory;
+import dorkbox.messagebus.subscription.reflection.ReflectionFactory;
 import dorkbox.messagebus.util.ClassUtils;
 
 import java.util.ArrayList;
@@ -134,16 +134,21 @@ class SubscriptionManager {
     public
     void shutdown() {
 
-        // explicitly clear out the subscriptions
-        final IdentityMap.Entries<Class<?>, Subscription[]> entries = subsPerListener.entries();
-        for (IdentityMap.Entry<Class<?>, Subscription[]> entry : entries) {
-            final Subscription[] subscriptions = entry.value;
-            if (subscriptions != null) {
-                Subscription subscription;
+        // synchronized is used here to ensure the "single writer principle", and make sure that ONLY one thread at a time can enter this
+        // section. Because of this, we can have unlimited reader threads all going at the same time, without contention (which is our
+        // use-case 99% of the time)
+        synchronized (singleWriterLock) {
+            // explicitly clear out the subscriptions
+            final IdentityMap.Entries<Class<?>, Subscription[]> entries = subsPerListener.entries();
+            for (IdentityMap.Entry<Class<?>, Subscription[]> entry : entries) {
+                final Subscription[] subscriptions = entry.value;
+                if (subscriptions != null) {
+                    Subscription subscription;
 
-                for (int i = 0; i < subscriptions.length; i++) {
-                    subscription = subscriptions[i];
-                    subscription.clear();
+                    for (int i = 0; i < subscriptions.length; i++) {
+                        subscription = subscriptions[i];
+                        subscription.clear();
+                    }
                 }
             }
         }

@@ -66,7 +66,10 @@ class Subscription<T> {
         this.entries = new IdentityMap<Object, Entry>(32, SubscriptionManager.LOAD_FACTOR);
     }
 
-    // called on shutdown for GC purposes
+    /**
+     * called on shutdown for GC purposes
+     * called within SYNCHRONIZE
+     */
     public final
     void clear() {
         this.entries.clear();
