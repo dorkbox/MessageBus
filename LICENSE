@@ -2,6 +2,7 @@
       https://github.com/dorkbox
       Copyright 2015, dorkbox, llc
       Copyright 2012, Benjamin Diedrichsen
+        Lightweight, extremely fast, zero-gc message/event bus
 
 
     - ASM - BSD 3-clause License
@@ -20,6 +21,7 @@
       https://github.com/LWJGL/lwjgl3/blob/5819c9123222f6ce51f208e022cb907091dd8023/modules/core/src/main/java/org/lwjgl/system/FastThreadLocal.java
       Copyright 2012-2014, Lightweight Java Game Library Project
        Riven
+        Optimized and Fast ThreadLocals
 
 
     - Kryo - BSD 3-clause License
