@@ -126,13 +126,16 @@ Message publication:
 
 
 
-<h2>Installation</h2>
-The MessageBus is available from the Maven Central Repository using the following coordinates:
+<h4>We now release to maven!</h4> 
+
+This project **includes** some utility classes, which are an extremely small subset of a much larger library; including only what is *necessary* for this particular project to function. Additionally this project is **kept in sync** with the utilities library, so "jar hell" is not an issue, and the latest release will always include the same utility files as all other projects in the dorkbox repository at that time.
+  
+  Please note that the utility classes have their source code included in the release, and eventually the entire utility library will be provided as a dorkbox repository.
 ```
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.15</version>
+        <version>1.16</version>
     </dependency>
 ```
 

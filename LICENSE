@@ -2,7 +2,7 @@
       https://github.com/dorkbox
       Copyright 2015, dorkbox, llc
       Copyright 2012, Benjamin Diedrichsen
-        Lightweight, extremely fast, zero-gc message/event bus
+        Lightweight, extremely fast, and zero-gc message/event bus for Java 6+
 
 
     - ASM - BSD 3-clause License
