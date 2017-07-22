@@ -15,17 +15,18 @@
  */
 package dorkbox.messagebus;
 
-import dorkbox.messagebus.error.ErrorHandler;
-import dorkbox.messagebus.error.IPublicationErrorHandler;
 import dorkbox.messagebus.dispatch.Dispatch;
 import dorkbox.messagebus.dispatch.DispatchExact;
 import dorkbox.messagebus.dispatch.DispatchExactWithSuperTypes;
+import dorkbox.messagebus.error.ErrorHandler;
+import dorkbox.messagebus.error.IPublicationErrorHandler;
 import dorkbox.messagebus.subscription.SubscriptionManager;
 import dorkbox.messagebus.synchrony.AsyncABQ;
 import dorkbox.messagebus.synchrony.AsyncABQ_noGc;
 import dorkbox.messagebus.synchrony.AsyncDisruptor;
 import dorkbox.messagebus.synchrony.Sync;
 import dorkbox.messagebus.synchrony.Synchrony;
+import dorkbox.util.Version;
 
 /**
  * The base class for all message bus implementations with support for asynchronous message dispatch.
@@ -36,6 +37,7 @@ import dorkbox.messagebus.synchrony.Synchrony;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
+@SuppressWarnings("WeakerAccess")
 public
 class MessageBus implements IMessageBus {
 
@@ -106,8 +108,8 @@ class MessageBus implements IMessageBus {
      * Gets the version number.
      */
     public static
-    String getVersion() {
-        return "1.17";
+    Version getVersion() {
+        return new Version("1.17");
     }
 
     private final ErrorHandler errorHandler;
@@ -157,9 +159,7 @@ class MessageBus implements IMessageBus {
 
         this.errorHandler = new ErrorHandler();
 
-        /**
-         * Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
-         */
+        // Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
         this.subscriptionManager = new SubscriptionManager(useStrongReferencesByDefault);
 
         switch (dispatchMode) {
