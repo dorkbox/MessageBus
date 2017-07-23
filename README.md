@@ -139,11 +139,14 @@ This project includes some utility classes that are a small subset of a much lar
 Maven Info
 ---------
 ```
+<dependencies>
+    ...
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
         <version>1.17</version>
     </dependency>
+</dependencies>
 ```
 
 
