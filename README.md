@@ -144,7 +144,7 @@ Maven Info
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.17</version>
+        <version>1.18</version>
     </dependency>
 </dependencies>
 ```

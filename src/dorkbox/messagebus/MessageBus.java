@@ -109,7 +109,7 @@ class MessageBus implements IMessageBus {
      */
     public static
     Version getVersion() {
-        return new Version("1.17");
+        return new Version("1.18");
     }
 
     private final ErrorHandler errorHandler;
