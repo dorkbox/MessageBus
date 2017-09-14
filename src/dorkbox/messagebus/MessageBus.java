@@ -26,7 +26,6 @@ import dorkbox.messagebus.synchrony.AsyncABQ_noGc;
 import dorkbox.messagebus.synchrony.AsyncDisruptor;
 import dorkbox.messagebus.synchrony.Sync;
 import dorkbox.messagebus.synchrony.Synchrony;
-import dorkbox.util.Version;
 
 /**
  * The base class for all message bus implementations with support for asynchronous message dispatch.
@@ -108,8 +107,8 @@ class MessageBus implements IMessageBus {
      * Gets the version number.
      */
     public static
-    Version getVersion() {
-        return new Version("1.18");
+    String getVersion() {
+        return "1.19";
     }
 
     private final ErrorHandler errorHandler;
