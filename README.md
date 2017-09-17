@@ -35,6 +35,9 @@ Table of contents:
 |`@Listener`|Can be used to customize listener wide configuration like the used reference type|
 |`@Synchronized`|Specifies that the handler/method will be accessed in a `synchronized` block|
 
+> Canceling message delivery
+Messages can be canceled (but only in the same thread they are on), and any further deliveries for that message will be cancelled; subsequent subscribers won’t receive the message. Call via `MessageBus.cancel()`
+
 > Delivers everything
 
 Messages do not need to implement any interface and can be of any type. It is possible though to define an upper bound of the message type using generics. The class hierarchy of a message is considered during message delivery, such that handlers will also receive subtypes of the message type they consume for - e.g. a handler of Object.class receives everything. Messages that do not match any handler result in the publication of a `DeadMessage` object which wraps the original message. DeadMessage events can be handled by registering listeners that handle DeadMessage.

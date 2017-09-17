@@ -16,6 +16,7 @@
 package dorkbox.messagebus;
 
 import dorkbox.messagebus.dispatch.Dispatch;
+import dorkbox.messagebus.dispatch.DispatchCancel;
 import dorkbox.messagebus.dispatch.DispatchExact;
 import dorkbox.messagebus.dispatch.DispatchExactWithSuperTypes;
 import dorkbox.messagebus.error.ErrorHandler;
@@ -110,6 +111,16 @@ class MessageBus implements IMessageBus {
     String getVersion() {
         return "1.19";
     }
+
+    /**
+     * Cancels the publication of the message (or messages). Only applicable for the currently running thread. No more subscribers for
+     * this message will be called.
+     */
+    public static
+    void cancel() {
+        throw new DispatchCancel();
+    }
+
 
     private final ErrorHandler errorHandler;
 
@@ -337,7 +348,6 @@ class MessageBus implements IMessageBus {
     boolean hasPendingMessages() {
         return asyncPublication.hasPendingMessages();
     }
-
 
     /**
      * Shutdown the bus such that it will stop delivering asynchronous messages. Executor service and

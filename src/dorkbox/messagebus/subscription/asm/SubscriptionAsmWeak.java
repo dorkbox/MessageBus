@@ -37,15 +37,17 @@
  */
 package dorkbox.messagebus.subscription.asm;
 
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
+
 import com.esotericsoftware.reflectasm.MethodAccess;
+
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.dispatch.DispatchCancel;
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Entry;
 import dorkbox.messagebus.subscription.Subscription;
-
-import java.lang.ref.WeakReference;
-import java.lang.reflect.Method;
 
 /**
  * A subscription is a container that manages exactly one message handler of all registered
@@ -139,6 +141,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, handler, handleIndex, message);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -175,6 +180,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, handler, handleIndex, message1, message2);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -211,6 +219,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)

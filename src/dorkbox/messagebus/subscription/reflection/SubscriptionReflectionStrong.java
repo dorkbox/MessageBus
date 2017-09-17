@@ -37,13 +37,14 @@
  */
 package dorkbox.messagebus.subscription.reflection;
 
+import java.lang.reflect.Method;
+
 import dorkbox.messagebus.common.MessageHandler;
+import dorkbox.messagebus.dispatch.DispatchCancel;
 import dorkbox.messagebus.error.ErrorHandler;
 import dorkbox.messagebus.error.PublicationError;
 import dorkbox.messagebus.subscription.Entry;
 import dorkbox.messagebus.subscription.Subscription;
-
-import java.lang.reflect.Method;
 
 /**
  * A subscription is a container that manages exactly one message handler of all registered
@@ -101,6 +102,9 @@ class SubscriptionReflectionStrong extends Subscription<Object> {
 
             try {
                 invocation.invoke(listener, method, message);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -126,6 +130,9 @@ class SubscriptionReflectionStrong extends Subscription<Object> {
 
             try {
                 invocation.invoke(listener, method, message1, message2);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -151,6 +158,9 @@ class SubscriptionReflectionStrong extends Subscription<Object> {
 
             try {
                 invocation.invoke(listener, method, message1, message2, message3);
+            } catch (DispatchCancel e) {
+                // we want to cancel the dispatch for this specific message
+                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
