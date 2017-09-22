@@ -22,12 +22,12 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.messagebus.MessageBus;
-import dorkbox.messagebus.PubSubSupport;
-import dorkbox.messagebus.subscription.SubscriptionManager;
-
 import java.util.Iterator;
 import java.util.List;
+
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.PubSubSupport;
+import dorkbox.messageBus.subscription.SubscriptionManager;
 
 /**
  * Todo: Add javadoc

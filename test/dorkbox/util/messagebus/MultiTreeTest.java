@@ -15,10 +15,11 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.util.messagebus.common.AssertSupport;
-import dorkbox.messagebus.common.ClassTree;
-import dorkbox.messagebus.common.MultiClass;
 import org.junit.Test;
+
+import dorkbox.messageBus.common.ClassTree;
+import dorkbox.messageBus.common.MultiClass;
+import dorkbox.util.messagebus.common.AssertSupport;
 
 public class MultiTreeTest extends AssertSupport {
 

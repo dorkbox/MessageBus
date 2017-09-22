@@ -22,13 +22,14 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.messagebus.IMessageBus;
-import dorkbox.messagebus.annotations.Handler;
-import dorkbox.messagebus.annotations.Synchronized;
-import dorkbox.util.messagebus.common.MessageBusTest;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.junit.Test;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import dorkbox.messageBus.IMessageBus;
+import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Synchronized;
+import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
  * Todo: Add javadoc

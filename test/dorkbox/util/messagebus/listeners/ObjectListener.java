@@ -22,11 +22,11 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.messagebus.annotations.Handler;
-
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+
+import dorkbox.messageBus.annotations.Handler;
 
 
 public class ObjectListener {

@@ -22,17 +22,18 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.AssertSupport;
-import dorkbox.messagebus.common.MessageHandler;
-import org.junit.Test;
-
 import java.io.BufferedReader;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.Test;
+
+import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.common.MessageHandler;
+import dorkbox.util.messagebus.common.AssertSupport;
 
 /**
  *

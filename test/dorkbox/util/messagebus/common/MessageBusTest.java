@@ -22,11 +22,12 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.messagebus.MessageBus;
-import dorkbox.messagebus.error.IPublicationErrorHandler;
-import dorkbox.messagebus.error.PublicationError;
-import dorkbox.util.messagebus.messages.MessageTypes;
 import org.junit.Before;
+
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.error.IPublicationErrorHandler;
+import dorkbox.messageBus.error.PublicationError;
+import dorkbox.util.messagebus.messages.MessageTypes;
 
 /**
  * A base test that provides a factory for message bus that makes tests fail if any

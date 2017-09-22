@@ -22,9 +22,6 @@
  */
 package dorkbox.util.messagebus.common;
 
-import dorkbox.messagebus.subscription.Subscription;
-import dorkbox.messagebus.subscription.SubscriptionManager;
-
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,6 +29,9 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+
+import dorkbox.messageBus.subscription.Subscription;
+import dorkbox.messageBus.subscription.SubscriptionManager;
 
 /**
  * @author bennidi

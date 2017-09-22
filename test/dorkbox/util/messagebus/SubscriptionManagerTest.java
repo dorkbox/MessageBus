@@ -22,7 +22,9 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.messagebus.subscription.SubscriptionManager;
+import org.junit.Test;
+
+import dorkbox.messageBus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
@@ -43,7 +45,6 @@ import dorkbox.util.messagebus.messages.IMultipartMessage;
 import dorkbox.util.messagebus.messages.MessageTypes;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 import dorkbox.util.messagebus.messages.StandardMessage;
-import org.junit.Test;
 
 /**
  * Test the subscriptions as generated and organized by the subscription manager. Tests use different sets of listeners

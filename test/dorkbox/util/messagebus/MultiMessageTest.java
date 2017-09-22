@@ -3,13 +3,14 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.messagebus.IMessageBus;
-import dorkbox.messagebus.MessageBus;
-import dorkbox.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.MessageBusTest;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.junit.Test;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import dorkbox.messageBus.IMessageBus;
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.annotations.Handler;
+import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
  * @author dorkbox, llc

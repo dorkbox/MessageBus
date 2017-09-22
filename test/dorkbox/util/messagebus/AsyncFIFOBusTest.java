@@ -22,14 +22,15 @@
  */
 package dorkbox.util.messagebus;
 
-import dorkbox.messagebus.IMessageBus;
-import dorkbox.messagebus.MessageBus;
-import dorkbox.messagebus.annotations.Handler;
-import dorkbox.util.messagebus.common.MessageBusTest;
-import org.junit.Test;
-
 import java.util.LinkedList;
 import java.util.List;
+
+import org.junit.Test;
+
+import dorkbox.messageBus.IMessageBus;
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.annotations.Handler;
+import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
  * NOTE: the async publication is truly async. There is no guaranteed order to when it's handled.
