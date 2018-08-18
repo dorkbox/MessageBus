@@ -1,44 +1,57 @@
-    - Dorkbox MessageBus - Apache 2.0 License
-      https://github.com/dorkbox
-      Copyright 2015, dorkbox, llc
-      Copyright 2012, Benjamin Diedrichsen
-        Lightweight, extremely fast, and zero-gc message/event bus for Java 6+
+ - MessageBus - 
+   https://git.dorkbox.com/dorkbox/MessageBus
+   Copyright 2018 - The Apache Software License, Version 2.0
+     dorkbox, llc
+   Lightweight, extremely fast, and zero-gc message/event bus for Java 6+
+   Copyright 2011 - 2014, XIAM Solutions B.V. (http://www.xiam.nl)
 
 
-    - ASM - BSD 3-clause License
-      http://asm.ow2.org
-      Copyright 2012, France Télécom
-        Bytecode manipulation framework and utilities
+ - ASM - 
+   http://asm.ow2.org
+   Copyright 2012 - BSD 3-Clause License
+     France Télécom
+   Bytecode manipulation framework and utilities
 
 
-    - Disruptor - Apache 2.0 License
-      https://github.com/LMAX-Exchange/disruptor/
-      Copyright 2011, LMAX Ltd/
-        A High Performance Inter-Thread Messaging Library
+ - Disruptor - 
+   https://github.com/LMAX-Exchange/disruptor/
+   Copyright 2011 - The Apache Software License, Version 2.0
+     LMAX Ltd
+   High Performance Inter-Thread Messaging Library
 
 
-    - FastThreadLocal - BSD 3-clause License
-      https://github.com/LWJGL/lwjgl3/blob/5819c9123222f6ce51f208e022cb907091dd8023/modules/core/src/main/java/org/lwjgl/system/FastThreadLocal.java
-      Copyright 2012-2014, Lightweight Java Game Library Project
-       Riven
-        Optimized and Fast ThreadLocals
+ - Dorkbox Utils - 
+   https://git.dorkbox.com/dorkbox/Utilities
+   Copyright 2018 - The Apache Software License, Version 2.0
+     dorkbox, llc
 
 
-    - Kryo - BSD 3-clause License
-      https://github.com/EsotericSoftware/kryo
-      Copyright 2008, Nathan Sweet
+ - FastThreadLocal - 
+   https://github.com/LWJGL/lwjgl3/blob/5819c9123222f6ce51f208e022cb907091dd8023/modules/core/src/main/java/org/lwjgl/system/FastThreadLocal.java
+   Copyright 2014 - BSD 3-Clause License
+     Lightweight Java Game Library Project
+     Riven
 
 
-    - MBassador - MIT License
-      https://github.com/bennidi/mbassador
-      Copyright 2012, Benjamin Diedrichsen
+ - Kryo - 
+   https://github.com/EsotericSoftware/kryo
+   Copyright 2008 - BSD 3-Clause License
+     Nathan Sweet
 
 
-    - ReflectASM - BSD 3-clause License
-      https://github.com/EsotericSoftware/reflectasm
-      Copyright 2008, Nathan Sweet
+ - MBassador - 
+   https://github.com/bennidi/mbassador
+   Copyright 2012 - MIT License
+     Benjamin Diedrichsen
 
 
-    - SLF4J - MIT License
-      http://www.slf4j.org
-      Copyright 2004-2008, QOS.ch
+ - ReflectASM - 
+   https://github.com/EsotericSoftware/reflectasm
+   Copyright 2008 - BSD 3-Clause License
+     Nathan Sweet
+
+
+ - SLF4J - 
+   http://www.slf4j.org
+   Copyright 2008 - MIT License
+     QOS.ch
