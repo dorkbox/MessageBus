@@ -19,12 +19,18 @@ import java.time.Instant
 
 buildscript {
     // load properties from custom location
-    def propsFile = Paths.get("${projectDir}/../../gradle.properties").toAbsolutePath().normalize().toFile()
-    println("Loading custom property data from: ${propsFile}")
+    def propsFile = Paths.get("${projectDir}/../../gradle.properties").normalize().toFile()
+    if (propsFile.canRead()) {
+        println("Loading custom property data from: ${propsFile}")
 
-    def props = new Properties()
-    propsFile.withInputStream {props.load(it)}
-    props.each {key, val -> project.ext.set(key, val)}
+        def props = new Properties()
+        propsFile.withInputStream {props.load(it)}
+        props.each {key, val -> project.ext.set(key, val)}
+    }
+    else {
+        ext.sonatypeUsername = ""
+        ext.sonatypePassword = ""
+    }
 
     // for plugin publishing and license sources
     repositories {
@@ -148,11 +154,6 @@ repositories {
 
 
 dependencies {
-    implementation(project('Utilities')) {
-        // don't include any of the project dependencies for anything
-        transitive = false
-    }
-
     // our main dependencies are ALSO the same as the limited utilities (they are not automatically pulled in from other sourceSets)
     // needed by the utilities (custom since we don't want to include everything). IntelliJ includes everything, but our builds do not
     api 'com.lmax:disruptor:3.4.2'
@@ -178,42 +179,6 @@ tasks.withType(Jar) {
         attributes['Implementation-Version'] = version
         attributes['Build-Date'] = Instant.now().toString()
     }
-}
-
-///////////////////////////////
-//////    UTILITIES COMPILE (for inclusion into jars)
-///////////////////////////////
-static String[] javaFile(String... fileNames) {
-    def fileList = [] as ArrayList
-
-    for (name in fileNames) {
-        def fixed = name.replace('.', '/') + '.java'
-        fileList.add(fixed)
-    }
-
-    return fileList
-}
-
-task compileUtils(type: JavaCompile) {
-    // we don't want the default include of **/*.java
-    getIncludes().clear()
-
-    source = Collections.singletonList('../Utilities/src')
-    include javaFile('dorkbox.util.FastThreadLocal')
-
-    classpath = sourceSets.main.compileClasspath
-    destinationDir = file("$rootDir/build/classes_utilities")
-}
-
-
-///////////////////////////////
-//////    Jar Tasks
-///////////////////////////////
-jar {
-    dependsOn compileUtils
-
-    // include applicable class files from subset of Utilities project
-    from compileUtils.destinationDir
 }
 
 /////////////////////////////
