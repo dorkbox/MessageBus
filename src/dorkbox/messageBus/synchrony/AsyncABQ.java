@@ -25,7 +25,7 @@ import dorkbox.messageBus.dispatch.Dispatch;
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.error.PublicationError;
 import dorkbox.messageBus.synchrony.disruptor.MessageType;
-import dorkbox.messageBus.util.NamedThreadFactory;
+import dorkbox.util.NamedThreadFactory;
 
 /**
  * By default, it is the calling thread that has to get the subscriptions, which the sync/async logic then uses.
