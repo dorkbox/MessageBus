@@ -273,7 +273,6 @@ publishing {
                     connection.set("scm:${Extras.url}.git")
                 }
             }
-
         }
     }
 
