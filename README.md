@@ -1,13 +1,17 @@
 MessageBus
 ==========
 
+###### [![Dorkbox](https://badge.dorkbox.com/dorkbox.svg "Dorkbox")](https://git.dorkbox.com/dorkbox/MessageBus) [![Github](https://badge.dorkbox.com/github.svg "Github")](https://github.com/dorkbox/MessageBus) [![Gitlab](https://badge.dorkbox.com/gitlab.svg "Gitlab")](https://gitlab.com/dorkbox/MessageBus) [![Bitbucket](https://badge.dorkbox.com/bitbucket.svg "Bitbucket")](https://bitbucket.org/dorkbox/MessageBus)
+
+
+
 The MessageBus is an extremely light-weight message/event bus implementation that follows the publish/subscribe pattern and is based on the [MBassador](https://github.com/bennidi/mbassador) project. It is designed for ease of use and simplicity, and aims for **maximum performance** and **zero garbage** during message publication. At the core of this project is the use of the `single writer principle` as described by Nitsan Wakart on his [blog](http://psy-lob-saw.blogspot.com/2012/12/atomiclazyset-is-performance-win-for.html) and the fantastic [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor).
   
 Using the MessageBus in your project is very easy.   
   1 Create an instance of the MessageBus (usually a singleton will do) `MessageBus bus = new MessageBus()`  
   2 Mark and configure your message handlers (the objects that will receive the messages) with `@Handler` notations  
   3 Register these via `bus.subscribe(listener)`  
-  4 Send messages to these listeners via `bus.publish(message)` for synchronus publication, or `bus.publishAsync(message)` for asynchronous publication  
+  4 Send messages to these listeners via `bus.publish(message)` for synchronous publication, or `bus.publishAsync(message)` for asynchronous publication  
   5 (Optional) Free resources and threads via `bus.shutdown()` when you are finished (usually on application exit)  
   
   You're done! 
