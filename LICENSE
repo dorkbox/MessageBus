@@ -1,6 +1,6 @@
  - MessageBus - 
    https://git.dorkbox.com/dorkbox/MessageBus
-   Copyright 2018 - The Apache Software License, Version 2.0
+   Copyright 2019 - The Apache Software License, Version 2.0
      dorkbox, llc
    Lightweight, extremely fast, and zero-gc message/event bus for Java 6+
    Copyright 2011 - 2014, XIAM Solutions B.V. (http://www.xiam.nl)
@@ -22,7 +22,7 @@
 
  - Dorkbox Utils - 
    https://git.dorkbox.com/dorkbox/Utilities
-   Copyright 2018 - The Apache Software License, Version 2.0
+   Copyright 2019 - The Apache Software License, Version 2.0
      dorkbox, llc
 
 
