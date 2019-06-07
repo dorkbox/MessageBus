@@ -45,12 +45,11 @@ import java.lang.annotation.Target;
 public
 @interface Listener {
     /**
-     * By default, references to message listeners (these are the objects/methods that receive messages) are strong. This default can be
-     * changed via a static boolean (during startup, see MessageBus.useStrongReferencesByDefault).
+     * By default, references to message listeners (these are the objects/methods that receive messages) are strong. See {@link dorkbox.messageBus.SubscriptionMode}).
      *
      * The benefits to use WEAK references, is to eliminate risks of memory leaks in managed environments (such as spring).
      *
-     * the default here "Undefined" here so that the static boolean (MessageBus.useStrongReferencesByDefault) takes priority
+     * the default here "Undefined" here so that the {@link dorkbox.messageBus.SubscriptionMode#StrongReferences} takes priority
      */
     References references() default References.Undefined;
 }
