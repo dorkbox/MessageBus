@@ -20,9 +20,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-import com.esotericsoftware.kryo.util.IdentityMap;
-
 import dorkbox.messageBus.subscription.SubscriptionManager;
+import dorkbox.util.collections.IdentityMap;
 
 /**
  * @author dorkbox

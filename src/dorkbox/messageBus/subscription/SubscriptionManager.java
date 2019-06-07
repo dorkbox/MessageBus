@@ -19,15 +19,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-import com.esotericsoftware.kryo.util.IdentityMap;
-
-import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.SubscriptionMode;
 import dorkbox.messageBus.common.ClassTree;
 import dorkbox.messageBus.common.MessageHandler;
 import dorkbox.messageBus.common.MultiClass;
 import dorkbox.messageBus.subscription.asm.AsmFactory;
 import dorkbox.messageBus.subscription.reflection.ReflectionFactory;
 import dorkbox.messageBus.util.ClassUtils;
+import dorkbox.util.collections.IdentityMap;
+
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
  *
@@ -103,14 +103,38 @@ class SubscriptionManager {
                                                            IdentityMap.class,
                                                            "subsSuperMulti");
 
+    /**
+     * By default, we use ASM for accessing methods during the dispatch of messages. This is only available on certain platforms, and so
+     * it will gracefully 'fallback' to using standard java reflection to access the methods. "Standard java reflection" is not as fast
+     * as ASM, but only marginally.
+     *
+     * If you would like to use java reflection for accessing methods, set this value to false.
+     */
+    public static boolean useAsmForDispatch = true;
+
+    static {
+        // check to see if we can use ASM for method access (it's a LOT faster than reflection). By default, we use ASM.
+        if (useAsmForDispatch) {
+            // only bother checking if we are different than the defaults
+            try {
+                Class.forName("com.esotericsoftware.reflectasm.MethodAccess");
+            } catch (Exception e) {
+                useAsmForDispatch = false;
+            }
+        }
+    }
+
     public
-    SubscriptionManager(final boolean useStrongReferencesByDefault) {
+    SubscriptionManager(final SubscriptionMode subscriptionMode) {
+        boolean useStrongReferences = subscriptionMode == SubscriptionMode.StrongReferences;
+
+
         // not all platforms support ASM. ASM is our default, and is just-as-fast and directly invoking the method
-        if (MessageBus.useAsmForDispatch) {
-            this.subscriptionFactory = new AsmFactory(useStrongReferencesByDefault);
+        if (useAsmForDispatch) {
+            this.subscriptionFactory = new AsmFactory(useStrongReferences);
         }
         else {
-            this.subscriptionFactory = new ReflectionFactory(useStrongReferencesByDefault);
+            this.subscriptionFactory = new ReflectionFactory(useStrongReferences);
         }
 
         classUtils = new ClassUtils();

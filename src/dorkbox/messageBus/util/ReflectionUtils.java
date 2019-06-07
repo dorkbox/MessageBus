@@ -43,9 +43,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import com.esotericsoftware.kryo.util.IdentityMap;
-
 import dorkbox.messageBus.annotations.Subscribe;
+import dorkbox.util.collections.IdentityMap;
 
 /**
  * @author bennidi

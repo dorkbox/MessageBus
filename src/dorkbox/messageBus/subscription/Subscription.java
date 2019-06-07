@@ -18,10 +18,9 @@ package dorkbox.messageBus.subscription;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-import com.esotericsoftware.kryo.util.IdentityMap;
-
 import dorkbox.messageBus.common.MessageHandler;
 import dorkbox.messageBus.error.ErrorHandler;
+import dorkbox.util.collections.IdentityMap;
 
 /**
  * A subscription is a container that manages exactly one message handler of all registered

@@ -18,9 +18,8 @@ package dorkbox.messageBus.common;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.esotericsoftware.kryo.util.IdentityMap;
-
 import dorkbox.messageBus.util.FastThreadLocal;
+import dorkbox.util.collections.IdentityMap;
 
 /**
  * Simple tree structure that is a map that contains a chain of keys to publish to a value.
