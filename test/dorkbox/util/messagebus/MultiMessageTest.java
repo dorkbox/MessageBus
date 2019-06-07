@@ -3,6 +3,8 @@
  */
 package dorkbox.util.messagebus;
 
+import static dorkbox.messageBus.IMessageBus.*;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
@@ -23,7 +25,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExact() {
-        IMessageBus bus = new MessageBus(IMessageBus.DispatchMode.Exact,
+        IMessageBus bus = new MessageBus(DispatchMode.Exact, PublicationMode.Disruptor, SubscriptionMode.StrongReferences,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();
@@ -54,7 +56,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExactAndSuper() {
-        IMessageBus bus = new MessageBus(IMessageBus.DispatchMode.ExactWithSuperTypes,
+        IMessageBus bus = new MessageBus(DispatchMode.ExactWithSuperTypes, PublicationMode.Disruptor, SubscriptionMode.StrongReferences,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();

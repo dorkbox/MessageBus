@@ -24,6 +24,7 @@ package dorkbox.util.messagebus;
 
 import org.junit.Test;
 
+import dorkbox.messageBus.IMessageBus.SubscriptionMode;
 import dorkbox.messageBus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
@@ -227,7 +228,7 @@ public class SubscriptionManagerTest extends AssertSupport {
         ListenerFactory listeners = listeners(Overloading.ListenerBase.class,
                                               Overloading.ListenerSub.class);
 
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(true);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(SubscriptionMode.StrongReferences);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
@@ -254,7 +255,7 @@ public class SubscriptionManagerTest extends AssertSupport {
     }
 
     private void runTestWith(final ListenerFactory listeners, final SubscriptionValidator validator) {
-        final SubscriptionManager subscriptionManager = new SubscriptionManager(true);
+        final SubscriptionManager subscriptionManager = new SubscriptionManager(SubscriptionMode.StrongReferences);
 
         ConcurrentExecutor.runConcurrent(TestUtil.subscriber(subscriptionManager, listeners), 1);
 
