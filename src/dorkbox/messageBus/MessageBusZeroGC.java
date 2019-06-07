@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 dorkbox, llc
+ * Copyright 2019 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package dorkbox.messageBus;
 
 import java.util.concurrent.BlockingQueue;
 
+import org.vibur.objectpool.PoolService;
+
 import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
 import com.conversantmedia.util.concurrent.SpinPolicy;
 
@@ -27,13 +29,16 @@ import dorkbox.messageBus.dispatch.DispatchExactWithSuperTypes;
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.error.IPublicationErrorHandler;
 import dorkbox.messageBus.subscription.SubscriptionManager;
-import dorkbox.messageBus.synchrony.Async;
-import dorkbox.messageBus.synchrony.MessageHolder;
-import dorkbox.messageBus.synchrony.Sync;
-import dorkbox.messageBus.synchrony.Synchrony;
+import dorkbox.messageBus.synchrony.AsyncZeroGC;
+import dorkbox.messageBus.synchrony.MessageHolderZeroGC;
+import dorkbox.messageBus.synchrony.SyncZeroGC;
+import dorkbox.messageBus.synchrony.SynchronyZeroGC;
 
 /**
- * A message bus offers facilities for publishing messages to the message handlers of registered listeners.
+ * A message bus with ZERO GC capabilities offers facilities for publishing messages to the message handlers of registered listeners.
+ * <p/>
+ * Zero GC is possible through the useage of object pools. In our specific case, we use the Vibur Object Pool, because
+ * it is one of the fastest AND it supports the usage of the Conversant Disruptor.
  * <p/>
  *
  * Because the message bus keeps track of classes that are subscribed and published, reloading the classloader means that you will need to
@@ -101,7 +106,7 @@ import dorkbox.messageBus.synchrony.Synchrony;
 
 @SuppressWarnings("WeakerAccess")
 public
-class MessageBus {
+class MessageBusZeroGC {
     /**
      * Gets the version number.
      */
@@ -129,12 +134,13 @@ class MessageBus {
         return new DispatchExactWithSuperTypes(errorHandler, subscriptionManager);
     }
 
+
     private final ErrorHandler errorHandler;
 
     private final SubscriptionManager subscriptionManager;
 
-    private final Synchrony syncPublication;
-    private final Synchrony asyncPublication;
+    private final SynchronyZeroGC syncPublication;
+    private final SynchronyZeroGC asyncPublication;
 
     /**
      * Will permit subType matching for matching what subscription handles which message
@@ -146,7 +152,7 @@ class MessageBus {
      * Will use half of CPUs available for dispatching async messages
      */
     public
-    MessageBus() {
+    MessageBusZeroGC() {
         this(Runtime.getRuntime().availableProcessors()/2);
     }
 
@@ -161,7 +167,7 @@ class MessageBus {
      * @param numberOfThreads how many threads to use for dispatching async messages
      */
     public
-    MessageBus(final int numberOfThreads) {
+    MessageBusZeroGC(final int numberOfThreads) {
         this(DispatchMode.ExactWithSuperTypes, SubscriptionMode.StrongReferences, numberOfThreads);
     }
 
@@ -175,7 +181,7 @@ class MessageBus {
      * @param subscriptionMode Specifies which Subscription Mode Mode (Strong or Weak) to change how subscription handlers are saved internally.
      */
     public
-    MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode) {
+    MessageBusZeroGC(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode) {
         this(dispatchMode, subscriptionMode, Runtime.getRuntime().availableProcessors()/2);
     }
 
@@ -188,8 +194,8 @@ class MessageBus {
      * @param numberOfThreads  how many threads to use for dispatching async messages
      */
     public
-    MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final int numberOfThreads) {
-        this(dispatchMode, subscriptionMode, new DisruptorBlockingQueue<MessageHolder>(1024, SpinPolicy.BLOCKING), numberOfThreads);
+    MessageBusZeroGC(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final int numberOfThreads) {
+        this(dispatchMode, subscriptionMode, new DisruptorBlockingQueue<MessageHolderZeroGC>(1024, SpinPolicy.BLOCKING), numberOfThreads);
     }
 
 
@@ -204,7 +210,7 @@ class MessageBus {
      * @param numberOfThreads  how many threads to use for dispatching async messages
      */
     public
-    MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final BlockingQueue<MessageHolder> dispatchQueue, final int numberOfThreads) {
+    MessageBusZeroGC(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final BlockingQueue<MessageHolderZeroGC> dispatchQueue, final int numberOfThreads) {
         this.errorHandler = new ErrorHandler();
 
         // Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
@@ -212,8 +218,8 @@ class MessageBus {
 
         Dispatch dispatch = getDispatch(dispatchMode, errorHandler, subscriptionManager);
 
-        syncPublication = new Sync(dispatch);
-        asyncPublication = new Async(numberOfThreads, dispatch, dispatchQueue, errorHandler);
+        syncPublication = new SyncZeroGC(dispatch);
+        asyncPublication = new AsyncZeroGC(numberOfThreads, dispatch, dispatchQueue, errorHandler);
     }
 
 
@@ -261,8 +267,8 @@ class MessageBus {
      * The call returns when all matching subscription handlers of all registered listeners have been notified (invoked) of the message.
      */
     public
-    void publish(final Object message) {
-        syncPublication.publish(message);
+    <T> void publish(final PoolService<T> pool, final T message) {
+        syncPublication.publish(pool, message);
     }
 
 
@@ -275,8 +281,9 @@ class MessageBus {
      * The call returns when all matching subscription handlers of all registered listeners have been notified (invoked) of the message.
      */
     public
-    void publish(final Object message1, final Object message2) {
-        syncPublication.publish(message1, message2);
+    <T1, T2> void publish(final PoolService<T1> pool1, final PoolService<T2> pool2,
+                          final T1 message1, final T2 message2) {
+        syncPublication.publish(pool1, pool2, message1, message2);
     }
 
 
@@ -289,8 +296,9 @@ class MessageBus {
      * The call returns when all matching subscription handlers of all registered listeners have been notified (invoked) of the message.
      */
     public
-    void publish(final Object message1, final Object message2, final Object message3) {
-        syncPublication.publish(message1, message2, message3);
+    <T1, T2, T3> void publish(final PoolService<T1> pool1, final PoolService<T2> pool2, final PoolService<T3> pool3,
+                              final T1 message1, final T2 message2, final T3 message3) {
+        syncPublication.publish(pool1, pool2, pool3, message1, message2, message3);
     }
 
 
@@ -303,8 +311,8 @@ class MessageBus {
      * This call returns immediately.
      */
     public
-    void publishAsync(final Object message) {
-        asyncPublication.publish(message);
+    <T> void publishAsync(final PoolService<T> pool, final T message) {
+        asyncPublication.publish(pool, message);
     }
 
 
@@ -318,8 +326,9 @@ class MessageBus {
      * This call returns immediately.
      */
     public
-    void publishAsync(final Object message1, final Object message2) {
-        asyncPublication.publish(message1, message2);
+    <T1, T2> void publishAsync(final PoolService<T1> pool1, final PoolService<T2> pool2,
+                               final T1 message1, final T2 message2) {
+        asyncPublication.publish(pool1, pool2, message1, message2);
     }
 
 
@@ -332,8 +341,9 @@ class MessageBus {
      * This call returns immediately.
      */
     public
-    void publishAsync(final Object message1, final Object message2, final Object message3) {
-        asyncPublication.publish(message1, message2, message3);
+    <T1, T2, T3> void publishAsync(final PoolService<T1> pool1, final PoolService<T2> pool2, final PoolService<T3> pool3,
+                                   final T1 message1, final T2 message2, final T3 message3) {
+        asyncPublication.publish(pool1, pool2, pool3, message1, message2, message3);
     }
 
 

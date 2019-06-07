@@ -25,25 +25,28 @@ import dorkbox.messageBus.dispatch.Dispatch;
 public final
 class Sync implements Synchrony {
 
+    private final Dispatch dispatch;
+
     public
-    Sync() {
+    Sync(final Dispatch dispatch) {
+        this.dispatch = dispatch;
     }
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1) {
+    void publish(final Object message1) {
         dispatch.publish(message1);
     }
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1, final Object message2) {
+    void publish(final Object message1, final Object message2) {
         dispatch.publish(message1, message2);
     }
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1, final Object message2, final Object message3) {
+    void publish(final Object message1, final Object message2, final Object message3) {
         dispatch.publish(message1, message2, message3);
     }
 

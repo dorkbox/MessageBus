@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 dorkbox, llc
+ * Copyright 2019 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ package dorkbox.messageBus.synchrony;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.locks.LockSupport;
 
+import dorkbox.messageBus.common.MessageType;
 import dorkbox.messageBus.dispatch.Dispatch;
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.error.PublicationError;
-import dorkbox.messageBus.synchrony.disruptor.MessageType;
 import dorkbox.util.NamedThreadFactory;
 
 /**
@@ -32,17 +32,25 @@ import dorkbox.util.NamedThreadFactory;
  *
  * The exception to this rule is when checking/calling DeadMessage publication.
  *
- * This is similar to the disruptor, however the downside of this implementation is that, while faster than the no-gc version, it
- * generates garbage (while the disruptor version does not).
- *
- * Basically, the disruptor is fast + noGC.
- *
  * @author dorkbox, llc Date: 2/3/16
  */
-public final
-class AsyncABQ implements Synchrony {
+public
+class Async implements Synchrony {
 
-    private final ArrayBlockingQueue<MessageHolder> dispatchQueue;
+    /**
+     * Always return at least 2 threads
+     */
+    private static
+    int getMinNumberOfThreads(final int numberOfThreads) {
+        if (numberOfThreads < 2) {
+            return 2;
+        }
+        return numberOfThreads;
+    }
+
+    private final Dispatch dispatch;
+    private final BlockingQueue<MessageHolder> dispatchQueue;
+
     private final Collection<Thread> threads;
     private final Collection<Boolean> shutdown;
     private final ErrorHandler errorHandler;
@@ -54,22 +62,28 @@ class AsyncABQ implements Synchrony {
 
 
     public
-    AsyncABQ(final int numberOfThreads, final ErrorHandler errorHandler) {
-        this.errorHandler = errorHandler;
+    Async(int numberOfThreads, final Dispatch dispatch, final BlockingQueue<MessageHolder> dispatchQueue, final ErrorHandler errorHandler) {
+        this.dispatch = dispatch;
 
-        this.dispatchQueue = new ArrayBlockingQueue<MessageHolder>(1024);
+        // ALWAYS round to the nearest power of 2
+        numberOfThreads = 1 << (32 - Integer.numberOfLeadingZeros(getMinNumberOfThreads(numberOfThreads) - 1));
+
+        this.errorHandler = errorHandler;
+        this.dispatchQueue = dispatchQueue;
 
         // each thread will run forever and process incoming message publication requests
         Runnable runnable = new Runnable() {
-            @SuppressWarnings({"ConstantConditions", "UnnecessaryLocalVariable"})
             @Override
             public
             void run() {
-                final ArrayBlockingQueue<MessageHolder> IN_QUEUE = AsyncABQ.this.dispatchQueue;
-                final ErrorHandler errorHandler1 = errorHandler;
+                final Async outsideThis = Async.this;
 
-                while (!AsyncABQ.this.shuttingDown) {
-                    process(IN_QUEUE, errorHandler1);
+                final Dispatch dispatch = outsideThis.dispatch;
+                final BlockingQueue<MessageHolder> queue = outsideThis.dispatchQueue;
+                final ErrorHandler errorHandler = outsideThis.errorHandler;
+
+                while (!outsideThis.shuttingDown) {
+                    process(dispatch, queue, errorHandler);
                 }
 
                 synchronized (shutdown) {
@@ -91,73 +105,62 @@ class AsyncABQ implements Synchrony {
 
     @SuppressWarnings("Duplicates")
     private
-    void process(final ArrayBlockingQueue<MessageHolder> queue, final ErrorHandler errorHandler) {
-        MessageHolder event;
-
-        int messageType = MessageType.ONE;
-        Dispatch dispatch;
-        Object message1 = null;
-        Object message2 = null;
-        Object message3 = null;
+    void process(final Dispatch dispatch, final BlockingQueue<MessageHolder> queue, final ErrorHandler errorHandler) {
 
         try {
-            event = queue.take();
+            MessageHolder message = queue.take();
 
-            messageType = event.type;
-            dispatch = event.dispatch;
-            message1 = event.message1;
-            message2 = event.message2;
-            message3 = event.message3;
-
+            int messageType = message.type;
             switch (messageType) {
                 case MessageType.ONE: {
-                    dispatch.publish(message1);
+                    try {
+                        dispatch.publish(message.message1);
+                    } catch (Exception e) {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Exception during message dequeue.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message.message1));
+                    }
                     return;
                 }
                 case MessageType.TWO: {
-                    dispatch.publish(message1, message2);
+                    try {
+                        dispatch.publish(message.message1, message.message2);
+                    } catch (Exception e) {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Exception during message dequeue.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message.message1, message.message2));
+                    }
+
                     return;
                 }
                 case MessageType.THREE: {
-                    dispatch.publish(message1, message2, message3);
+                    try {
+                        dispatch.publish(message.message1, message.message2, message.message3);
+                    } catch (Exception e) {
+                        errorHandler.handlePublicationError(new PublicationError().setMessage("Exception during message dequeue.")
+                                                                                  .setCause(e)
+                                                                                  .setPublishedObject(message.message1, message.message2, message.message3));
+                    }
+
                     //noinspection UnnecessaryReturnStatement
                     return;
                 }
             }
         } catch (InterruptedException e) {
             if (!this.shuttingDown) {
-                switch (messageType) {
-                    case MessageType.ONE: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
-                                                                                  .setCause(e)
-                                                                                  .setPublishedObject(message1));
-                        return;
-                    }
-                    case MessageType.TWO: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
-                                                                                   .setCause(e)
-                                                                                   .setPublishedObject(message1, message2));
-                        return;
-                    }
-                    case MessageType.THREE: {
-                        errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted error during message dequeue.")
-                                                                                  .setCause(e)
-                                                                                  .setPublishedObject(message1, message2, message3));
-                        //noinspection UnnecessaryReturnStatement
-                        return;
-                    }
-                }
+                errorHandler.handlePublicationError(new PublicationError().setMessage("Interrupted exception during message dequeue.")
+                                                                          .setCause(e)
+                                                                          .setNoPublishedObject());
             }
         }
     }
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1) {
+    void publish(final Object message1) {
         MessageHolder job = new MessageHolder();
 
         job.type = MessageType.ONE;
-        job.dispatch = dispatch;
 
         job.message1 = message1;
 
@@ -172,11 +175,10 @@ class AsyncABQ implements Synchrony {
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1, final Object message2) {
+    void publish(final Object message1, final Object message2) {
         MessageHolder job = new MessageHolder();
 
         job.type = MessageType.TWO;
-        job.dispatch = dispatch;
 
         job.message1 = message1;
         job.message2 = message2;
@@ -192,11 +194,10 @@ class AsyncABQ implements Synchrony {
 
     @Override
     public
-    void publish(final Dispatch dispatch, final Object message1, final Object message2, final Object message3) {
+    void publish(final Object message1, final Object message2, final Object message3) {
         MessageHolder job = new MessageHolder();
 
         job.type = MessageType.THREE;
-        job.dispatch = dispatch;
 
         job.message1 = message1;
         job.message2 = message2;

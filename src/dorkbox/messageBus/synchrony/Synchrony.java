@@ -15,16 +15,14 @@
  */
 package dorkbox.messageBus.synchrony;
 
-import dorkbox.messageBus.dispatch.Dispatch;
-
 /**
  * @author dorkbox, llc Date: 2/3/16
  */
 public
 interface Synchrony {
-    void publish(Dispatch dispatch, Object message1);
-    void publish(Dispatch dispatch, Object message1, Object message2);
-    void publish(Dispatch dispatch, Object message1, Object message2, Object message3);
+    void publish(Object message1);
+    void publish(Object message1, Object message2);
+    void publish(Object message1, Object message2, Object message3);
 
     void shutdown();
     boolean hasPendingMessages();

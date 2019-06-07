@@ -16,9 +16,6 @@
 
 
 import java.time.Instant
-import java.util.*
-import kotlin.reflect.KMutableProperty
-import kotlin.reflect.full.declaredMemberProperties
 
 ///////////////////////////////
 //////    PUBLISH TO SONATYPE / MAVEN CENTRAL
@@ -36,14 +33,14 @@ plugins {
     `maven-publish`
 
     // close and release on sonatype
-    id("io.codearte.nexus-staging") version "0.20.0"
+    id("io.codearte.nexus-staging") version "0.21.0"
 
     id("com.dorkbox.CrossCompile") version "1.0.1"
     id("com.dorkbox.Licensing") version "1.4"
-    id("com.dorkbox.VersionUpdate") version "1.4.1"
-    id("com.dorkbox.GradleUtils") version "1.0"
+    id("com.dorkbox.VersionUpdate") version "1.5"
+    id("com.dorkbox.GradleUtils") version "1.2"
 
-    kotlin("jvm") version "1.3.21"
+    kotlin("jvm") version "1.3.31"
 }
 
 object Extras {
@@ -68,33 +65,10 @@ object Extras {
 ///////////////////////////////
 /////  assign 'Extras'
 ///////////////////////////////
+GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 description = Extras.description
 group = Extras.group
 version = Extras.version
-
-val propsFile = File("$projectDir/../../gradle.properties").normalize()
-if (propsFile.canRead()) {
-    println("\tLoading custom property data from: [$propsFile]")
-
-    val props = Properties()
-    propsFile.inputStream().use {
-        props.load(it)
-    }
-
-    val extraProperties = Extras::class.declaredMemberProperties.filterIsInstance<KMutableProperty<String>>()
-    props.forEach { (k, v) -> run {
-        val key = k as String
-        val value = v as String
-
-        val member = extraProperties.find { it.name == key }
-        if (member != null) {
-            member.setter.call(Extras::class.objectInstance, value)
-        }
-        else {
-            project.extra.set(k, v)
-        }
-    }}
-}
 
 
 licensing {
@@ -118,9 +92,9 @@ licensing {
 
     license("Disruptor", License.APACHE_2) {
         copyright(2011)
-        author("LMAX Ltd")
-        url("https://github.com/LMAX-Exchange/disruptor/")
-        note("High Performance Inter-Thread Messaging Library")
+        author("Conversant")
+        url("https://github.com/conversant/disruptor/")
+        note("The highest performing intra-thread transfer mechanism available in Java")
     }
 
     license("FastThreadLocal", License.BSD_3) {
@@ -130,10 +104,11 @@ licensing {
         url("https://github.com/LWJGL/lwjgl3/blob/5819c9123222f6ce51f208e022cb907091dd8023/modules/core/src/main/java/org/lwjgl/system/FastThreadLocal.java")
     }
 
-    license("Kryo", License.BSD_3) {
-        copyright(2008)
-        author("Nathan Sweet")
-        url("https://github.com/EsotericSoftware/kryo")
+    license("IntMap", License.APACHE_2) {
+        copyright(2013)
+        author("Mario Zechner <badlogicgames@gmail.com>")
+        author("Nathan Sweet <nathan.sweet@gmail.com>")
+        url("http://github.com/libgdx/libgdx/")
     }
 
     license("ReflectASM", License.BSD_3) {
@@ -153,12 +128,27 @@ licensing {
         author("QOS.ch")
         url("http://www.slf4j.org")
     }
+
+    license("Vibur Object Pool", License.APACHE_2) {
+        copyright(2013)
+        author("Simeon Malchev")
+        url("https://github.com/vibur/vibur-object-pool")
+    }
 }
 
 sourceSets {
     main {
         java {
             setSrcDirs(listOf("src"))
+
+            // want to include java files for the source. 'setSrcDirs' resets includes...
+            include("**/*.java")
+        }
+    }
+
+    test {
+        java {
+            setSrcDirs(listOf("test"))
 
             // want to include java files for the source. 'setSrcDirs' resets includes...
             include("**/*.java")
@@ -205,13 +195,19 @@ tasks.compileJava.get().apply {
 
 
 dependencies {
-    api ("com.lmax:disruptor:3.4.2")
+    implementation("com.dorkbox:Utilities:1.2")
 
-    api ("org.ow2.asm:asm:5.2")
-    api ("com.esotericsoftware:reflectasm:1.11.1")
-    api ("com.esotericsoftware:kryo:4.0.2")
+    implementation("com.conversantmedia:disruptor:1.2.15")
+    implementation("org.vibur:vibur-object-pool:23.0")
 
-    api("org.slf4j:slf4j-api:1.7.25")
+    implementation("org.ow2.asm:asm:7.1")
+    implementation("com.esotericsoftware:reflectasm:1.11.9")
+
+    implementation("org.slf4j:slf4j-api:1.7.26")
+
+
+    testCompile("junit:junit:4.12")
+    testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 
 ///////////////////////////////

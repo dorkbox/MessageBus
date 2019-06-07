@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 dorkbox, llc
+ * Copyright 2019 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,22 @@
  */
 package dorkbox.messageBus.synchrony;
 
-import dorkbox.messageBus.common.MessageType;
+import org.vibur.objectpool.PoolService;
 
 /**
- * @author dorkbox, llc Date: 2/2/15
+ * @author dorkbox, llc Date: 2/3/16
  */
 public
-class MessageHolder {
-    public int type = MessageType.ONE;
+interface SynchronyZeroGC {
+    <T> void publish(PoolService<T> pool, T message1);
 
-    public Object message1 = null;
-    public Object message2 = null;
-    public Object message3 = null;
+    <T1, T2> void publish(PoolService<T1> pool1, PoolService<T2> pool2,
+                          T1 message1, T2 message2);
 
-    public
-    MessageHolder() {}
+    <T1, T2, T3> void publish(PoolService<T1> pool1, PoolService<T2> pool2, PoolService<T3> pool3,
+                              T1 message1, T2 message2, T3 message3);
+
+    void shutdown();
+
+    boolean hasPendingMessages();
 }
