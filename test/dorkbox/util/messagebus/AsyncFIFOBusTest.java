@@ -43,13 +43,13 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     @Test
     public void testSingleThreadedSyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
-        IMessageBus fifoBUs = new MessageBus();
+        IMessageBus fifoBus = new MessageBus();
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){
             Listener listener = new Listener();
             listeners.add(listener);
-            fifoBUs.subscribe(listener);
+            fifoBus.subscribe(listener);
         }
 
         // prepare set of messages in increasing order
@@ -59,10 +59,10 @@ public class AsyncFIFOBusTest extends MessageBusTest {
         }
         // publish in ascending order
         for(Integer message : messages) {
-            fifoBUs.publish(message);
+            fifoBus.publish(message);
         }
 
-        while(fifoBUs.hasPendingMessages()) {
+        while(fifoBus.hasPendingMessages()) {
             pause(1000);
         }
 
@@ -72,7 +72,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
                 assertEquals(messages[i], listener.receivedSync.get(i));
             }
         }
-        fifoBUs.shutdown();
+        fifoBus.shutdown();
     }
 
     public static class Listener {
