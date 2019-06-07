@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus;
 import dorkbox.messageBus.MessageBus;
 import dorkbox.messageBus.error.IPublicationErrorHandler;
 import dorkbox.messageBus.error.PublicationError;
@@ -53,7 +52,7 @@ public class SyncBusTest extends MessageBusTest {
     @Test
     public void testSynchronousMessagePublication() throws Exception {
 
-        final IMessageBus bus = new MessageBus();
+        final MessageBus bus = new MessageBus();
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, IMessageListener.DefaultListener.class)
                 .create(InstancesPerListener, IMessageListener.DisabledListener.class)
@@ -112,7 +111,7 @@ public class SyncBusTest extends MessageBusTest {
             }
         };
 
-        final IMessageBus bus = new MessageBus();
+        final MessageBus bus = new MessageBus();
         bus.addErrorHandler(ExceptionCounter);
         ListenerFactory listeners = new ListenerFactory()
                 .create(InstancesPerListener, ExceptionThrowingListener.class);

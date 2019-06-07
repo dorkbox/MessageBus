@@ -27,9 +27,8 @@ import java.util.List;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus;
 import dorkbox.messageBus.MessageBus;
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
@@ -43,7 +42,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
     @Test
     public void testSingleThreadedSyncFIFO(){
         // create a fifo bus with 1000 concurrently subscribed listeners
-        IMessageBus fifoBus = new MessageBus();
+        MessageBus fifoBus = new MessageBus();
 
         List<Listener> listeners = new LinkedList<Listener>();
         for(int i = 0; i < 1000 ; i++){
@@ -79,7 +78,7 @@ public class AsyncFIFOBusTest extends MessageBusTest {
 
         private List<Integer> receivedSync = new LinkedList<Integer>();
 
-        @Handler
+        @Subscribe
         public void handleSync(Integer message){
             synchronized (this.receivedSync) {
                 this.receivedSync.add(message);

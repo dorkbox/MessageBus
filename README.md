@@ -9,7 +9,7 @@ The MessageBus is an extremely light-weight message/event bus implementation tha
   
 Using the MessageBus in your project is very easy.   
   1 Create an instance of the MessageBus (usually a singleton will do) `MessageBus bus = new MessageBus()`  
-  2 Mark and configure your message handlers (the objects that will receive the messages) with `@Handler` notations  
+  2 Mark and configure your message subscription handlers (the methods that will receive the messages) with `@Subscribe` notations  
   3 Register these via `bus.subscribe(listener)`  
   4 Send messages to these listeners via `bus.publish(message)` for synchronous publication, or `bus.publishAsync(message)` for asynchronous publication  
   5 (Optional) Free resources and threads via `bus.shutdown()` when you are finished (usually on application exit)  
@@ -35,7 +35,7 @@ Table of contents:
 
 |Annotation|Function|
 |:-----|:-----|
-|`@Handler`|Defines and customizes a message handler. Any well-formed method annotated with `@Handler` will cause instances of the defining class to be treated as message listeners|
+|`@Subscribe`|Defines and customizes a message subscription handler. Any well-formed method annotated with `@Subscribe` will cause instances of the defining class to be treated as event receivers|
 |`@Listener`|Can be used to customize listener wide configuration like the used reference type|
 |`@Synchronized`|Specifies that the handler/method will be accessed in a `synchronized` block|
 
@@ -48,7 +48,7 @@ Messages do not need to implement any interface and can be of any type. It is po
 
 > Configurable reference types
 
-By default, the MessageBus uses strong references for listeners. If the programmer wants to relieve the  need to explicitly unsubscribe listeners that are not used anymore and avoid memory-leaks, it is trivial to configure via `MessageBus.useStrongReferencesByDefault = false`. Using strong references is the fastest, most robust method for dispatching messages, however weak references are very comfortable in container managed environments where listeners are created and destroyed by frameworks, i.e. Spring, Guice etc. Just stuff everything into the message bus, it will ignore objects without message handlers and automatically clean-up orphaned weak references after the garbage collector has done its job. Strongly referenced listeners will stick around until explicitly unsubscribed.
+By default, the MessageBus uses strong references for listeners. If the programmer wants to relieve the  need to explicitly unsubscribe listeners that are not used anymore and avoid memory-leaks, it is trivial to configure via setting the `SubscriptionMode`. Using strong references is the fastest, most robust method for dispatching messages, however weak references are very comfortable in container managed environments where listeners are created and destroyed by frameworks, i.e. Spring, Guice etc. Just stuff everything into the message bus, it will ignore objects without message handlers and automatically clean-up orphaned weak references after the garbage collector has done its job. Strongly referenced listeners will stick around until explicitly unsubscribed.
 
 > Custom error handling
 
@@ -59,26 +59,26 @@ Errors during message delivery are sent to all registered error handlers which c
 
 Handler definition (in any bean):
 
-        // every message of type TestMessage or any subtype will be delivered to this handler
-        @Handler
+        // every message of type TestMessage or any subtype will be delivered to this subscription handler
+        @Subscribe
 		public void handleTestMessage(TestMessage message) {
 			// do something
 		}
 
-		// every message of type TestMessage or any subtype will be delivered to this handler
-        @Handler
+		// every message of type TestMessage or any subtype will be delivered to this subscription handler
+        @Subscribe
         public void handleTestMessage(TestMessage message) {
             // do something
         }
 
-        // this handler will not accept subtypes of the TestMessage.
-        @Handler(acceptSubtypes = false})
+        // this subscription handler will not accept subtypes of the TestMessage.
+        @Subscribe(acceptSubtypes = false})
         public void handleNoSubTypes(TestMessage message) {
            //do something
         }
 
         // this handler will be accessed in a "syncrhonized" manner (only one thread at a time may access it)
-        @Handler
+        @Subscribe
         @Synchronized
         public void handleSyncrhonzied(TeastMessage message) {
             //do something
@@ -87,7 +87,7 @@ Handler definition (in any bean):
         // configure a listener to be stored using strong/weak references
         @Listener(references = References.Strong)
         public class MessageListener{
-            @Handler
+            @Subscribe
             public void handleTestMessage(TestMessage message) {
                 // do something
             }
@@ -95,9 +95,6 @@ Handler definition (in any bean):
 
 
 Creation of message bus and registration of listeners:
-
-        // configure to use weak-references
-        MessageBus.useStrongReferencesByDefault = false;
 
         // create as many instances as necessary (usually a singleton is best)
         MessageBus bus = new MessageBus();
@@ -113,7 +110,7 @@ Creation of message bus and registration of listeners:
         // do stuff....
         
         
-        // and when FINSIHED with the messagebus, to shutsdown all of the in-use threads and clean the data-structures
+        // and when FINSIHED with the messagebus, to shutdown all of the in-use threads and clean the data-structures
         bus.shutdown();
         
 
@@ -125,7 +122,7 @@ Message publication:
         TestMessage message3 = new TestMessage();
         TestMessage subMessage = new SubTestMessage();
 
-        bus.publishAsync(message); //returns immediately, publication will continue asynchronously
+        bus.publishAsync(message); // returns immediately, publication will continue asynchronously
         bus.publish(subMessage);   // will return after all the handlers have been invoked
         
         bus.publish(message, message2);   // will return after all the handlers have been invoked, but for two messages at the same time
@@ -137,10 +134,6 @@ Message publication:
 
 Release Notes 
 ---------
-
-This project includes some utility classes that are a small subset of a much larger library. These classes are **kept in sync** with the main utilities library, so "jar hell" is not an issue, and the latest release will always include the same version of utility files as all of the other projects in the dorkbox repository at that time. 
-  
-  Please note that the utility source code is included in the release and on our [Git Server](https://git.dorkbox.com/dorkbox/Utilities) repository.
   
   
 Maven Info
@@ -164,16 +157,6 @@ dependencies {
     compile 'com.dorkbox:MessageBus:1.20'
 }
 ````
-
-Or if you don't want to use Maven, you can access the files directly here:  
-https://repo1.maven.org/maven2/releases/com/dorkbox/MessageBus/
-
-https://repo1.maven.org/maven2/org/slf4j/slf4j-api/  
-https://repo1.maven.org/maven2/com/lmax/disruptor/  
-https://repo1.maven.org/maven2/asm/asm/  
-
-https://repo1.maven.org/maven2/com/esotericsoftware/kryo/  
-https://repo1.maven.org/maven2/com/esotericsoftware/reflectasm/  
 
 License
 ---------

@@ -22,7 +22,7 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.messages.IMessage;
 
 /**
@@ -33,7 +33,7 @@ import dorkbox.util.messagebus.messages.IMessage;
 public class IMessageListener {
 
     private static abstract class BaseListener {
-        @Handler
+        @Subscribe
         public void handle(IMessage message){
             message.handled(this.getClass());
         }
@@ -51,7 +51,7 @@ public class IMessageListener {
     public static class NoSubtypesListener extends BaseListener {
 
         @Override
-        @Handler(acceptSubtypes = false)
+        @Subscribe(acceptSubtypes = false)
         public void handle(IMessage message){
             super.handle(message);
         }
@@ -60,7 +60,7 @@ public class IMessageListener {
 
     public static class DisabledListener extends BaseListener {
         @Override
-        @Handler(enabled = false)
+        @Subscribe(enabled = false)
         public void handle(IMessage message){
             super.handle(message);
         }

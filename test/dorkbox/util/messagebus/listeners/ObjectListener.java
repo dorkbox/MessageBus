@@ -26,14 +26,14 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 
 
 public class ObjectListener {
 
     private List handledMessages = Collections.synchronizedList(new LinkedList());
 
-    @Handler()
+    @Subscribe()
     public void handle(Object message){
         this.handledMessages.add(message);
     }

@@ -24,8 +24,8 @@ package dorkbox.util.messagebus;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus;
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
@@ -44,7 +44,7 @@ public class MethodDispatchTest extends MessageBusTest{
     // a simple event listener
     public class EventListener1 {
 
-        @Handler
+        @Subscribe
         public void handleString(String s) {
              MethodDispatchTest.this.listener1Called = true;
         }
@@ -64,7 +64,7 @@ public class MethodDispatchTest extends MessageBusTest{
 
     @Test
     public void testDispatch1(){
-        IMessageBus bus = createBus();
+        MessageBus bus = createBus();
         EventListener2 listener2 = new EventListener2();
         bus.subscribe(listener2);
         bus.publish("jfndf");
@@ -76,5 +76,4 @@ public class MethodDispatchTest extends MessageBusTest{
         bus.publish("jfndf");
         assertTrue(this.listener1Called);
     }
-
 }

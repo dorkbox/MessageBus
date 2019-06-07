@@ -104,16 +104,16 @@ public class MBassadorTest extends MessageBusTest {
         };
 
         ConcurrentExecutor.runConcurrent(publishAndCheck, 1);
-        while (bus.hasPendingMessages()) {
+        do {
             pause(10);
-        }
+        } while (bus.hasPendingMessages());
 
         MessageTypes.resetAll();
         ConcurrentExecutor.runConcurrent(publishAndCheck, ConcurrentUnits);
 
-        while (bus.hasPendingMessages()) {
+        do {
             pause(10);
-        }
+        } while (bus.hasPendingMessages());
         messageManager.waitForMessages(600);
     }
 

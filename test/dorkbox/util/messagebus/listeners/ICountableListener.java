@@ -22,7 +22,7 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.messages.ICountable;
 
 /**
@@ -33,7 +33,7 @@ import dorkbox.util.messagebus.messages.ICountable;
 public class ICountableListener {
 
     private static abstract class BaseListener {
-        @Handler
+        @Subscribe
         public void handle(ICountable message){
             message.handled(this.getClass());
         }
@@ -48,7 +48,7 @@ public class ICountableListener {
 
     public static class NoSubtypesListener extends BaseListener {
         @Override
-        @Handler(acceptSubtypes = false)
+        @Subscribe(acceptSubtypes = false)
         public void handle(ICountable message){
             super.handle(message);
         }
@@ -56,7 +56,7 @@ public class ICountableListener {
 
     public static class DisabledListener extends BaseListener {
         @Override
-        @Handler(enabled = false)
+        @Subscribe(enabled = false)
         public void handle(ICountable message){
             super.handle(message);
         }

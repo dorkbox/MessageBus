@@ -22,7 +22,7 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.messages.StandardMessage;
 
 /**
@@ -33,7 +33,7 @@ public class ExceptionThrowingListener {
 
 
     // this handler will be invoked asynchronously
-    @Handler()
+    @Subscribe()
     public void handle(StandardMessage message) {
         throw new RuntimeException("This is an expected exception");
     }

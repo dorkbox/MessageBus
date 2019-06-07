@@ -26,8 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus;
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.MessageBus;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.annotations.Synchronized;
 import dorkbox.util.messagebus.common.MessageBusTest;
 
@@ -45,7 +45,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
 
     @Test
     public void testSynchronizedWithSynchronousInvocation(){
-        IMessageBus bus = createBus();
+        MessageBus bus = createBus();
         for(int i = 0; i < numberOfListeners; i++){
             SynchronizedWithSynchronousDelivery handler = new SynchronizedWithSynchronousDelivery();
             bus.subscribe(handler);
@@ -68,7 +68,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
     }
 
     public static class SynchronizedWithSynchronousDelivery {
-        @Handler
+        @Subscribe
         @Synchronized
         public void handleMessage(Object o){
             counter.getAndIncrement();

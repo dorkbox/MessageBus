@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import dorkbox.messageBus.MessageBus;
-import dorkbox.messageBus.PubSubSupport;
 import dorkbox.messageBus.subscription.SubscriptionManager;
 
 /**
@@ -62,7 +61,7 @@ public class TestUtil {
         };
     }
 
-    public static Runnable subscriber(final PubSubSupport bus, final ListenerFactory listeners) {
+    public static Runnable subscriber(final MessageBus bus, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
             @Override public void run() {
@@ -74,7 +73,7 @@ public class TestUtil {
         };
     }
 
-    public static Runnable unsubscriber(final PubSubSupport bus, final ListenerFactory listeners) {
+    public static Runnable unsubscriber(final MessageBus bus, final ListenerFactory listeners) {
         final Iterator source = listeners.iterator();
         return new Runnable() {
             @Override public void run() {
@@ -86,7 +85,7 @@ public class TestUtil {
         };
     }
 
-    public static void setup(final PubSubSupport bus, final List<Object> listeners, int numberOfThreads) {
+    public static void setup(final MessageBus bus, final List<Object> listeners, int numberOfThreads) {
         Runnable[] setupUnits = new Runnable[numberOfThreads];
         int partitionSize;
         if (listeners.size() >= numberOfThreads) {

@@ -3,15 +3,14 @@
  */
 package dorkbox.util.messagebus;
 
-import static dorkbox.messageBus.IMessageBus.*;
-
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus;
+import dorkbox.messageBus.DispatchMode;
 import dorkbox.messageBus.MessageBus;
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.SubscriptionMode;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.common.MessageBusTest;
 
 /**
@@ -25,7 +24,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExact() {
-        IMessageBus bus = new MessageBus(DispatchMode.Exact, PublicationMode.Disruptor, SubscriptionMode.StrongReferences,
+        MessageBus bus = new MessageBus(DispatchMode.Exact, SubscriptionMode.StrongReferences,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();
@@ -56,7 +55,7 @@ public class MultiMessageTest extends MessageBusTest {
 
     @Test
     public void testMultiMessageSendingExactAndSuper() {
-        IMessageBus bus = new MessageBus(DispatchMode.ExactWithSuperTypes, PublicationMode.Disruptor, SubscriptionMode.StrongReferences,
+        MessageBus bus = new MessageBus(DispatchMode.ExactWithSuperTypes, SubscriptionMode.StrongReferences,
                                          Runtime.getRuntime()
                                                 .availableProcessors() / 2);
         MultiListener listener1 = new MultiListener();
@@ -86,49 +85,49 @@ public class MultiMessageTest extends MessageBusTest {
     }
 
     public static class MultiListener {
-        @Handler
+        @Subscribe
         public void handleSync(Object o) {
             count.getAndIncrement();
             System.err.println("match Object");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(String o1) {
             count.getAndIncrement();
             System.err.println("match String");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(String o1, String o2) {
             count.getAndIncrement();
             System.err.println("match String, String");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(String o1, String o2, String o3) {
             count.getAndIncrement();
             System.err.println("match String, String, String");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(Integer o1, Integer o2, String o3) {
             count.getAndIncrement();
             System.err.println("match Integer, Integer, String");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(String... o) {
             count.getAndIncrement();
             System.err.println("match String[]");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(Integer... o) {
             count.getAndIncrement();
             System.err.println("match Integer[]");
         }
 
-        @Handler
+        @Subscribe
         public void handleSync(Object... o) {
             count.getAndIncrement();
             System.err.println("match Object[]");

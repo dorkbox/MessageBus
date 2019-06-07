@@ -40,7 +40,7 @@ package dorkbox.messageBus.common;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.annotations.Listener;
 import dorkbox.messageBus.annotations.References;
 import dorkbox.messageBus.annotations.Synchronized;
@@ -88,7 +88,7 @@ class MessageHandler {
 
                 // for each handler there will be no overriding method that specifies @Handler annotation
                 // but an overriding method does inherit the listener configuration of the overwritten method
-                final Handler handler = ReflectionUtils.getAnnotation(method, Handler.class);
+                final Subscribe handler = ReflectionUtils.getAnnotation(method, Subscribe.class);
                 if (handler == null || !handler.enabled()) {
                     // disabled or invalid listeners are ignored
                     continue;
@@ -121,7 +121,7 @@ class MessageHandler {
     private final int referenceType;
 
     private
-    MessageHandler(final Class<?> clazz, final Method method, final Handler config) {
+    MessageHandler(final Class<?> clazz, final Method method, final Subscribe config) {
         if (method == null) {
             throw new IllegalArgumentException("The message method configuration may not be null");
         }
@@ -132,12 +132,10 @@ class MessageHandler {
         this.isSynchronized = ReflectionUtils.getAnnotation(method, Synchronized.class) != null;
 
         Listener annotation = ReflectionUtils.getAnnotation(clazz, Listener.class);
-        if (annotation == null || annotation.references() == null || annotation.references()
-                                                                               .equals(References.Undefined)) {
+        if (annotation == null || annotation.references().equals(References.Undefined)) {
             this.referenceType = UNDEFINED;
         }
-        else if (annotation.references()
-                           .equals(References.Weak)) {
+        else if (annotation.references().equals(References.Weak)) {
             this.referenceType = WEAK;
         }
         else {

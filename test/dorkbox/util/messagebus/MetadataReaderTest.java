@@ -31,7 +31,7 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.common.MessageHandler;
 import dorkbox.util.messagebus.common.AssertSupport;
 
@@ -167,18 +167,18 @@ public class MetadataReaderTest extends AssertSupport {
     // a simple event listener
     public class MessageListener1 {
 
-        @Handler(acceptSubtypes = false)
+        @Subscribe(acceptSubtypes = false)
         public void handleObject(Object o) {
 
         }
 
-        @Handler
+        @Subscribe
         public void handleAny(Object o) {
 
         }
 
 
-        @Handler
+        @Subscribe
         public void handleString(String s) {
 
         }
@@ -198,13 +198,13 @@ public class MetadataReaderTest extends AssertSupport {
 
         // narrow the handler
         @Override
-        @Handler(acceptSubtypes = false)
+        @Subscribe(acceptSubtypes = false)
         public void handleAny(Object o) {
 
         }
 
         @Override
-        @Handler(enabled = false)
+        @Subscribe(enabled = false)
         public void handleString(String s) {
 
         }
@@ -233,31 +233,48 @@ public class MetadataReaderTest extends AssertSupport {
 
     public class MultiMessageListener1 {
 
-        @Handler public void handleString1(String s) {}
-        @Handler public void handleString2(String s, String s1) {}
-        @Handler public void handleString3(String s, String s1, String s2) {}
+        @Subscribe
+        public void handleString1(String s) {}
+        @Subscribe
+        public void handleString2(String s, String s1) {}
+        @Subscribe
+        public void handleString3(String s, String s1, String s2) {}
 
-        @Handler public void handleStringN(String... s1) {}
-        @Handler public void handleStringArray(String[] s1) {}
+        @Subscribe
+        public void handleStringN(String... s1) {}
+        @Subscribe
+        public void handleStringArray(String[] s1) {}
 
-        @Handler public void handleStringN(Object... s1) {}
-        @Handler public void handleStringArray(Object[] s1) {}
+        @Subscribe
+        public void handleStringN(Object... s1) {}
+        @Subscribe
+        public void handleStringArray(Object[] s1) {}
 
-        @Handler public void handleString1plusN(String s, String... s1) {}
-        @Handler public void handleString1plusN(String s, Object... s1) {}
+        @Subscribe
+        public void handleString1plusN(String s, String... s1) {}
+        @Subscribe
+        public void handleString1plusN(String s, Object... s1) {}
 
-        @Handler public void handleString2plusN(String s, String s1, String... s2) {}
-        @Handler public void handleString2plusN(String s, Object s1, String... s2) {}
+        @Subscribe
+        public void handleString2plusN(String s, String s1, String... s2) {}
+        @Subscribe
+        public void handleString2plusN(String s, Object s1, String... s2) {}
 
-        @Handler public void handleStringXplus1(String[] s, String s1) {}
+        @Subscribe
+        public void handleStringXplus1(String[] s, String s1) {}
 
-        @Handler public void handleStringXplusN(String[] s, String... s1) {}
-        @Handler public void handleStringXplusN(String[] s, Object... s1) {}
+        @Subscribe
+        public void handleStringXplusN(String[] s, String... s1) {}
+        @Subscribe
+        public void handleStringXplusN(String[] s, Object... s1) {}
 
-        @Handler public void handleStringXplus1plusN(String[] s, String s1, String... s2) {}
-        @Handler public void handleStringXplus1plusN(String[] s, String s1, Object... o) {}
+        @Subscribe
+        public void handleStringXplus1plusN(String[] s, String s1, String... s2) {}
+        @Subscribe
+        public void handleStringXplus1plusN(String[] s, String s1, Object... o) {}
 
-        @Handler public void handleStringXplus1plusN(String[] s, Object o, Object... o1) {}
+        @Subscribe
+        public void handleStringXplus1plusN(String[] s, Object o, Object... o1) {}
 
     }
 

@@ -22,7 +22,7 @@
  */
 package dorkbox.util.messagebus.listeners;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.util.messagebus.messages.MultipartMessage;
 
 /**
@@ -33,7 +33,7 @@ public class MultipartMessageListener {
 
     private static abstract class BaseListener {
 
-        @Handler
+        @Subscribe
         public void handle(MultipartMessage message){
             message.handled(this.getClass());
         }
@@ -51,7 +51,7 @@ public class MultipartMessageListener {
     public static class NoSubtypesListener extends BaseListener {
 
         @Override
-        @Handler(acceptSubtypes = false)
+        @Subscribe(acceptSubtypes = false)
         public void handle(MultipartMessage message){
             super.handle(message);
         }
@@ -61,7 +61,7 @@ public class MultipartMessageListener {
     public static class DisabledListener extends BaseListener {
 
         @Override
-        @Handler(enabled = false)
+        @Subscribe(enabled = false)
         public void handle(MultipartMessage message){
             super.handle(message);
         }

@@ -45,7 +45,7 @@ import java.util.Iterator;
 
 import com.esotericsoftware.kryo.util.IdentityMap;
 
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 
 /**
  * @author bennidi
@@ -75,7 +75,7 @@ class ReflectionUtils {
     void getMethods(Class<?> target, ArrayList<Method> methods) {
         try {
             for (Method method : target.getDeclaredMethods()) {
-                if (getAnnotation(method, Handler.class) != null) {
+                if (getAnnotation(method, Subscribe.class) != null) {
                     methods.add(method);
                 }
             }

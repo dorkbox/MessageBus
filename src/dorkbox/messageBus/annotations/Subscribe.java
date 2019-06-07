@@ -44,7 +44,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Mark any method of any class(=listener) as a message handler and configure the handler
+ * Marks a method of any subscribed class as a message event handler and configure the handler
  * using different properties.
  *
  * @author bennidi
@@ -56,17 +56,18 @@ import java.lang.annotation.Target;
 @Inherited
 @Target(value = {ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public
-@interface Handler {
+@interface Subscribe {
 
     /**
-     * Define whether or not the handler accepts sub types of the message type it declares in its
+     * Define whether or not the subscription handler accepts sub types of the message type it declares in its
      * signature.
      */
     boolean acceptSubtypes() default true;
 
     /**
-     * Enable or disable the handler. Disabled handlers do not receive any messages.
-     * This property is useful for quick changes in configuration and necessary to disable
+     * Enable or disable the subscription. Disabled subscription handlers do not receive any messages.
+     *
+     * This property is useful for quick changes in configuration and necessary to subscription disable
      * handlers that have been declared by a superclass but do not apply to the subclass
      */
     boolean enabled() default true;

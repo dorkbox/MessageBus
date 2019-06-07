@@ -28,7 +28,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import dorkbox.messageBus.MessageBus;
-import dorkbox.messageBus.annotations.Handler;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.error.DeadMessage;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
 import dorkbox.util.messagebus.common.ListenerFactory;
@@ -129,7 +129,7 @@ public class DeadMessageTest extends MessageBusTest{
     }
 
     public static class DeadMessagHandler {
-        @Handler
+        @Subscribe
         public void handle(DeadMessage message){
             deadMessages.incrementAndGet();
         }

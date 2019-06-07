@@ -24,7 +24,7 @@ package dorkbox.util.messagebus;
 
 import org.junit.Test;
 
-import dorkbox.messageBus.IMessageBus.SubscriptionMode;
+import dorkbox.messageBus.SubscriptionMode;
 import dorkbox.messageBus.subscription.SubscriptionManager;
 import dorkbox.util.messagebus.common.AssertSupport;
 import dorkbox.util.messagebus.common.ConcurrentExecutor;
