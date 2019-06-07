@@ -104,6 +104,13 @@ class PublicationError {
     }
 
     public
+    PublicationError setNoPublishedObject() {
+        this.publishedObjects = new Object[0];
+
+        return this;
+    }
+
+    public
     PublicationError setPublishedObject(Object publishedObject) {
         this.publishedObjects = new Object[1];
         this.publishedObjects[0] = publishedObject;
