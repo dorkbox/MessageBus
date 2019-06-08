@@ -125,6 +125,9 @@ class MessageBusZeroGC {
         throw new DispatchCancel();
     }
 
+    /**
+     * Helper method to determine the dispatch mode
+     */
     private static
     Dispatch getDispatch(final DispatchMode dispatchMode, final ErrorHandler errorHandler, final SubscriptionManager subscriptionManager) {
         if (dispatchMode == DispatchMode.Exact) {
@@ -206,7 +209,7 @@ class MessageBusZeroGC {
      *
      * @param dispatchMode     Specifies which Dispatch Mode (Exact or ExactWithSuperTypes) to allow what subscription hierarchies receive the publication of a message.
      * @param subscriptionMode Specifies which Subscription Mode Mode (Strong or Weak) to change how subscription handlers are saved internally.
-     * @param dispatchQueue    Specified the Blocking queue implementation for managing asynchronous message publication
+     * @param dispatchQueue    Specified Blocking queue implementation for managing asynchronous message publication
      * @param numberOfThreads  how many threads to use for dispatching async messages
      */
     public
