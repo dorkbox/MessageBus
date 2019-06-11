@@ -15,22 +15,16 @@
  */
 package dorkbox.messageBus;
 
-import java.util.concurrent.BlockingQueue;
-
-import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
-import com.conversantmedia.util.concurrent.SpinPolicy;
-
 import dorkbox.messageBus.dispatch.Dispatch;
-import dorkbox.messageBus.dispatch.DispatchCancel;
 import dorkbox.messageBus.dispatch.DispatchExact;
 import dorkbox.messageBus.dispatch.DispatchExactWithSuperTypes;
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.error.IPublicationErrorHandler;
+import dorkbox.messageBus.publication.ConversantDisruptor;
+import dorkbox.messageBus.publication.DirectInvocation;
+import dorkbox.messageBus.publication.LmaxDisruptor;
+import dorkbox.messageBus.publication.Publisher;
 import dorkbox.messageBus.subscription.SubscriptionManager;
-import dorkbox.messageBus.synchrony.Async;
-import dorkbox.messageBus.synchrony.MessageHolder;
-import dorkbox.messageBus.synchrony.Sync;
-import dorkbox.messageBus.synchrony.Synchrony;
 
 /**
  * A message bus offers facilities for publishing messages to the message handlers of registered listeners.
@@ -70,9 +64,6 @@ import dorkbox.messageBus.synchrony.Synchrony;
  * Messages are dispatched to all listeners that accept the type or supertype of the dispatched message.
  *
  * <p/>
- * You may cancel any further dispatch of a message via {@link #cancel()}
- *
- * <p/>
  * Subscribed message handlers are available to all pending message publications that have not yet started processing.
  * Any message listener may only be subscribed once -> subsequent subscriptions of an already subscribed message listener
  * will be silently ignored)
@@ -102,42 +93,26 @@ import dorkbox.messageBus.synchrony.Synchrony;
 @SuppressWarnings("WeakerAccess")
 public
 class MessageBus {
+
     /**
      * Gets the version number.
      */
     public static
     String getVersion() {
-        return "1.20";
+        return "2.0";
     }
 
-    /**
-     * Cancels the publication of the message or messages. Only applicable for the current dispatched message.
-     * <p>
-     * No more subscribers for this message will be called.
-     */
-    public static
-    void cancel() {
-        throw new DispatchCancel();
-    }
-
-    /**
-     * Helper method to determine the dispatch mode
-     */
-    private static
-    Dispatch getDispatch(final DispatchMode dispatchMode, final ErrorHandler errorHandler, final SubscriptionManager subscriptionManager) {
-        if (dispatchMode == DispatchMode.Exact) {
-            return new DispatchExact(errorHandler, subscriptionManager);
-        }
-
-        return new DispatchExactWithSuperTypes(errorHandler, subscriptionManager);
-    }
-
-    private final ErrorHandler errorHandler;
+    private final Dispatch dispatch;
+    private final ErrorHandler errorHandler = new ErrorHandler();
+    private final DispatchMode dispatchMode;
 
     private final SubscriptionManager subscriptionManager;
+    private final AsyncPublicationMode publicationMode;
+    private final SubscriptionMode subscriptionMode;
+    private final int numberOfThreads;
 
-    private final Synchrony syncPublication;
-    private final Synchrony asyncPublication;
+    private final Publisher syncPublisher;
+    private final Publisher asyncPublisher;
 
     /**
      * Will permit subType matching for matching what subscription handles which message
@@ -172,7 +147,7 @@ class MessageBus {
     /**
      * Will use half of CPUs available for dispatching async messages
      * <p>
-     * Will use the Conversant Disruptor as the blocking queue implementation for asynchronous publication
+     * Will use the LMAX Disruptor as the blocking queue implementation for asynchronous publication
      *
      * @param dispatchMode     Specifies which Dispatch Mode (Exact or ExactWithSuperTypes) to allow what subscription hierarchies receive the publication of a message.
      * @param subscriptionMode Specifies which Subscription Mode Mode (Strong or Weak) to change how subscription handlers are saved internally.
@@ -184,7 +159,7 @@ class MessageBus {
 
 
     /**
-     * Will use the Conversant Disruptor as the blocking queue implementation for asynchronous publication
+     * Will use the LMAX Disruptor as the blocking queue implementation for asynchronous publication
      *
      * @param dispatchMode     Specifies which Dispatch Mode (Exact or ExactWithSuperTypes) to allow what subscription hierarchies receive the publication of a message.
      * @param subscriptionMode Specifies which Subscription Mode Mode (Strong or Weak) to change how subscription handlers are saved internally.
@@ -192,33 +167,96 @@ class MessageBus {
      */
     public
     MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final int numberOfThreads) {
-        this(dispatchMode, subscriptionMode, new DisruptorBlockingQueue<MessageHolder>(1024, SpinPolicy.BLOCKING), numberOfThreads);
+        this(dispatchMode, subscriptionMode, AsyncPublicationMode.LmaxDisruptor, numberOfThreads);
     }
 
 
     /**
-     * Will use the Conversant Disruptor for asynchronous dispatch of published messages.
-     * <p>
-     * The benefit of such is that it is VERY high performance and generates zero garbage on the heap.
-     *
      * @param dispatchMode     Specifies which Dispatch Mode (Exact or ExactWithSuperTypes) to allow what subscription hierarchies receive the publication of a message.
-     * @param subscriptionMode Specifies which Subscription Mode Mode (Strong or Weak) to change how subscription handlers are saved internally.
-     * @param dispatchQueue    Specified Blocking queue implementation for managing asynchronous message publication
+     * @param subscriptionMode Specifies which Subscription Mode (Strong or Weak) to change how subscription handlers are saved internally.
+     * @param publicationMode  Specifies which Publication Mode (LMAX or Conversant disruptors) for executing messages asynchronously.
      * @param numberOfThreads  how many threads to use for dispatching async messages
      */
     public
-    MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final BlockingQueue<MessageHolder> dispatchQueue, final int numberOfThreads) {
-        this.errorHandler = new ErrorHandler();
+    MessageBus(final DispatchMode dispatchMode, final SubscriptionMode subscriptionMode, final AsyncPublicationMode publicationMode, final int numberOfThreads) {
+        this.dispatchMode = dispatchMode;
+        this.subscriptionMode = subscriptionMode;
+        this.publicationMode = publicationMode;
+        this.numberOfThreads = numberOfThreads;
 
         // Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
         this.subscriptionManager = new SubscriptionManager(subscriptionMode);
 
-        Dispatch dispatch = getDispatch(dispatchMode, errorHandler, subscriptionManager);
+        if (dispatchMode == DispatchMode.Exact) {
+            this.dispatch =  new DispatchExact();
+        } else {
+            this.dispatch = new DispatchExactWithSuperTypes();
+        }
 
-        syncPublication = new Sync(dispatch);
-        asyncPublication = new Async(numberOfThreads, dispatch, dispatchQueue, errorHandler);
+        syncPublisher = new DirectInvocation();
+
+        if (publicationMode == AsyncPublicationMode.LmaxDisruptor) {
+            asyncPublisher = new LmaxDisruptor(numberOfThreads, errorHandler);
+        } else {
+            asyncPublisher = new ConversantDisruptor(numberOfThreads);
+        }
     }
 
+    /**
+     * Creates a copy of this messagebus - BUT - instead of making a copy of everything, it shares the async thread executor.
+     * </p>
+     * This will permit unique subscriptions.
+     * </p>
+     * Only the original messagebus can shutdown the thread executor
+     */
+    private
+    MessageBus(final MessageBus messageBus) {
+        this.dispatchMode = messageBus.dispatchMode;
+        this.subscriptionMode = messageBus.subscriptionMode;
+        this.publicationMode = messageBus.publicationMode;
+        this.numberOfThreads = messageBus.numberOfThreads;
+
+
+        // Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
+        this.subscriptionManager = new SubscriptionManager(subscriptionMode);
+
+        this.dispatch = messageBus.dispatch;
+        this.syncPublisher = messageBus.syncPublisher;
+
+
+        // we have to make sure that calling .shutdown() DOES NOT shutdown the thread executor for these!
+        if (publicationMode == AsyncPublicationMode.LmaxDisruptor) {
+            asyncPublisher = new LmaxDisruptor((LmaxDisruptor) messageBus.asyncPublisher) {
+                @Override
+                public
+                void shutdown() {
+                    // do nothing for a clone!
+                }
+            };
+
+        } else {
+            asyncPublisher = new ConversantDisruptor((ConversantDisruptor) messageBus.asyncPublisher) {
+                @Override
+                public
+                void shutdown() {
+                    // do nothing for a clone!
+                }
+            };
+        }
+    }
+
+    /**
+     * Clones the this MessageBus, sharing the same configurations and executor for Async Publications.
+     * </p>
+     * This will permit unique subscriptions.
+     * </p>
+     * Calling {@link #shutdown()} on this new MessageBus will NOT shutdown the thread executor. Only the ORIGINAL
+     * MessageBus can shut it down.
+     */
+    public
+    MessageBus cloneWithSharedExecutor() {
+        return new MessageBus(this);
+    }
 
     /**
      * Subscribe all handlers of the given listener. Any listener is only subscribed once and
@@ -226,11 +264,6 @@ class MessageBus {
      */
     public
     void subscribe(final Object listener) {
-        if (listener == null) {
-            return;
-        }
-
-        // single writer principle using synchronised
         subscriptionManager.subscribe(listener);
     }
 
@@ -246,11 +279,6 @@ class MessageBus {
      */
     public
     void unsubscribe(final Object listener) {
-        if (listener == null) {
-            return;
-        }
-
-        // single writer principle using synchronised
         subscriptionManager.unsubscribe(listener);
     }
 
@@ -265,7 +293,7 @@ class MessageBus {
      */
     public
     void publish(final Object message) {
-        syncPublication.publish(message);
+        dispatch.publish(syncPublisher, errorHandler, subscriptionManager, message);
     }
 
 
@@ -279,7 +307,7 @@ class MessageBus {
      */
     public
     void publish(final Object message1, final Object message2) {
-        syncPublication.publish(message1, message2);
+        dispatch.publish(syncPublisher, errorHandler, subscriptionManager, message1, message2);
     }
 
 
@@ -293,7 +321,7 @@ class MessageBus {
      */
     public
     void publish(final Object message1, final Object message2, final Object message3) {
-        syncPublication.publish(message1, message2, message3);
+        dispatch.publish(syncPublisher, errorHandler, subscriptionManager, message1, message2, message3);
     }
 
 
@@ -307,7 +335,7 @@ class MessageBus {
      */
     public
     void publishAsync(final Object message) {
-        asyncPublication.publish(message);
+        dispatch.publish(asyncPublisher, errorHandler, subscriptionManager, message);
     }
 
 
@@ -322,7 +350,7 @@ class MessageBus {
      */
     public
     void publishAsync(final Object message1, final Object message2) {
-        asyncPublication.publish(message1, message2);
+        dispatch.publish(asyncPublisher, errorHandler, subscriptionManager, message1, message2);
     }
 
 
@@ -336,7 +364,7 @@ class MessageBus {
      */
     public
     void publishAsync(final Object message1, final Object message2, final Object message3) {
-        asyncPublication.publish(message1, message2, message3);
+        dispatch.publish(asyncPublisher, errorHandler, subscriptionManager, message1, message2, message3);
     }
 
 
@@ -362,7 +390,7 @@ class MessageBus {
      */
     public final
     boolean hasPendingMessages() {
-        return asyncPublication.hasPendingMessages();
+        return asyncPublisher.hasPendingMessages();
     }
 
 
@@ -374,9 +402,8 @@ class MessageBus {
      */
     public
     void shutdown() {
-        this.syncPublication.shutdown();
-        this.asyncPublication.shutdown();
         this.subscriptionManager.shutdown();
+        this.asyncPublisher.shutdown();
     }
 }
 
