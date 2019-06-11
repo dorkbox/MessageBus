@@ -37,7 +37,7 @@ plugins {
 
     id("com.dorkbox.CrossCompile") version "1.0.1"
     id("com.dorkbox.Licensing") version "1.4"
-    id("com.dorkbox.VersionUpdate") version "1.5"
+    id("com.dorkbox.VersionUpdate") version "1.6"
     id("com.dorkbox.GradleUtils") version "1.2"
 
     kotlin("jvm") version "1.3.31"
