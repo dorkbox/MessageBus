@@ -47,7 +47,7 @@ object Extras {
     // set for the project
     const val description = "Lightweight, extremely fast, and zero-gc message/event bus for Java 6+"
     const val group = "com.dorkbox"
-    const val version = "1.20"
+    const val version = "2.0"
 
     // set as project.ext
     const val name = "MessageBus"
@@ -90,7 +90,14 @@ licensing {
         note("Bytecode manipulation framework and utilities")
     }
 
-    license("Disruptor", License.APACHE_2) {
+    license("LMAX Disruptor", License.APACHE_2) {
+        copyright(2011)
+        author("LMAX Ltd")
+        url("https://github.com/LMAX-Exchange/disruptor/")
+        note("High Performance Inter-Thread Messaging Library")
+    }
+
+    license("Conversant Disruptor", License.APACHE_2) {
         copyright(2011)
         author("Conversant")
         url("https://github.com/conversant/disruptor/")
@@ -197,6 +204,7 @@ tasks.compileJava.get().apply {
 dependencies {
     implementation("com.dorkbox:Utilities:1.2")
 
+    implementation("com.lmax:disruptor:3.4.2")
     implementation("com.conversantmedia:disruptor:1.2.15")
     implementation("org.vibur:vibur-object-pool:23.0")
 
