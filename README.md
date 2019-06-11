@@ -77,7 +77,7 @@ Handler definition (in any bean):
         // this handler will be accessed in a "syncrhonized" manner (only one thread at a time may access it)
         @Subscribe
         @Synchronized
-        public void handleSyncrhonzied(TeastMessage message) {
+        public void handleSynchronzied(TeastMessage message) {
             //do something
         }
 
@@ -141,7 +141,7 @@ Maven Info
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>1.20</version>
+        <version>2.0</version>
     </dependency>
 </dependencies>
 ```
@@ -151,7 +151,7 @@ Gradle Info
 ````
 dependencies {
     ...
-    compile 'com.dorkbox:MessageBus:1.20'
+    compile 'com.dorkbox:MessageBus:2.0'
 }
 ````
 
