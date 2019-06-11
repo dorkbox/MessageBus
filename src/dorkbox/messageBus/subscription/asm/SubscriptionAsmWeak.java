@@ -43,11 +43,10 @@ import java.lang.reflect.Method;
 import com.esotericsoftware.reflectasm.MethodAccess;
 
 import dorkbox.messageBus.common.MessageHandler;
-import dorkbox.messageBus.dispatch.DispatchCancel;
 import dorkbox.messageBus.error.ErrorHandler;
-import dorkbox.messageBus.error.PublicationError;
 import dorkbox.messageBus.subscription.Entry;
 import dorkbox.messageBus.subscription.Subscription;
+import dorkbox.messageBus.publication.Publisher;
 
 /**
  * A subscription is a container that manages exactly one message handler of all registered
@@ -94,7 +93,7 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry<WeakReference<Object>> head) {
+    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry head) {
         return new Entry<WeakReference<Object>>(new WeakReference<Object>(listener), head);
     }
 
@@ -118,7 +117,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -139,16 +140,7 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message);
         }
 
         // because the value can be GC'd at any time, this is the best guess possible
@@ -157,7 +149,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler,final Object message1, final Object message2) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -178,16 +172,7 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message1, message2);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message1, message2));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message1, message2);
         }
 
         // because the value can be GC'd at any time, this is the best guess possible
@@ -196,7 +181,9 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2, final Object message3) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -217,16 +204,7 @@ class SubscriptionAsmWeak extends Subscription<WeakReference<Object>> {
             }
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message1, message2, message3));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message1, message2, message3);
         }
 
         // because the value can be GC'd at any time, this is the best guess possible

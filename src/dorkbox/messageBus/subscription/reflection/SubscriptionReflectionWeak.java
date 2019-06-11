@@ -41,10 +41,10 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 
 import dorkbox.messageBus.common.MessageHandler;
-import dorkbox.messageBus.dispatch.DispatchCancel;
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.error.PublicationError;
 import dorkbox.messageBus.subscription.Entry;
+import dorkbox.messageBus.publication.Publisher;
 import dorkbox.messageBus.subscription.Subscription;
 
 /**
@@ -86,7 +86,7 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry<WeakReference<Object>> head) {
+    Entry<WeakReference<Object>> createEntry(final Object listener, final Entry head) {
         return new Entry<WeakReference<Object>>(new WeakReference<Object>(listener), head);
     }
 
@@ -110,7 +110,9 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message) {
+
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
@@ -132,9 +134,6 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, method, message);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -148,7 +147,9 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2) {
+
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
@@ -170,9 +171,6 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, method, message1, message2);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)
@@ -186,7 +184,9 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2, final Object message3) {
+
         final Method method = this.method;
         final ReflectionInvocation invocation = this.invocation;
 
@@ -208,9 +208,6 @@ class SubscriptionReflectionWeak extends Subscription<WeakReference<Object>> {
 
             try {
                 invocation.invoke(listener, method, message1, message2, message3);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
             } catch (Throwable e) {
                 errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
                                                                           .setCause(e)

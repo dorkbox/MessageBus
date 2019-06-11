@@ -203,6 +203,10 @@ class SubscriptionManager {
      */
     public
     void subscribe(final Object listener) {
+        if (listener == null) {
+            return;
+        }
+
         final Class<?> listenerClass = listener.getClass();
 
         // synchronized is used here to ensure the "single writer principle", and make sure that ONLY one thread at a time can enter this
@@ -398,6 +402,10 @@ class SubscriptionManager {
      */
     public
     void unsubscribe(final Object listener) {
+        if (listener == null) {
+            return;
+        }
+
         final Class<?> listenerClass = listener.getClass();
 
         // synchronized is used here to ensure the "single writer principle", and make sure that ONLY one thread at a time can enter this

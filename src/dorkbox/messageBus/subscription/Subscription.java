@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import dorkbox.messageBus.common.MessageHandler;
 import dorkbox.messageBus.error.ErrorHandler;
+import dorkbox.messageBus.publication.Publisher;
 import dorkbox.util.collections.IdentityMap;
 
 /**
@@ -88,7 +89,7 @@ class Subscription<T> {
     }
 
     public abstract
-    Entry<T> createEntry(final Object listener, final Entry<T> head);
+    Entry<T> createEntry(final Object listener, final Entry head);
 
     /**
      * single writer principle!
@@ -154,14 +155,9 @@ class Subscription<T> {
         return this.entries.size;
     }
 
-    public abstract
-    boolean publish(final ErrorHandler errorHandler, final Object message);
-
-    public abstract
-    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2);
-
-    public abstract
-    boolean publish(final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3);
+    public abstract boolean publish(final Publisher publisher, final ErrorHandler errorHandler, final Object message);
+    public abstract boolean publish(final Publisher publisher, final ErrorHandler errorHandler, final Object message1, final Object message2);
+    public abstract boolean publish(final Publisher publisher, final ErrorHandler errorHandler, final Object message1, final Object message2, final Object message3);
 
 
     @Override

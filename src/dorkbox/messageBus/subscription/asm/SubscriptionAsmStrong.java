@@ -42,10 +42,9 @@ import java.lang.reflect.Method;
 import com.esotericsoftware.reflectasm.MethodAccess;
 
 import dorkbox.messageBus.common.MessageHandler;
-import dorkbox.messageBus.dispatch.DispatchCancel;
 import dorkbox.messageBus.error.ErrorHandler;
-import dorkbox.messageBus.error.PublicationError;
 import dorkbox.messageBus.subscription.Entry;
+import dorkbox.messageBus.publication.Publisher;
 import dorkbox.messageBus.subscription.Subscription;
 
 /**
@@ -91,13 +90,15 @@ class SubscriptionAsmStrong extends Subscription<Object> {
 
     @Override
     public
-    Entry<Object> createEntry(final Object listener, final Entry<Object> head) {
+    Entry<Object> createEntry(final Object listener, final Entry head) {
         return new Entry<Object>(listener, head);
     }
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler, final Object message) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -109,16 +110,7 @@ class SubscriptionAsmStrong extends Subscription<Object> {
             listener = current.getValue();
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message);
         }
 
         return head != null;  // true if we have something to publish to, otherwise false
@@ -126,7 +118,9 @@ class SubscriptionAsmStrong extends Subscription<Object> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler,final Object message1, final Object message2) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -138,16 +132,7 @@ class SubscriptionAsmStrong extends Subscription<Object> {
             listener = current.getValue();
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message1, message2);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message1, message2));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message1, message2);
         }
 
         return head != null;  // true if we have something to publish to, otherwise false
@@ -155,7 +140,9 @@ class SubscriptionAsmStrong extends Subscription<Object> {
 
     @Override
     public
-    boolean publish(final ErrorHandler errorHandler,final Object message1, final Object message2, final Object message3) {
+    boolean publish(final Publisher publisher, final ErrorHandler errorHandler,
+                    final Object message1, final Object message2, final Object message3) {
+
         final MethodAccess handler = this.handlerAccess;
         final int handleIndex = this.methodIndex;
         final AsmInvocation invocation = this.invocation;
@@ -167,16 +154,7 @@ class SubscriptionAsmStrong extends Subscription<Object> {
             listener = current.getValue();
             current = current.next();
 
-            try {
-                invocation.invoke(listener, handler, handleIndex, message1, message2, message3);
-            } catch (DispatchCancel e) {
-                // we want to cancel the dispatch for this specific message
-                throw e;
-            } catch (Throwable e) {
-                errorHandler.handlePublicationError(new PublicationError().setMessage("Error during publication of message.")
-                                                                          .setCause(e)
-                                                                          .setPublishedObject(message1, message2, message3));
-            }
+            publisher.publish(errorHandler, invocation, listener, handler, handleIndex, message1, message2, message3);
         }
 
         return head != null;  // true if we have something to publish to, otherwise false
