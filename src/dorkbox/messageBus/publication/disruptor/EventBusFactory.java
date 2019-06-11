@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dorkbox.messageBus.synchrony;
+package dorkbox.messageBus.publication.disruptor;
 
-import dorkbox.messageBus.common.MessageType;
+import com.lmax.disruptor.EventFactory;
 
 /**
- * @author dorkbox, llc Date: 2/2/15
+ * @author dorkbox, llc
+ *         Date: 2/2/15
  */
-public
-class MessageHolder {
-    public int type = MessageType.ONE;
+public class EventBusFactory implements EventFactory<MessageHolder> {
 
-    public Object message1 = null;
-    public Object message2 = null;
-    public Object message3 = null;
+    public EventBusFactory() {
+    }
 
+    @Override
     public
-    MessageHolder() {}
+    MessageHolder newInstance() {
+        return new MessageHolder();
+    }
 }
