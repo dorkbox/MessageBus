@@ -99,7 +99,7 @@ class MessageBus {
      */
     public static
     String getVersion() {
-        return "2.0";
+        return "3.0";
     }
 
     private final Dispatch dispatch;
