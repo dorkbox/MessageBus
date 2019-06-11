@@ -17,6 +17,7 @@ package dorkbox.messageBus.dispatch;
 
 import dorkbox.messageBus.error.DeadMessage;
 import dorkbox.messageBus.error.ErrorHandler;
+import dorkbox.messageBus.publication.Publisher;
 import dorkbox.messageBus.subscription.Subscription;
 import dorkbox.messageBus.subscription.SubscriptionManager;
 
@@ -28,20 +29,14 @@ import dorkbox.messageBus.subscription.SubscriptionManager;
 public
 class DispatchExactWithSuperTypes implements Dispatch {
 
-    private final ErrorHandler errorHandler;
-    private final SubscriptionManager subManager;
-
     public
-    DispatchExactWithSuperTypes(final ErrorHandler errorHandler, final SubscriptionManager subManager) {
-        this.errorHandler = errorHandler;
-        this.subManager = subManager;
+    DispatchExactWithSuperTypes() {
     }
 
     @Override
     public
-    void publish(final Object message1) {
-        final ErrorHandler errorHandler = this.errorHandler;
-        final SubscriptionManager subManager = this.subManager;
+    void publish(final Publisher publisher, final ErrorHandler errorHandler, final SubscriptionManager subManager,
+                 final Object message1) {
 
         final Class<?> messageClass1 = message1.getClass();
 
@@ -52,47 +47,43 @@ class DispatchExactWithSuperTypes implements Dispatch {
         int subLength;
         boolean hasSubs = false;
 
-        try {
-            // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
-            if (subscriptions != null && (subLength = subscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = subscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1);
-                }
+        // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
+        if (subscriptions != null && (subLength = subscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = subscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1);
             }
+        }
 
-            if ((subLength = superSubscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = superSubscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1);
-                }
+        if ((subLength = superSubscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = superSubscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1);
             }
+        }
 
-            if (!hasSubs) {
-                // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-                if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1);
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(errorHandler, deadMessage);
-                    }
+        if (!hasSubs) {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1);
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(publisher, errorHandler, deadMessage);
                 }
             }
-        } catch (DispatchCancel ignored) {
-            // we wanted to cancel the dispatch for this specific message
         }
     }
 
+
     @Override
     public
-    void publish(final Object message1, final Object message2) {
-        final ErrorHandler errorHandler = this.errorHandler;
-        final SubscriptionManager subManager = this.subManager;
+    void publish(final Publisher publisher, final ErrorHandler errorHandler, final SubscriptionManager subManager,
+                 final Object message1, final Object message2) {
 
         final Class<?> messageClass1 = message1.getClass();
         final Class<?> messageClass2 = message2.getClass();
@@ -104,47 +95,42 @@ class DispatchExactWithSuperTypes implements Dispatch {
         int subLength;
         boolean hasSubs = false;
 
-        try {
-            // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
-            if (subscriptions != null && (subLength = subscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = subscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1, message2);
-                }
+        // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
+        if (subscriptions != null && (subLength = subscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = subscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1, message2);
             }
+        }
 
-            if ((subLength = superSubscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = superSubscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1, message2);
-                }
+        if ((subLength = superSubscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = superSubscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1, message2);
             }
+        }
 
-            if (!hasSubs) {
-                // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-                if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2);
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(errorHandler, deadMessage);
-                    }
+        if (!hasSubs) {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2);
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(publisher, errorHandler, deadMessage);
                 }
             }
-        } catch (DispatchCancel ignored) {
-            // we wanted to cancel the dispatch for these specific messages
         }
     }
 
     @Override
     public
-    void publish(final Object message1, final Object message2, final Object message3) {
-        final ErrorHandler errorHandler = this.errorHandler;
-        final SubscriptionManager subManager = this.subManager;
+    void publish(final Publisher publisher, final ErrorHandler errorHandler, final SubscriptionManager subManager,
+                 final Object message1, final Object message2, final Object message3) {
 
         final Class<?> messageClass1 = message1.getClass();
         final Class<?> messageClass2 = message2.getClass();
@@ -157,39 +143,35 @@ class DispatchExactWithSuperTypes implements Dispatch {
         int subLength;
         boolean hasSubs = false;
 
-        try {
-            // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
-            if (subscriptions != null && (subLength = subscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = subscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1, message2, message3);
-                }
+        // Run subscriptions. if the subscriptions are NULL or length == 0, it means we don't have any that were ever subscribed.
+        if (subscriptions != null && (subLength = subscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = subscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1, message2, message3);
             }
+        }
 
-            if ((subLength = superSubscriptions.length) > 0) {
-                // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
-                // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
-                for (int i = 0; i < subLength; i++) {
-                    sub = superSubscriptions[i];
-                    hasSubs |= sub.publish(errorHandler, message1, message2, message3);
-                }
+        if ((subLength = superSubscriptions.length) > 0) {
+            // even though they are non-null, and have length > 0 --- it is still possible the subscription was REMOVED at some point.
+            // so there won't be any object/method this publishes to AND there won't be any "dead messages" triggered
+            for (int i = 0; i < subLength; i++) {
+                sub = superSubscriptions[i];
+                hasSubs |= sub.publish(publisher, errorHandler, message1, message2, message3);
             }
+        }
 
-            if (!hasSubs) {
-                // Dead Event must EXACTLY MATCH (no subclasses)
-                final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
-                if (deadSubscriptions != null) {
-                    final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
-                    for (int i = 0; i < deadSubscriptions.length; i++) {
-                        sub = deadSubscriptions[i];
-                        sub.publish(errorHandler, deadMessage);
-                    }
+        if (!hasSubs) {
+            // Dead Event must EXACTLY MATCH (no subclasses)
+            final Subscription[] deadSubscriptions = subManager.getSubs(DeadMessage.class); // can return null
+            if (deadSubscriptions != null) {
+                final DeadMessage deadMessage = new DeadMessage(message1, message2, message3);
+                for (int i = 0; i < deadSubscriptions.length; i++) {
+                    sub = deadSubscriptions[i];
+                    sub.publish(publisher, errorHandler, deadMessage);
                 }
             }
-        } catch (DispatchCancel ignored) {
-            // we wanted to cancel the dispatch for these specific messages
         }
     }
 }

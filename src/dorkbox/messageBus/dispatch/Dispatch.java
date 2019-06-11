@@ -16,12 +16,16 @@
 package dorkbox.messageBus.dispatch;
 
 
+import dorkbox.messageBus.error.ErrorHandler;
+import dorkbox.messageBus.publication.Publisher;
+import dorkbox.messageBus.subscription.SubscriptionManager;
+
 /**
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
 public interface Dispatch {
-    void publish(Object message1);
-    void publish(Object message1, Object message2);
-    void publish(Object message1, Object message2, Object message3);
+    void publish(Publisher publisher, ErrorHandler errorHandler, SubscriptionManager subscriptionManager, Object message1);
+    void publish(Publisher publisher, ErrorHandler errorHandler, SubscriptionManager subscriptionManager, Object message1, Object message2);
+    void publish(Publisher publisher, ErrorHandler errorHandler, SubscriptionManager subscriptionManager, Object message1, Object message2, Object message3);
 }
