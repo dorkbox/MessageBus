@@ -135,12 +135,6 @@ licensing {
         author("QOS.ch")
         url("http://www.slf4j.org")
     }
-
-    license("Vibur Object Pool", License.APACHE_2) {
-        copyright(2013)
-        author("Simeon Malchev")
-        url("https://github.com/vibur/vibur-object-pool")
-    }
 }
 
 sourceSets {
@@ -206,7 +200,6 @@ dependencies {
 
     implementation("com.lmax:disruptor:3.4.2")
     implementation("com.conversantmedia:disruptor:1.2.15")
-    implementation("org.vibur:vibur-object-pool:23.0")
 
     implementation("org.ow2.asm:asm:7.1")
     implementation("com.esotericsoftware:reflectasm:1.11.9")
