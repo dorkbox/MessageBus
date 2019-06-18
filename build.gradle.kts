@@ -47,7 +47,7 @@ object Extras {
     // set for the project
     const val description = "Lightweight, extremely fast, and zero-gc message/event bus for Java 6+"
     const val group = "com.dorkbox"
-    const val version = "2.0"
+    const val version = "2.1"
 
     // set as project.ext
     const val name = "MessageBus"
