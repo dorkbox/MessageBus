@@ -32,6 +32,8 @@ plugins {
     signing
     `maven-publish`
 
+    // publish on sonatype
+    id("de.marcphilipp.nexus-publish") version "0.2.0"
     // close and release on sonatype
     id("io.codearte.nexus-staging") version "0.21.0"
 
@@ -305,13 +307,33 @@ publishing {
 
         println("Maven URL: $url$projectName/$name/$version/")
     }
+
+
+    nexusStaging {
+        username = Extras.sonatypeUserName
+        password = Extras.sonatypePassword
+    }
+
+    nexusPublishing {
+        packageGroup.set(Extras.group)
+        repositoryName.set("maven")
+        username.set(Extras.sonatypeUserName)
+        password.set(Extras.sonatypePassword)
+    }
+
+    signing {
+        sign(publishing.publications["maven"])
+    }
+
+    task<Task>("publishAndRelease") {
+        group = "publish and release"
+
+        // required to make sure the tasks run in the correct order
+        tasks["closeAndReleaseRepository"].mustRunAfter(tasks["publishToNexus"])
+        dependsOn("publishToNexus", "closeAndReleaseRepository")
+    }
 }
 
-nexusStaging {
-    username = Extras.sonatypeUserName
-    password = Extras.sonatypePassword
-}
 
-signing {
-    sign(publishing.publications["maven"])
-}
+
+
