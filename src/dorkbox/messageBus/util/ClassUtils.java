@@ -63,7 +63,7 @@ class ClassUtils {
      * never reset (class hierarchy never changes during runtime)
      */
     public
-    Class<?>[] getSuperClasses(final Class<?> clazz) {
+    Class<?>[] getClassAndSuperClasses(final Class<?> clazz) {
         // access a snapshot of the subscriptions (single-writer-principle)
         final IdentityMap<Class<?>, Class<?>[]> cache = cast(superClassesREF.get(this));
 

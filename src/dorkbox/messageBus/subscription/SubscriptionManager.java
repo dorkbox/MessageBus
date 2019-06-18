@@ -40,7 +40,7 @@ import dorkbox.util.collections.IdentityMap;
  * @author dorkbox, llc
  *         Date: 2/2/15
  */
-@SuppressWarnings({"unchecked", "ToArrayCallWithZeroLengthArrayArgument"})
+@SuppressWarnings({"unchecked", "ToArrayCallWithZeroLengthArrayArgument", "ForLoopReplaceableByForEach", "Duplicates"})
 public final
 class SubscriptionManager {
     public static final float LOAD_FACTOR = 0.8F;
@@ -473,10 +473,11 @@ class SubscriptionManager {
         final IdentityMap<Class<?>, Subscription[]> localSuperSubs = subsSuperSingleREF.get(this);
 
         Subscription[] subscriptions = localSuperSubs.get(messageClass);
+
         // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
         // calculated and if they do not exist - this will be an empty array.
         if (subscriptions == null) {
-            final Class<?>[] superClasses = this.classUtils.getSuperClasses(messageClass);  // never returns null, cached response
+            final Class<?>[] superClasses = this.classUtils.getClassAndSuperClasses(messageClass);  // never returns null, cached response
 
             final int length = superClasses.length;
             final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
@@ -543,8 +544,8 @@ class SubscriptionManager {
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2) {
         // save the subscriptions
-        final Class<?>[] superClasses1 = this.classUtils.getSuperClasses(messageClass1);  // never returns null, cached response
-        final Class<?>[] superClasses2 = this.classUtils.getSuperClasses(messageClass2);  // never returns null, cached response
+        final Class<?>[] superClasses1 = this.classUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
+        final Class<?>[] superClasses2 = this.classUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
 
         final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2);
 
@@ -587,9 +588,9 @@ class SubscriptionManager {
                     MultiClass multiClass = classTree.get(superClass1,
                                                           superClass2);
 
+                    // check to see if we have a subscription for this
                     superSubs = localSubs.get(multiClass);
 
-                    //noinspection Duplicates
                     if (superSubs != null) {
                         for (int k = 0; k < superSubs.length; k++) {
                             sub = superSubs[k];
@@ -601,7 +602,8 @@ class SubscriptionManager {
                             handledMessage1 = handledMessages[0];
                             handledMessage2 = handledMessages[1];
 
-                            if (handledMessage1.equals(messageClass1) && handledMessage2.equals(messageClass2)) {
+                            if (handledMessage1.equals(messageClass1) &&
+                                handledMessage2.equals(messageClass2)) {
                                 // exact type
                                 subsAsList.add(sub);
                             }
@@ -631,14 +633,15 @@ class SubscriptionManager {
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
         // save the subscriptions
-        final Class<?>[] superClasses1 = this.classUtils.getSuperClasses(messageClass1);  // never returns null, cached response
-        final Class<?>[] superClasses2 = this.classUtils.getSuperClasses(messageClass2);  // never returns null, cached response
-        final Class<?>[] superClasses3 = this.classUtils.getSuperClasses(messageClass3);  // never returns null, cached response
+        final Class<?>[] superClasses1 = this.classUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
+        final Class<?>[] superClasses2 = this.classUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
+        final Class<?>[] superClasses3 = this.classUtils.getClassAndSuperClasses(messageClass3);  // never returns null, cached response
 
         final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2, messageClass3);
 
         IdentityMap<MultiClass, Subscription[]> localSuperSubs = subsSuperMultiREF.get(this);
         Subscription[] subscriptions = localSuperSubs.get(origMultiClass);
+
         // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
         // calculated and if they do not exist - this will be an empty array.
         if (subscriptions == null) {
@@ -661,7 +664,7 @@ class SubscriptionManager {
             final int length2 = superClasses2.length;
             final int length3 = superClasses3.length;
 
-            ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length1 + length2);
+            ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length1 + length2 + length3);
 
             for (int i = 0; i < length1; i++) {
                 superClass1 = superClasses1[i];
@@ -687,7 +690,6 @@ class SubscriptionManager {
 
                         superSubs = localSubs.get(multiClass);
 
-                        //noinspection Duplicates
                         if (superSubs != null) {
                             for (int m = 0; m < superSubs.length; m++) {
                                 sub = superSubs[m];
@@ -703,7 +705,6 @@ class SubscriptionManager {
                                 if (handledMessage1.equals(messageClass1) &&
                                     handledMessage2.equals(messageClass2) &&
                                     handledMessage3.equals(messageClass3)) {
-
                                     // exact type
                                     subsAsList.add(sub);
                                 }
