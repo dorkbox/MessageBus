@@ -55,6 +55,7 @@ class ClassUtils {
     }
 
     /**
+     * will return the class + parent classes as an array.
      * if parameter clazz is of type array, then the super classes are of array type as well
      * <p>
      * race conditions will result in DUPLICATE answers, which we don't care if happens
@@ -78,6 +79,10 @@ class ClassUtils {
             final boolean isArray = clazz.isArray();
 
             if (isArray) {
+                // have to add the original class to the front of the list
+                c = getArrayClass(clazz);
+                newList.add(c);
+
                 while (superTypesIterator.hasNext()) {
                     c = superTypesIterator.next();
                     c = getArrayClass(c);
@@ -88,6 +93,9 @@ class ClassUtils {
                 }
             }
             else {
+                // have to add the original class to the front of the list
+                newList.add(clazz);
+
                 while (superTypesIterator.hasNext()) {
                     c = superTypesIterator.next();
 
