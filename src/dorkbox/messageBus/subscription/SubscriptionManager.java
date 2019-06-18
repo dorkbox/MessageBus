@@ -492,9 +492,16 @@ class SubscriptionManager {
             boolean acceptsSubtypes;
             Class<?> handledMessage;
 
-            // walks through all of the subscriptions that might exist for super types, and if applicable, save them
+            // walks through all of the subscriptions that might exist for super types, and if applicable, save them.
             for (int i = 0; i < length; i++) {
                 superClass = superClasses[i];
+
+                // only go over subtypes (NON-EXACT class signature matches)
+                if (superClass == messageClass) {
+                    continue;
+                }
+
+                // check to see if we have a subscription for this
                 superSubs = localSubs.get(superClass);
 
                 if (superSubs != null) {
@@ -543,6 +550,7 @@ class SubscriptionManager {
 
         IdentityMap<MultiClass, Subscription[]> localSuperSubs = subsSuperMultiREF.get(this);
         Subscription[] subscriptions = localSuperSubs.get(origMultiClass);
+
         // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
         // calculated and if they do not exist - this will be an empty array.
         if (subscriptions == null) {
@@ -567,16 +575,11 @@ class SubscriptionManager {
             for (int i = 0; i < length1; i++) {
                 superClass1 = superClasses1[i];
 
-                // only go over subtypes
-                if (superClass1 == messageClass1) {
-                    continue;
-                }
-
                 for (int j = 0; j < length2; j++) {
                     superClass2 = superClasses2[j];
 
-                    // only go over subtypes
-                    if (superClass2 == messageClass2) {
+                    // only go over subtypes (NON-EXACT class signature matches)
+                    if (superClass1 == messageClass1 && superClass2 == messageClass2) {
                         continue;
                     }
 
@@ -663,24 +666,17 @@ class SubscriptionManager {
             for (int i = 0; i < length1; i++) {
                 superClass1 = superClasses1[i];
 
-                // only go over subtypes
-                if (superClass1 == messageClass1) {
-                    continue;
-                }
-
                 for (int j = 0; j < length2; j++) {
                     superClass2 = superClasses2[j];
-
-                    // only go over subtypes
-                    if (superClass2 == messageClass2) {
-                        continue;
-                    }
 
                     for (int k = 0; k < length3; k++) {
                         superClass3 = superClasses3[j];
 
-                        // only go over subtypes
-                        if (superClass3 == messageClass3) {
+
+                        // only go over subtypes (NON-EXACT class signature matches)
+                        if (superClass1 == messageClass1 &&
+                            superClass2 == messageClass2 &&
+                            superClass3 == messageClass3) {
                             continue;
                         }
 
@@ -707,6 +703,7 @@ class SubscriptionManager {
                                 if (handledMessage1.equals(messageClass1) &&
                                     handledMessage2.equals(messageClass2) &&
                                     handledMessage3.equals(messageClass3)) {
+
                                     // exact type
                                     subsAsList.add(sub);
                                 }
