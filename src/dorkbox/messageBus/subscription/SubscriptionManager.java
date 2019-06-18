@@ -670,7 +670,7 @@ class SubscriptionManager {
                     superClass2 = superClasses2[j];
 
                     for (int k = 0; k < length3; k++) {
-                        superClass3 = superClasses3[j];
+                        superClass3 = superClasses3[k];
 
 
                         // only go over subtypes (NON-EXACT class signature matches)
