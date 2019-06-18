@@ -141,7 +141,7 @@ Maven Info
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>2.0</version>
+        <version>2.1</version>
     </dependency>
 </dependencies>
 ```
@@ -151,7 +151,7 @@ Gradle Info
 ````
 dependencies {
     ...
-    compile 'com.dorkbox:MessageBus:2.0'
+    compile 'com.dorkbox:MessageBus:2.1'
 }
 ````
 
