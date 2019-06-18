@@ -74,13 +74,13 @@ public class MultiMessageTest extends MessageBusTest {
         bus.subscribe(listener1);
 
         bus.publish("s"); // 2
-        bus.publish("s", "s"); // 1
-        bus.publish("s", "s", "s"); // 1
+        bus.publish("s", "s"); // 2
+        bus.publish("s", "s", "s"); // 4
         bus.publish(1, "s"); // 0
         bus.publish(1, 2, "s"); // 1
         bus.publish(new Integer[] {1, 2, 3, 4, 5, 6}); // 2
 
-        assertEquals(7, count.get());
+        assertEquals(11, count.get());
         count.set(0);
     }
 
@@ -89,6 +89,12 @@ public class MultiMessageTest extends MessageBusTest {
         public void handleSync(Object o) {
             count.getAndIncrement();
             System.err.println("match Object");
+        }
+
+        @Subscribe
+        public void handleSync(String o1, Object o2) {
+            count.getAndIncrement();
+            System.err.println("match String, Object");
         }
 
         @Subscribe
@@ -107,6 +113,24 @@ public class MultiMessageTest extends MessageBusTest {
         public void handleSync(String o1, String o2, String o3) {
             count.getAndIncrement();
             System.err.println("match String, String, String");
+        }
+
+        @Subscribe
+        public void handleSync(Object o1, String o2, String o3) {
+            count.getAndIncrement();
+            System.err.println("match Object, String, String");
+        }
+
+        @Subscribe
+        public void handleSync(String o1, Object o2, String o3) {
+            count.getAndIncrement();
+            System.err.println("match String, Object, String");
+        }
+
+        @Subscribe
+        public void handleSync(String o1, Object o2, Object o3) {
+            count.getAndIncrement();
+            System.err.println("match String, Object, Object");
         }
 
         @Subscribe
