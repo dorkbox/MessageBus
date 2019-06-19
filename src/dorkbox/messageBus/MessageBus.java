@@ -102,6 +102,17 @@ class MessageBus {
         return "2.1";
     }
 
+    /**
+     * Always return at least 1 thread
+     */
+    private static
+    int getMinNumberOfThreads(final int numberOfThreads) {
+        if (numberOfThreads < 1) {
+            return 1;
+        }
+        return numberOfThreads;
+    }
+
     private final Dispatch dispatch;
     private final ErrorHandler errorHandler = new ErrorHandler();
     private final DispatchMode dispatchMode;
@@ -182,7 +193,10 @@ class MessageBus {
         this.dispatchMode = dispatchMode;
         this.subscriptionMode = subscriptionMode;
         this.publicationMode = publicationMode;
-        this.numberOfThreads = numberOfThreads;
+
+        // make sure there are ALWAYS at least 1 thread, even if (by accident) 0 threads were specified because of rounding errors.
+        int minNumberOfThreads = getMinNumberOfThreads(numberOfThreads);
+        this.numberOfThreads = minNumberOfThreads;
 
         // Will subscribe and publish using all provided parameters in the method signature (for subscribe), and arguments (for publish)
         this.subscriptionManager = new SubscriptionManager(subscriptionMode);
@@ -195,10 +209,12 @@ class MessageBus {
 
         syncPublisher = new DirectInvocation();
 
+
+
         if (publicationMode == AsyncPublicationMode.LmaxDisruptor) {
-            asyncPublisher = new LmaxDisruptor(numberOfThreads, errorHandler);
+            asyncPublisher = new LmaxDisruptor(minNumberOfThreads, errorHandler);
         } else {
-            asyncPublisher = new ConversantDisruptor(numberOfThreads);
+            asyncPublisher = new ConversantDisruptor(minNumberOfThreads);
         }
     }
 

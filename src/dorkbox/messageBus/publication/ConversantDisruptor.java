@@ -34,28 +34,14 @@ class ConversantDisruptor implements Publisher {
     private final Publisher syncPublisher;
     private final ThreadPoolExecutor threadExecutor;
 
-    /**
-     * Always return at least 2 threads
-     */
-    public static
-    int getMinNumberOfThreads(final int numberOfThreads) {
-        if (numberOfThreads < 2) {
-            return 2;
-        }
-        return numberOfThreads;
-    }
-
     public
     ConversantDisruptor(final int numberOfThreads) {
         this.syncPublisher = new DirectInvocation();
 
-        int minNumberOfThreads = getMinNumberOfThreads(numberOfThreads) - 1;
-
         // ALWAYS round to the nearest power of 2
-        int minQueueCapacity = 1 << (32 - Integer.numberOfLeadingZeros(minNumberOfThreads));
+        int minQueueCapacity = 1 << (32 - Integer.numberOfLeadingZeros(numberOfThreads));
 
-
-        threadExecutor = new ThreadPoolExecutor(minNumberOfThreads, minNumberOfThreads,
+        threadExecutor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
                                                 0L, TimeUnit.MILLISECONDS,
                                                 new DisruptorBlockingQueue<Runnable>(minQueueCapacity, SpinPolicy.WAITING),
                                                 new NamedThreadFactory("MessageBus", Thread.NORM_PRIORITY, true));

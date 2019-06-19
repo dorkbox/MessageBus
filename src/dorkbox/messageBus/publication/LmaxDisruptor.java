@@ -62,12 +62,22 @@ class LmaxDisruptor implements Publisher {
 
     public
     LmaxDisruptor(final int numberOfThreads, final ErrorHandler errorHandler) {
-        int minNumberOfThreads = ConversantDisruptor.getMinNumberOfThreads(numberOfThreads) - 1;
+        // ALWAYS round to the nearest power of 2
+        int minQueueCapacity = 1 << (32 - Integer.numberOfLeadingZeros(numberOfThreads));
 
-        threadExecutor = new ThreadPoolExecutor(minNumberOfThreads, minNumberOfThreads,
+//        final int minQueueCapacity = ringBufferSize * 64;
+//        final int minQueueCapacity = 1024 * 64;
+//        final int minQueueCapacity = 1024;
+        //final int minQueueCapacity = 32; // this one was previous. The best is generally based on how many workers there are
+//        final int minQueueCapacity = 16;
+//        final int minQueueCapacity = 8;
+//        final int minQueueCapacity = 4;
+
+
+        threadExecutor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
                                                 0L, TimeUnit.MILLISECONDS,
                                                 // this doesn't matter, since the LMAX disruptor is managing the produce/consume cycle
-                                                new DisruptorBlockingQueue<Runnable>(minNumberOfThreads, SpinPolicy.WAITING),
+                                                new DisruptorBlockingQueue<Runnable>(minQueueCapacity, SpinPolicy.WAITING),
                                                 new NamedThreadFactory("MessageBus", Thread.NORM_PRIORITY, true));
 
 
@@ -83,19 +93,6 @@ class LmaxDisruptor implements Publisher {
             handlers[i] = new MessageHandler(syncPublisher);  // exactly one per thread is used
         }
 
-
-        // ALWAYS round to the nearest power of 2
-        int BUFFER_SIZE = 1 << (32 - Integer.numberOfLeadingZeros(minNumberOfThreads));
-
-//        final int BUFFER_SIZE = ringBufferSize * 64;
-//        final int BUFFER_SIZE = 1024 * 64;
-//        final int BUFFER_SIZE = 1024;
-        //final int BUFFER_SIZE = 32; // this one was previous. The best is generally based on how many workers there are
-//        final int BUFFER_SIZE = 16;
-//        final int BUFFER_SIZE = 8;
-//        final int BUFFER_SIZE = 4;
-
-
         WaitStrategy consumerWaitStrategy;
 //        consumerWaitStrategy = new LiteBlockingWaitStrategy(); // good blocking one
 //        consumerWaitStrategy = new BlockingWaitStrategy();
@@ -107,7 +104,7 @@ class LmaxDisruptor implements Publisher {
         consumerWaitStrategy = new PhasedBackoffWaitStrategy(10, 50, TimeUnit.MILLISECONDS, new LiteBlockingWaitStrategy()); // good combo
 
 
-        ringBuffer = RingBuffer.createMultiProducer(factory, BUFFER_SIZE, consumerWaitStrategy);
+        ringBuffer = RingBuffer.createMultiProducer(factory, minQueueCapacity, consumerWaitStrategy);
         SequenceBarrier sequenceBarrier = ringBuffer.newBarrier();
 
 
