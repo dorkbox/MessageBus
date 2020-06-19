@@ -25,8 +25,9 @@ import dorkbox.messageBus.common.MessageHandler;
 import dorkbox.messageBus.common.MultiClass;
 import dorkbox.messageBus.subscription.asm.AsmFactory;
 import dorkbox.messageBus.subscription.reflection.ReflectionFactory;
-import dorkbox.messageBus.util.ClassUtils;
+import dorkbox.util.classes.ClassHierarchy;
 import dorkbox.util.collections.IdentityMap;
+
 
 /**
  * Permits subscriptions with a varying length of parameters as the signature, which must be match by the publisher for it to be accepted
@@ -78,7 +79,7 @@ class SubscriptionManager {
 
 
     private final ClassTree<Class<?>> classTree;
-    private final ClassUtils classUtils;
+    private final ClassHierarchy classHierarchyUtils;
 
 
     // Recommended for best performance while adhering to the "single writer principle". Must be static-final
@@ -137,7 +138,7 @@ class SubscriptionManager {
             this.subscriptionFactory = new ReflectionFactory(useStrongReferences);
         }
 
-        classUtils = new ClassUtils();
+        classHierarchyUtils = new ClassHierarchy(LOAD_FACTOR);
         classTree = new ClassTree<Class<?>>();
 
 
@@ -189,7 +190,7 @@ class SubscriptionManager {
         this.subsSuperMulti.clear();
 
         this.classTree.clear();
-        this.classUtils.shutdown();
+        this.classHierarchyUtils.shutdown();
     }
 
     /**
@@ -477,7 +478,7 @@ class SubscriptionManager {
         // the only time this is null, is when subscriptions DO NOT exist, and they haven't been calculated. Otherwise, if they are
         // calculated and if they do not exist - this will be an empty array.
         if (subscriptions == null) {
-            final Class<?>[] superClasses = this.classUtils.getClassAndSuperClasses(messageClass);  // never returns null, cached response
+            final Class<?>[] superClasses = this.classHierarchyUtils.getClassAndSuperClasses(messageClass);  // never returns null, cached response
 
             final int length = superClasses.length;
             final ArrayList<Subscription> subsAsList = new ArrayList<Subscription>(length);
@@ -544,8 +545,8 @@ class SubscriptionManager {
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2) {
         // save the subscriptions
-        final Class<?>[] superClasses1 = this.classUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
-        final Class<?>[] superClasses2 = this.classUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
+        final Class<?>[] superClasses1 = this.classHierarchyUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
+        final Class<?>[] superClasses2 = this.classHierarchyUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
 
         final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2);
 
@@ -633,9 +634,9 @@ class SubscriptionManager {
     public
     Subscription[] getSuperSubs(final Class<?> messageClass1, final Class<?> messageClass2, final Class<?> messageClass3) {
         // save the subscriptions
-        final Class<?>[] superClasses1 = this.classUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
-        final Class<?>[] superClasses2 = this.classUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
-        final Class<?>[] superClasses3 = this.classUtils.getClassAndSuperClasses(messageClass3);  // never returns null, cached response
+        final Class<?>[] superClasses1 = this.classHierarchyUtils.getClassAndSuperClasses(messageClass1);  // never returns null, cached response
+        final Class<?>[] superClasses2 = this.classHierarchyUtils.getClassAndSuperClasses(messageClass2);  // never returns null, cached response
+        final Class<?>[] superClasses3 = this.classHierarchyUtils.getClassAndSuperClasses(messageClass3);  // never returns null, cached response
 
         final MultiClass origMultiClass = classTree.get(messageClass1, messageClass2, messageClass3);
 

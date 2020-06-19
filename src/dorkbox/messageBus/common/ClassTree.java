@@ -18,7 +18,7 @@ package dorkbox.messageBus.common;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import dorkbox.messageBus.util.FastThreadLocal;
+import dorkbox.util.FastThreadLocal;
 import dorkbox.util.collections.IdentityMap;
 
 /**

@@ -40,11 +40,11 @@ package dorkbox.messageBus.common;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
-import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.annotations.Listener;
 import dorkbox.messageBus.annotations.References;
+import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.annotations.Synchronized;
-import dorkbox.messageBus.util.ReflectionUtils;
+import dorkbox.util.classes.ReflectionUtils;
 
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
@@ -74,7 +74,7 @@ class MessageHandler {
     MessageHandler[] get(final Class<?> messageClass) {
 
         // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)
-        final Method[] allMethods = ReflectionUtils.getMethods(messageClass);
+        final Method[] allMethods = ReflectionUtils.getMethods(messageClass, Subscribe.class);
         final int length = allMethods.length;
 
         final ArrayList<MessageHandler> finalMethods = new ArrayList<MessageHandler>(length);
