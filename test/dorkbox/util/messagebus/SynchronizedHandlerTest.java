@@ -57,13 +57,26 @@ public class SynchronizedHandlerTest extends MessageBusTest {
 
         int totalCount = numberOfListeners * numberOfMessages;
 
+        System.err.println("Testing: " + totalCount);
+
         // wait for last publication
         while (bus.hasPendingMessages()) {
             pause(100);
         }
 
+        // while (true) {
+        //     synchronized (SynchronizedWithSynchronousDelivery.class) {
+        //         if (totalCount != counter.get()) {
+        //             System.err.println("Waiting for tally: " + (totalCount - counter.get()));
+        //             pause(100L);
+        //         } else {
+        //             break;
+        //         }
+        //     }
+        // }
+
         if (totalCount != counter.get()) {
-            fail("Count '" + counter.get() + "' was incorrect!");
+            fail("Count '" + counter.get() + "' was incorrect! (Should be " + totalCount + ", difference of " + (totalCount - counter.get()) + ")");
         }
     }
 
