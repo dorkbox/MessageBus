@@ -141,21 +141,22 @@ Maven Info
     <dependency>
         <groupId>com.dorkbox</groupId>
         <artifactId>MessageBus</artifactId>
-        <version>2.1</version>
+        <version>2.3</version>
     </dependency>
 </dependencies>
 ```
 
 Gradle Info
 ---------
-````
+```
 dependencies {
     ...
-    compile 'com.dorkbox:MessageBus:2.1'
+    implementation("com.dorkbox:MessageBus:2.3")
 }
-````
+```
 
 License
 ---------
-This project is © 2012 Benjamin Diedrichsen and © 2015 dorkbox llc, and is distributed under the terms of the Apache v2.0 License. See file "LICENSE" for further references.
+This project is © 2012 Benjamin Diedrichsen and © 2021 dorkbox llc, and is distributed under the terms of the Apache v2.0 License. See 
+file "LICENSE" for further references.
 
