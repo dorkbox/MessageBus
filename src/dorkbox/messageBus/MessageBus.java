@@ -113,6 +113,11 @@ class MessageBus {
         return numberOfThreads;
     }
 
+    static {
+        // Add this project to the updates system, which verifies this class + UUID + version information
+        dorkbox.updates.Updates.INSTANCE.add(MessageBus.class, "3e5ed233229c41359cabeb56e32b16d8", getVersion());
+    }
+
     private final Dispatch dispatch;
     private final ErrorHandler errorHandler = new ErrorHandler();
     private final DispatchMode dispatchMode;
