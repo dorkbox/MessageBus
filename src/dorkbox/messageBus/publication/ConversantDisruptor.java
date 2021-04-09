@@ -33,6 +33,7 @@ class ConversantDisruptor implements Publisher {
 
     private final Publisher syncPublisher;
     private final ThreadPoolExecutor threadExecutor;
+    private final DisruptorBlockingQueue<Runnable> workQueue;
 
     public
     ConversantDisruptor(final int numberOfThreads) {
@@ -41,9 +42,9 @@ class ConversantDisruptor implements Publisher {
         // ALWAYS round to the nearest power of 2
         int minQueueCapacity = 1 << (32 - Integer.numberOfLeadingZeros(numberOfThreads));
 
+        workQueue = new DisruptorBlockingQueue<>(minQueueCapacity, SpinPolicy.WAITING);
         threadExecutor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
-                                                0L, TimeUnit.MILLISECONDS,
-                                                new DisruptorBlockingQueue<Runnable>(minQueueCapacity, SpinPolicy.WAITING),
+                                                0L, TimeUnit.MILLISECONDS, workQueue,
                                                 new NamedThreadFactory("MessageBus", Thread.NORM_PRIORITY, true));
     }
 
@@ -51,6 +52,7 @@ class ConversantDisruptor implements Publisher {
     ConversantDisruptor(final ConversantDisruptor publisher) {
         this.syncPublisher = publisher.syncPublisher;
         this.threadExecutor = publisher.threadExecutor;
+        this.workQueue = publisher.workQueue;
     }
 
 
@@ -151,9 +153,10 @@ class ConversantDisruptor implements Publisher {
     @Override
     public
     boolean hasPendingMessages() {
-        return threadExecutor.getActiveCount() > 0;
+        return threadExecutor.getActiveCount() > 0 || workQueue.isEmpty();
     }
 
+    @Override
     public
     void shutdown() {
         // This uses Thread.interrupt()
