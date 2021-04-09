@@ -31,6 +31,7 @@ import com.lmax.disruptor.SequenceBarrier;
 import com.lmax.disruptor.Sequencer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.WorkProcessor;
+import com.lmax.disruptor.util.Util;
 
 import dorkbox.messageBus.error.ErrorHandler;
 import dorkbox.messageBus.publication.disruptor.EventBusFactory;
@@ -303,20 +304,14 @@ class LmaxDisruptor implements Publisher {
         ringBuffer.publish(seq);
     }
 
+    @Override
     public
     boolean hasPendingMessages() {
-        // from workerPool.drainAndHalt()
-        Sequence[] workerSequences = getSequences();
-        final long cursor = ringBuffer.getCursor();
-        for (Sequence s : workerSequences) {
-            if (cursor > s.get()) {
-                return true;
-            }
-        }
-
-        return false;
+        // modified from workerPool.drainAndHalt()
+        return ringBuffer.getCursor() > Util.getMinimumSequence(getSequences());
     }
 
+    @Override
     public
     void shutdown() {
         // let some messages finish publishing
