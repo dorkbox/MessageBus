@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
+import dorkbox.collections.IdentityMap;
 import dorkbox.messageBus.SubscriptionMode;
 import dorkbox.messageBus.common.ClassTree;
 import dorkbox.messageBus.common.MessageHandler;
@@ -26,7 +27,6 @@ import dorkbox.messageBus.common.MultiClass;
 import dorkbox.messageBus.subscription.asm.AsmFactory;
 import dorkbox.messageBus.subscription.reflection.ReflectionFactory;
 import dorkbox.util.classes.ClassHierarchy;
-import dorkbox.util.collections.IdentityMap;
 
 
 /**

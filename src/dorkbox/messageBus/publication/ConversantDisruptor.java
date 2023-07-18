@@ -45,7 +45,7 @@ class ConversantDisruptor implements Publisher {
         workQueue = new DisruptorBlockingQueue<>(minQueueCapacity, SpinPolicy.WAITING);
         threadExecutor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
                                                 0L, TimeUnit.MILLISECONDS, workQueue,
-                                                new NamedThreadFactory("MessageBus", Thread.NORM_PRIORITY, true));
+                                                new NamedThreadFactory("MessageBus",  true));
     }
 
     public

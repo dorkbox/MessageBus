@@ -18,8 +18,8 @@ package dorkbox.messageBus.common;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import dorkbox.collections.IdentityMap;
 import dorkbox.util.FastThreadLocal;
-import dorkbox.util.collections.IdentityMap;
 
 /**
  * Simple tree structure that is a map that contains a chain of keys to publish to a value.
@@ -47,7 +47,13 @@ public class ClassTree<KEY> {
     };
 
     private static
-    final FastThreadLocal<MultiClass> valueCache = new FastThreadLocal<MultiClass>();
+    final FastThreadLocal<MultiClass> valueCache = new FastThreadLocal<MultiClass>() {
+        @Override
+        public
+        MultiClass initialValue() {
+            return null;
+        }
+    };
 
     private AtomicReference<Object> children = new AtomicReference<Object>();
     private AtomicReference<MultiClass> value = new AtomicReference<MultiClass>();

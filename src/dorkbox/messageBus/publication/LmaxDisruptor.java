@@ -78,7 +78,7 @@ class LmaxDisruptor implements Publisher {
         threadExecutor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads,
                                                 0L, TimeUnit.MILLISECONDS,
                                                 new DisruptorBlockingQueue<Runnable>(minQueueCapacity, SpinPolicy.WAITING),
-                                                new NamedThreadFactory("MessageBus", Thread.NORM_PRIORITY, true));
+                                                new NamedThreadFactory("MessageBus", true));
 
 
         // Now we setup the disruptor and work handlers

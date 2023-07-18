@@ -26,12 +26,12 @@ gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show th
 gradle.startParameter.warningMode = WarningMode.All
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "1.17"
-    id("com.dorkbox.Licensing") version "2.5.5"
-    id("com.dorkbox.VersionUpdate") version "2.3"
-    id("com.dorkbox.GradlePublish") version "1.10"
+    id("com.dorkbox.GradleUtils") version "3.17"
+    id("com.dorkbox.Licensing") version "2.24"
+    id("com.dorkbox.VersionUpdate") version "2.8"
+    id("com.dorkbox.GradlePublish") version "1.18"
 
-    kotlin("jvm") version "1.4.32"
+    kotlin("jvm") version "1.8.0"
 }
 object Extras {
     // set for the project
@@ -45,7 +45,6 @@ object Extras {
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
     const val url = "https://git.dorkbox.com/dorkbox/MessageBus"
-    val buildDate = Instant.now().toString()
 
     val JAVA_VERSION = JavaVersion.VERSION_1_8.toString()
 }
@@ -54,8 +53,7 @@ object Extras {
 /////  assign 'Extras'
 ///////////////////////////////
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
-GradleUtils.fixIntellijPaths()
-GradleUtils.defaultResolutionStrategy()
+GradleUtils.defaults()
 GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
 
 licensing {
@@ -65,29 +63,9 @@ licensing {
         note(Extras.description)
 
         extra("MBassador", License.MIT) {
-            it.copyright(2012)
-            it.author("Benjamin Diedrichsen")
-            it.url("https://github.com/bennidi/mbassador")
-        }
-    }
-}
-
-sourceSets {
-    main {
-        java {
-            setSrcDirs(listOf("src"))
-
-            // want to include java files for the source. 'setSrcDirs' resets includes...
-            include("**/*.java")
-        }
-    }
-
-    test {
-        java {
-            setSrcDirs(listOf("test"))
-
-            // want to include java files for the source. 'setSrcDirs' resets includes...
-            include("**/*.java")
+            copyright(2012)
+            author("Benjamin Diedrichsen")
+            url("https://github.com/bennidi/mbassador")
         }
     }
 }
@@ -102,33 +80,28 @@ tasks.jar.get().apply {
         attributes["Specification-Vendor"] = Extras.vendor
 
         attributes["Implementation-Title"] = "${Extras.group}.${Extras.id}"
-        attributes["Implementation-Version"] = Extras.buildDate
+        attributes["Implementation-Version"] = GradleUtils.now()
         attributes["Implementation-Vendor"] = Extras.vendor
 
         attributes["Automatic-Module-Name"] = Extras.id
     }
 }
 
-repositories {
-    mavenLocal() // this must be first!
-    jcenter()
-}
-
 dependencies {
-    implementation("com.dorkbox:Updates:1.0")
-    implementation("com.dorkbox:Utilities:1.9")
+    implementation("com.dorkbox:Updates:1.1")
+    implementation("com.dorkbox:Utilities:1.43")
 
-    implementation("com.lmax:disruptor:3.4.2")
-    implementation("com.conversantmedia:disruptor:1.2.19")
+    implementation("com.lmax:disruptor:3.4.4")
+    implementation("com.conversantmedia:disruptor:1.2.21")
 
-    implementation("org.ow2.asm:asm:9.1")
+    implementation("org.ow2.asm:asm:9.5")
     implementation("com.esotericsoftware:reflectasm:1.11.9")
 
-    implementation("org.slf4j:slf4j-api:1.7.30")
+    api("org.slf4j:slf4j-api:2.0.7")
 
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("ch.qos.logback:logback-classic:1.2.3")
+    testImplementation("ch.qos.logback:logback-classic:1.4.5")
 }
 
 publishToSonatype {
