@@ -88,8 +88,10 @@ tasks.jar.get().apply {
 }
 
 dependencies {
+    implementation("com.dorkbox:ClassUtils:1.0")
+    implementation("com.dorkbox:Collections:2.2")
     implementation("com.dorkbox:Updates:1.1")
-    implementation("com.dorkbox:Utilities:1.43")
+    implementation("com.dorkbox:Utilities:1.44")
 
     implementation("com.lmax:disruptor:3.4.4")
     implementation("com.conversantmedia:disruptor:1.2.21")
