@@ -24,6 +24,7 @@ package dorkbox.util.messagebus;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import dorkbox.messageBus.MessageBus;
@@ -44,7 +45,9 @@ public class SynchronizedHandlerTest extends MessageBusTest {
     private static int numberOfListeners = 1000;
 
     @Test
-    public void testSynchronizedWithSynchronousInvocation(){
+    public void testSynchronizedWithSynchronousInvocation() {
+        counter.set(0);
+
         MessageBus bus = createBus();
         for(int i = 0; i < numberOfListeners; i++){
             SynchronizedWithSynchronousDelivery handler = new SynchronizedWithSynchronousDelivery();
@@ -52,7 +55,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
         }
 
         for (int i = 0; i < numberOfMessages; i++) {
-            bus.publishAsync(new Object());
+            bus.publish(new Object());
         }
 
         int totalCount = numberOfListeners * numberOfMessages;
@@ -64,20 +67,7 @@ public class SynchronizedHandlerTest extends MessageBusTest {
             pause(100);
         }
 
-        // while (true) {
-        //     synchronized (SynchronizedWithSynchronousDelivery.class) {
-        //         if (totalCount != counter.get()) {
-        //             System.err.println("Waiting for tally: " + (totalCount - counter.get()));
-        //             pause(100L);
-        //         } else {
-        //             break;
-        //         }
-        //     }
-        // }
-
-        if (totalCount != counter.get()) {
-            fail("Count '" + counter.get() + "' was incorrect! (Should be " + totalCount + ", difference of " + (totalCount - counter.get()) + ")");
-        }
+        Assert.assertEquals(totalCount, counter.get());
     }
 
     public static class SynchronizedWithSynchronousDelivery {
@@ -85,7 +75,6 @@ public class SynchronizedHandlerTest extends MessageBusTest {
         @Synchronized
         public void handleMessage(Object o){
             counter.getAndIncrement();
-//            System.err.println(counter.publish());
         }
     }
 }
