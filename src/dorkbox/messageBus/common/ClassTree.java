@@ -46,18 +46,20 @@ public class ClassTree<KEY> {
         }
     };
 
+    private static AtomicInteger valueId = new AtomicInteger(Integer.MIN_VALUE);
+
     private static
     final FastThreadLocal<MultiClass> valueCache = new FastThreadLocal<MultiClass>() {
         @Override
         public
         MultiClass initialValue() {
-            return null;
+            return new MultiClass(valueId.getAndIncrement());
         }
     };
 
     private AtomicReference<Object> children = new AtomicReference<Object>();
     private AtomicReference<MultiClass> value = new AtomicReference<MultiClass>();
-    private AtomicInteger valueId = new AtomicInteger(Integer.MIN_VALUE);
+
 
 
     @SuppressWarnings("unchecked")
@@ -182,9 +184,6 @@ public class ClassTree<KEY> {
         MultiClass value = leaf.value.get();
         if (value == null) {
             MultiClass multiClass = valueCache.get();
-            if (multiClass == null) {
-                multiClass = new MultiClass(valueId.getAndIncrement());
-            }
 
             final boolean success = leaf.value.compareAndSet(null, multiClass);
             if (success) {
