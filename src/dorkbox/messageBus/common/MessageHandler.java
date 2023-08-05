@@ -40,11 +40,11 @@ package dorkbox.messageBus.common;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+import dorkbox.classUtil.ReflectionUtils;
 import dorkbox.messageBus.annotations.Listener;
 import dorkbox.messageBus.annotations.References;
 import dorkbox.messageBus.annotations.Subscribe;
 import dorkbox.messageBus.annotations.Synchronized;
-import dorkbox.util.classes.ReflectionUtils;
 
 /**
  * Any method in any class annotated with the @Handler annotation represents a message handler. The class that contains
@@ -74,7 +74,7 @@ class MessageHandler {
     MessageHandler[] get(final Class<?> messageClass) {
 
         // publish all handlers (this will include all (inherited) methods directly annotated using @Handler)
-        final Method[] allMethods = ReflectionUtils.getMethods(messageClass, Subscribe.class);
+        final Method[] allMethods = ReflectionUtils.INSTANCE.getMethods(messageClass, Subscribe.class);
         final int length = allMethods.length;
 
         final ArrayList<MessageHandler> finalMethods = new ArrayList<MessageHandler>(length);
@@ -84,17 +84,17 @@ class MessageHandler {
             method = allMethods[i];
 
             // retain only those that are at the bottom of their respective class hierarchy (deepest overriding method)
-            if (!ReflectionUtils.containsOverridingMethod(allMethods, method)) {
+            if (!ReflectionUtils.INSTANCE.containsOverridingMethod(allMethods, method)) {
 
                 // for each handler there will be no overriding method that specifies @Handler annotation
                 // but an overriding method does inherit the listener configuration of the overwritten method
-                final Subscribe handler = ReflectionUtils.getAnnotation(method, Subscribe.class);
+                final Subscribe handler = ReflectionUtils.INSTANCE.getAnnotation(method, Subscribe.class);
                 if (handler == null || !handler.enabled()) {
                     // disabled or invalid listeners are ignored
                     continue;
                 }
 
-                Method overriddenHandler = ReflectionUtils.getOverridingMethod(method, messageClass);
+                Method overriddenHandler = ReflectionUtils.INSTANCE.getOverridingMethod(method, messageClass);
                 if (overriddenHandler == null) {
                     overriddenHandler = method;
                 }
@@ -129,9 +129,9 @@ class MessageHandler {
         this.method = method;
         this.acceptsSubtypes = config.acceptSubtypes();
         this.handledMessages = method.getParameterTypes();
-        this.isSynchronized = ReflectionUtils.getAnnotation(method, Synchronized.class) != null;
+        this.isSynchronized = ReflectionUtils.INSTANCE.getAnnotation(method, Synchronized.class) != null;
 
-        Listener annotation = ReflectionUtils.getAnnotation(clazz, Listener.class);
+        Listener annotation = ReflectionUtils.INSTANCE.getAnnotation(clazz, Listener.class);
         if (annotation == null || annotation.references().equals(References.Undefined)) {
             this.referenceType = UNDEFINED;
         }

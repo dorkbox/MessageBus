@@ -50,8 +50,7 @@ class MessageBusTest extends AssertSupport {
         @Override
         public
         void handleError(PublicationError error) {
-            error.getCause()
-                 .printStackTrace();
+            error.getCause().printStackTrace();
             fail();
         }
 
@@ -65,9 +64,7 @@ class MessageBusTest extends AssertSupport {
     @Before
     public
     void setUp() {
-        for (MessageTypes mes : MessageTypes.values()) {
-            mes.reset();
-        }
+        MessageTypes.resetAll();
     }
 
 

@@ -152,7 +152,7 @@ class Subscription<T> {
      */
     public final
     int size() {
-        return this.entries.size;
+        return this.entries.size();
     }
 
     public abstract boolean publish(final Publisher publisher, final ErrorHandler errorHandler, final Object message);
