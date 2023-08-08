@@ -12,12 +12,6 @@
        Copyright 2012
          Benjamin Diedrichsen
 
-     - SLF4J - Simple facade or abstraction for various logging frameworks
-       [MIT License]
-       https://www.slf4j.org
-       Copyright 2023
-         QOS.ch
-
      - Conversant Disruptor - Disruptor is the highest performing intra-thread transfer mechanism available in Java.
        [The Apache Software License, Version 2.0]
        https://github.com/conversant/disruptor
@@ -30,7 +24,13 @@
        Copyright 2023
          INRIA, France Telecom
 
-     - 1_ClassUtils - Class helpers and utilities for managing class hierarchies.
+     - SLF4J - Simple facade or abstraction for various logging frameworks
+       [MIT License]
+       https://www.slf4j.org
+       Copyright 2023
+         QOS.ch
+
+     - ClassUtils - Class helpers and utilities for managing class hierarchies.
        [The Apache Software License, Version 2.0]
        https://git.dorkbox.com/dorkbox/ClassUtils
        Copyright 2023
