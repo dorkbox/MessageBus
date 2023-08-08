@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,7 @@ object Extras {
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 GradleUtils.defaults()
 GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
+GradleUtils.jpms(JavaVersion.VERSION_1_9)
 
 licensing {
     license(License.APACHE_2) {
@@ -88,16 +89,16 @@ tasks.jar.get().apply {
 }
 
 dependencies {
-    implementation("com.dorkbox:ClassUtils:1.1")
-    implementation("com.dorkbox:Collections:2.2")
-    implementation("com.dorkbox:Updates:1.1")
-    implementation("com.dorkbox:Utilities:1.44")
+    api("com.dorkbox:ClassUtils:1.2")
+    api("com.dorkbox:Collections:2.3")
+    api("com.dorkbox:Updates:1.1")
+    api("com.dorkbox:Utilities:1.44")
 
-    implementation("com.lmax:disruptor:3.4.4")
-    implementation("com.conversantmedia:disruptor:1.2.21")
+    api("com.lmax:disruptor:3.4.4")
+    api("com.conversantmedia:disruptor:1.2.21")
 
-    implementation("org.ow2.asm:asm:9.5")
-    implementation("com.esotericsoftware:reflectasm:1.11.9")
+    api("org.ow2.asm:asm:9.5")
+    api("com.esotericsoftware:reflectasm:1.11.9")
 
     api("org.slf4j:slf4j-api:2.0.7")
 
