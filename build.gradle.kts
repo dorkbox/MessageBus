@@ -92,7 +92,7 @@ dependencies {
     api("com.dorkbox:ClassUtils:1.3")
     api("com.dorkbox:Collections:2.4")
     api("com.dorkbox:Updates:1.1")
-    api("com.dorkbox:Utilities:1.45")
+    api("com.dorkbox:Utilities:1.46")
 
     api("com.lmax:disruptor:3.4.4")
     api("com.conversantmedia:disruptor:1.2.21")
