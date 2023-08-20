@@ -27,7 +27,7 @@ gradle.startParameter.warningMode = WarningMode.All
 
 plugins {
     id("com.dorkbox.GradleUtils") version "3.17"
-    id("com.dorkbox.Licensing") version "2.24"
+    id("com.dorkbox.Licensing") version "2.26"
     id("com.dorkbox.VersionUpdate") version "2.8"
     id("com.dorkbox.GradlePublish") version "1.18"
 
@@ -89,10 +89,10 @@ tasks.jar.get().apply {
 }
 
 dependencies {
-    api("com.dorkbox:ClassUtils:1.2")
-    api("com.dorkbox:Collections:2.3")
+    api("com.dorkbox:ClassUtils:1.3")
+    api("com.dorkbox:Collections:2.4")
     api("com.dorkbox:Updates:1.1")
-    api("com.dorkbox:Utilities:1.44")
+    api("com.dorkbox:Utilities:1.45")
 
     api("com.lmax:disruptor:3.4.4")
     api("com.conversantmedia:disruptor:1.2.21")
@@ -100,7 +100,7 @@ dependencies {
     api("org.ow2.asm:asm:9.5")
     api("com.esotericsoftware:reflectasm:1.11.9")
 
-    api("org.slf4j:slf4j-api:2.0.7")
+    implementation("org.slf4j:slf4j-api:2.0.7")
 
 
     testImplementation("junit:junit:4.13.2")
